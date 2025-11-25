@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Callyy.ai Dashboard</title>
+    <link rel="icon" type="image/svg+xml" href="/callyy-icon.svg" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+Devanagari:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+      /* Ahsing Font for Logo */
+      @font-face {
+        font-family: 'Ahsing';
+        src: url('/fonts/ahsing.otf') format('opentype');
+        font-weight: normal;
+        font-style: normal;
+        font-display: swap;
+      }
+
+      :root {
+        /* Light Mode Defaults */
+        --color-background: 249 250 251; /* #F9FAFB */
+        --color-surface: 255 255 255;    /* #FFFFFF */
+        --color-surface-hover: 243 244 246; /* #F3F4F6 */
+        --color-primary: 46 199 183;     /* #2EC7B7 */
+        --color-primary-hover: 38 175 161; /* #26AFA1 */
+        --color-border: 229 231 235;     /* #E5E7EB */
+        --color-text-main: 17 24 39;     /* #111827 */
+        --color-text-muted: 107 114 128; /* #6B7280 */
+      }
+      .dark {
+        /* Dark Mode Overrides */
+        --color-background: 18 20 23;    /* #121417 */
+        --color-surface: 27 30 35;       /* #1B1E23 */
+        --color-surface-hover: 37 41 48; /* #252930 */
+        --color-primary: 46 199 183;     /* #2EC7B7 */
+        --color-primary-hover: 38 175 161; /* #26AFA1 */
+        --color-border: 45 49 57;        /* #2D3139 */
+        --color-text-main: 235 235 235;  /* #EBEBEB */
+        --color-text-muted: 156 163 175; /* #9CA3AF */
+      }
+
+      /* Custom scrollbar for dashboard feel */
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: rgb(var(--color-background)); 
+      }
+      ::-webkit-scrollbar-thumb {
+        background: rgb(var(--color-border)); 
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: rgb(var(--color-text-muted)); 
+      }
+    </style>
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Inter', 'Noto Sans Devanagari', 'sans-serif'],
+            },
+            colors: {
+              background: 'rgb(var(--color-background) / <alpha-value>)',
+              surface: 'rgb(var(--color-surface) / <alpha-value>)',
+              surfaceHover: 'rgb(var(--color-surface-hover) / <alpha-value>)',
+              primary: 'rgb(var(--color-primary) / <alpha-value>)',
+              primaryHover: 'rgb(var(--color-primary-hover) / <alpha-value>)',
+              border: 'rgb(var(--color-border) / <alpha-value>)',
+              textMain: 'rgb(var(--color-text-main) / <alpha-value>)',
+              textMuted: 'rgb(var(--color-text-muted) / <alpha-value>)',
+            }
+          }
+        }
+      }
+    </script>
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.554.0",
+    "react-router-dom": "https://aistudiocdn.com/react-router-dom@^7.9.6",
+    "recharts": "https://aistudiocdn.com/recharts@^3.4.1",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body class="bg-background text-textMain antialiased selection:bg-primary selection:text-black">
+    <div id="root"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>

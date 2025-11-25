@@ -1,0 +1,7 @@
+{
+  "name": "Callyy.ai Dashboard",
+  "description": "A Callyy.ai Voice AI dashboard tailored for Indian users with multi-language support.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
