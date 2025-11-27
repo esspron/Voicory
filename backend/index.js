@@ -475,13 +475,20 @@ async function processWithAI(config, message, contact) {
 // Send WhatsApp reply message
 async function sendWhatsAppReply(config, toNumber, text) {
     try {
-        // Clean the access token (remove any newlines or extra whitespace)
-        const accessToken = config.access_token?.trim().replace(/[\r\n]/g, '');
+        // Clean the access token (remove any newlines, whitespace, and strip prefix if exists)
+        let accessToken = config.access_token?.trim().replace(/[\r\n]/g, '');
+        
+        // Strip common prefixes that might be accidentally stored
+        if (accessToken?.includes('=')) {
+            accessToken = accessToken.split('=').pop();
+        }
         
         if (!accessToken) {
             console.error('No access token found for config:', config.id);
             return;
         }
+
+        console.log('Sending WhatsApp reply to:', toNumber, 'Token length:', accessToken.length);
 
         const response = await axios.post(
             `https://graph.facebook.com/v21.0/${config.phone_number_id}/messages`,
