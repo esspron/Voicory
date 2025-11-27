@@ -311,6 +311,26 @@ async function handleIncomingMessages(config, value) {
     for (const message of messages) {
         const contact = contacts.find(c => c.wa_id === message.from) || {};
         
+        // Skip duplicate/old messages (older than 5 minutes)
+        const messageTimestamp = parseInt(message.timestamp) * 1000;
+        const fiveMinutesAgo = Date.now() - (5 * 60 * 1000);
+        if (messageTimestamp < fiveMinutesAgo) {
+            console.log('Skipping old message (older than 5 min):', message.id, new Date(messageTimestamp).toISOString());
+            continue;
+        }
+
+        // Check if message already exists (duplicate detection)
+        const { data: existingMsg } = await supabase
+            .from('whatsapp_messages')
+            .select('id')
+            .eq('wa_message_id', message.id)
+            .single();
+        
+        if (existingMsg) {
+            console.log('Skipping duplicate message:', message.id);
+            continue;
+        }
+
         // Upsert contact
         await supabase
             .from('whatsapp_contacts')
