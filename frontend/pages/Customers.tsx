@@ -835,51 +835,6 @@ const Customers: React.FC = () => {
                                         </div>
                                     </div>
 
-                                    {/* Memory Summary */}
-                                    {customerMemory && (
-                                        <div className="space-y-3">
-                                            <h3 className="text-sm font-semibold text-textMuted uppercase tracking-wider flex items-center gap-2">
-                                                <Brain size={14} />
-                                                AI Memory Summary
-                                            </h3>
-                                            <div className="bg-gradient-to-br from-primary/10 to-purple-500/10 border border-primary/20 rounded-xl p-4 space-y-4">
-                                                {customerMemory.executiveSummary && (
-                                                    <div>
-                                                        <p className="text-xs text-primary font-semibold mb-1">Executive Summary</p>
-                                                        <p className="text-sm text-textMain">{customerMemory.executiveSummary}</p>
-                                                    </div>
-                                                )}
-                                                {customerMemory.conversationContext && (
-                                                    <div>
-                                                        <p className="text-xs text-primary font-semibold mb-1">Conversation Context</p>
-                                                        <p className="text-sm text-textMain">{customerMemory.conversationContext}</p>
-                                                    </div>
-                                                )}
-                                                <div className="flex items-center gap-6 text-xs text-textMuted border-t border-border/50 pt-3 mt-3">
-                                                    <span className="flex items-center gap-1">
-                                                        <MessageSquare size={12} />
-                                                        {customerMemory.totalConversations || 0} conversations
-                                                    </span>
-                                                    {customerMemory.lastInteraction && (
-                                                        <span className="flex items-center gap-1">
-                                                            <Clock size={12} />
-                                                            Last: {new Date(customerMemory.lastInteraction).toLocaleDateString()}
-                                                        </span>
-                                                    )}
-                                                    {customerMemory.overallSentiment && (
-                                                        <span className={`flex items-center gap-1 ${
-                                                            customerMemory.overallSentiment === 'positive' ? 'text-green-400' :
-                                                            customerMemory.overallSentiment === 'negative' ? 'text-red-400' : 'text-yellow-400'
-                                                        }`}>
-                                                            <Heart size={12} />
-                                                            {customerMemory.overallSentiment}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
-
                                     {/* Key Insights */}
                                     {customerInsights.length > 0 && (
                                         <div className="space-y-3">
