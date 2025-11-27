@@ -308,13 +308,13 @@ const AssistantEditor: React.FC = () => {
     };
 
     const handleAutoDetectToggle = () => {
-        setFormData({
-            ...formData,
+        setFormData(prev => ({
+            ...prev,
             languageSettings: { 
-                ...formData.languageSettings, 
-                autoDetect: !formData.languageSettings.autoDetect 
+                ...prev.languageSettings, 
+                autoDetect: !prev.languageSettings.autoDetect 
             }
-        });
+        }));
     };
 
     const handleAddSupportedLanguage = (langCode: string) => {
@@ -348,16 +348,16 @@ const AssistantEditor: React.FC = () => {
     };
 
     const handleAdaptiveConfigToggle = (key: keyof typeof formData.styleSettings.adaptiveConfig) => {
-        setFormData({
-            ...formData,
+        setFormData(prev => ({
+            ...prev,
             styleSettings: {
-                ...formData.styleSettings,
+                ...prev.styleSettings,
                 adaptiveConfig: {
-                    ...formData.styleSettings.adaptiveConfig,
-                    [key]: !formData.styleSettings.adaptiveConfig[key]
+                    ...prev.styleSettings.adaptiveConfig,
+                    [key]: !prev.styleSettings.adaptiveConfig[key]
                 }
             }
-        });
+        }));
     };
 
     const handleDelete = async () => {
@@ -841,7 +841,8 @@ const AgentTab: React.FC<AgentTabProps> = ({
                     </span>
                     <div className="flex items-center gap-3">
                         <button 
-                            onClick={() => setFormData({...formData, useDefaultPersonality: !formData.useDefaultPersonality})}
+                            type="button"
+                            onClick={() => setFormData(prev => ({...prev, useDefaultPersonality: !prev.useDefaultPersonality}))}
                             className="flex items-center gap-2 cursor-pointer"
                         >
                             <div className={`w-9 h-5 rounded-full transition-colors ${formData.useDefaultPersonality ? 'bg-primary' : 'bg-gray-600'}`}>
@@ -850,6 +851,7 @@ const AgentTab: React.FC<AgentTabProps> = ({
                             <span className="text-xs text-textMain">Default personality</span>
                         </button>
                         <button 
+                            type="button"
                             onClick={onOpenTimezoneModal}
                             className="flex items-center gap-1.5 px-2 py-1 text-xs text-textMuted hover:text-textMain hover:bg-surfaceHover rounded transition-colors"
                         >
@@ -887,16 +889,20 @@ const AgentTab: React.FC<AgentTabProps> = ({
                     <span className="text-xs text-textMuted">
                         Type <code className="bg-surface px-1.5 py-0.5 rounded text-primary">{'{{'}</code> to add variables
                     </span>
-                    <label className="flex items-center gap-2 cursor-pointer">
+                    <button 
+                        type="button"
+                        onClick={() => setFormData(prev => ({...prev, interruptible: !prev.interruptible}))}
+                        className="flex items-center gap-2 cursor-pointer"
+                    >
                         <div className={`w-9 h-5 rounded-full transition-colors ${formData.interruptible ? 'bg-primary' : 'bg-gray-600'}`}>
                             <div className={`w-4 h-4 rounded-full bg-white mt-0.5 transition-transform ${formData.interruptible ? 'translate-x-4.5 ml-0.5' : 'translate-x-0.5'}`} />
                         </div>
                         <span className="text-xs text-textMain">Interruptible</span>
-                    </label>
+                    </button>
                 </div>
 
                 {/* ============================================
-                    DYNAMIC VARIABLES SECTION (ElevenLabs-style)
+                    DYNAMIC VARIABLES SECTION (Unified View)
                     ============================================ */}
                 <div className="mb-6">
                     <div className="flex items-center justify-between mb-2">
@@ -918,116 +924,127 @@ const AgentTab: React.FC<AgentTabProps> = ({
                         Use <code className="bg-surface px-1.5 py-0.5 rounded text-primary font-mono">{'{{variable_name}}'}</code> in prompts to personalize conversations.
                     </p>
 
-                    {/* System Variables Toggle */}
-                    <div className="flex items-center justify-between p-3 bg-surface/50 border border-border rounded-lg mb-3">
-                        <div className="flex items-center gap-2">
-                            <Code size={14} className="text-blue-400" />
-                            <div className="text-xs">
-                                <div className="text-textMain font-medium">System Variables</div>
-                                <div className="text-textMuted">Auto-filled: customer_name, customer_phone, current_time...</div>
+                    {/* Unified Variables List */}
+                    <div className="bg-surface border border-border rounded-xl overflow-hidden">
+                        {/* Header */}
+                        <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-surface/50">
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs font-medium text-textMain">All Variables</span>
+                                <span className="px-1.5 py-0.5 bg-primary/20 text-primary text-[10px] font-medium rounded">
+                                    {(formData.dynamicVariables.enableSystemVariables ? SYSTEM_VARIABLES.length : 0) + formData.dynamicVariables.variables.length}
+                                </span>
                             </div>
+                            <button
+                                onClick={() => setFormData(prev => ({
+                                    ...prev,
+                                    dynamicVariables: {
+                                        ...prev.dynamicVariables,
+                                        enableSystemVariables: !prev.dynamicVariables.enableSystemVariables
+                                    }
+                                }))}
+                                className="flex items-center gap-1.5 text-xs text-textMuted hover:text-textMain transition-colors"
+                            >
+                                <span>{formData.dynamicVariables.enableSystemVariables ? 'System vars ON' : 'System vars OFF'}</span>
+                                <div className={`w-7 h-4 rounded-full transition-colors ${formData.dynamicVariables.enableSystemVariables ? 'bg-primary' : 'bg-gray-600'}`}>
+                                    <div className={`w-3 h-3 rounded-full bg-white mt-0.5 transition-transform ${formData.dynamicVariables.enableSystemVariables ? 'translate-x-3.5' : 'translate-x-0.5'}`} />
+                                </div>
+                            </button>
                         </div>
-                        <button
-                            onClick={() => setFormData(prev => ({
-                                ...prev,
-                                dynamicVariables: {
-                                    ...prev.dynamicVariables,
-                                    enableSystemVariables: !prev.dynamicVariables.enableSystemVariables
-                                }
-                            }))}
-                            className={`w-9 h-5 rounded-full transition-colors ${formData.dynamicVariables.enableSystemVariables ? 'bg-primary' : 'bg-gray-600'}`}
-                        >
-                            <div className={`w-4 h-4 rounded-full bg-white mt-0.5 transition-transform ${formData.dynamicVariables.enableSystemVariables ? 'translate-x-4.5 ml-0.5' : 'translate-x-0.5'}`} />
-                        </button>
-                    </div>
 
-                    {/* System Variables List (when enabled) */}
-                    {formData.dynamicVariables.enableSystemVariables && (
-                        <div className="mb-4 p-3 bg-blue-500/5 border border-blue-500/20 rounded-lg">
-                            <div className="text-xs font-medium text-blue-300 mb-2">Available System Variables</div>
-                            <div className="flex flex-wrap gap-1.5">
-                                {SYSTEM_VARIABLES.map((variable) => (
+                        {/* Variables Grid */}
+                        <div className="p-3">
+                            <div className="grid grid-cols-1 gap-2">
+                                {/* System Variables */}
+                                {formData.dynamicVariables.enableSystemVariables && SYSTEM_VARIABLES.map((variable) => (
                                     <div 
                                         key={variable.name}
-                                        className="px-2 py-1 bg-blue-500/10 border border-blue-500/30 rounded text-xs font-mono text-blue-300 cursor-help"
-                                        title={variable.description}
+                                        className="flex items-center justify-between p-2.5 bg-blue-500/5 border border-blue-500/20 rounded-lg"
                                     >
-                                        {`{{${variable.name}}}`}
+                                        <div className="flex items-center gap-3">
+                                            <code className="px-2 py-1 bg-blue-500/10 rounded text-xs font-mono text-blue-300">
+                                                {`{{${variable.name}}}`}
+                                            </code>
+                                            <span className="text-xs text-textMuted">{variable.description}</span>
+                                        </div>
+                                        <span className="px-1.5 py-0.5 bg-blue-500/20 text-blue-300 text-[9px] font-medium rounded uppercase">System</span>
                                     </div>
                                 ))}
-                            </div>
-                        </div>
-                    )}
 
-                    {/* Custom Variables */}
-                    <div className="mb-3">
-                        <div className="text-xs font-medium text-textMuted mb-2">Custom Variables</div>
-                        
-                        {formData.dynamicVariables.variables.length === 0 ? (
-                            <div className="text-center py-4 bg-surface border border-dashed border-border rounded-lg">
-                                <Variable size={20} className="mx-auto text-textMuted mb-2" />
-                                <p className="text-xs text-textMuted">No custom variables defined</p>
-                                <p className="text-[10px] text-textMuted mt-1">Add variables for customer-specific data</p>
-                            </div>
-                        ) : (
-                            <div className="space-y-2">
+                                {/* Custom Variables */}
                                 {formData.dynamicVariables.variables.map((variable, index) => (
                                     <div 
-                                        key={index}
-                                        className="flex items-center gap-2 p-2.5 bg-surface border border-border rounded-lg group"
+                                        key={`custom-${index}`}
+                                        className="flex items-center justify-between p-2.5 bg-purple-500/5 border border-purple-500/20 rounded-lg group"
                                     >
-                                        <div className="flex-1">
-                                            <div className="flex items-center gap-2">
-                                                <code className="text-xs font-mono text-primary">{`{{${variable.name}}}`}</code>
-                                                <span className="px-1.5 py-0.5 bg-gray-600/50 text-gray-300 text-[9px] rounded uppercase">{variable.type}</span>
-                                                {variable.isSecret && (
-                                                    <span className="px-1.5 py-0.5 bg-red-500/20 text-red-400 text-[9px] rounded uppercase">Secret</span>
+                                        <div className="flex items-center gap-3">
+                                            <code className="px-2 py-1 bg-purple-500/10 rounded text-xs font-mono text-purple-300">
+                                                {`{{${variable.name}}}`}
+                                            </code>
+                                            <div className="flex flex-col">
+                                                <span className="text-xs text-textMuted">
+                                                    {variable.description || 'Custom variable'}
+                                                </span>
+                                                {variable.placeholder && (
+                                                    <span className="text-[10px] text-textMuted">
+                                                        Default: <span className="text-purple-300">{variable.placeholder}</span>
+                                                    </span>
                                                 )}
                                             </div>
-                                            {variable.description && (
-                                                <div className="text-[10px] text-textMuted mt-0.5">{variable.description}</div>
-                                            )}
-                                            {variable.placeholder && (
-                                                <div className="text-[10px] text-textMuted mt-0.5">
-                                                    Default: <span className="text-textMain">{variable.placeholder}</span>
-                                                </div>
-                                            )}
                                         </div>
-                                        <button
-                                            onClick={() => {
-                                                const newVars = [...formData.dynamicVariables.variables];
-                                                newVars.splice(index, 1);
-                                                setFormData(prev => ({
-                                                    ...prev,
-                                                    dynamicVariables: { ...prev.dynamicVariables, variables: newVars }
-                                                }));
-                                            }}
-                                            className="p-1 text-textMuted hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
-                                        >
-                                            <X size={14} />
-                                        </button>
+                                        <div className="flex items-center gap-2">
+                                            <span className="px-1.5 py-0.5 bg-purple-500/20 text-purple-300 text-[9px] font-medium rounded uppercase">
+                                                {variable.type}
+                                            </span>
+                                            {variable.isSecret && (
+                                                <span className="px-1.5 py-0.5 bg-red-500/20 text-red-400 text-[9px] font-medium rounded uppercase">Secret</span>
+                                            )}
+                                            <button
+                                                onClick={() => {
+                                                    const newVars = [...formData.dynamicVariables.variables];
+                                                    newVars.splice(index, 1);
+                                                    setFormData(prev => ({
+                                                        ...prev,
+                                                        dynamicVariables: { ...prev.dynamicVariables, variables: newVars }
+                                                    }));
+                                                }}
+                                                className="p-1 text-textMuted hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
+                                            >
+                                                <X size={14} />
+                                            </button>
+                                        </div>
                                     </div>
                                 ))}
-                            </div>
-                        )}
-                    </div>
 
-                    {/* Add Variable Button & Form */}
-                    <AddVariableForm 
-                        onAdd={(variable) => {
-                            setFormData(prev => ({
-                                ...prev,
-                                dynamicVariables: {
-                                    ...prev.dynamicVariables,
-                                    variables: [...prev.dynamicVariables.variables, variable]
-                                }
-                            }));
-                        }}
-                        existingNames={[
-                            ...formData.dynamicVariables.variables.map(v => v.name),
-                            ...SYSTEM_VARIABLES.map(v => v.name)
-                        ]}
-                    />
+                                {/* Empty State */}
+                                {!formData.dynamicVariables.enableSystemVariables && formData.dynamicVariables.variables.length === 0 && (
+                                    <div className="text-center py-6">
+                                        <Variable size={24} className="mx-auto text-textMuted mb-2" />
+                                        <p className="text-xs text-textMuted">No variables defined</p>
+                                        <p className="text-[10px] text-textMuted mt-1">Enable system variables or add custom ones</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Add Variable Footer */}
+                        <div className="border-t border-border">
+                            <AddVariableForm 
+                                onAdd={(variable) => {
+                                    setFormData(prev => ({
+                                        ...prev,
+                                        dynamicVariables: {
+                                            ...prev.dynamicVariables,
+                                            variables: [...prev.dynamicVariables.variables, variable]
+                                        }
+                                    }));
+                                }}
+                                existingNames={[
+                                    ...formData.dynamicVariables.variables.map(v => v.name),
+                                    ...SYSTEM_VARIABLES.map(v => v.name)
+                                ]}
+                            />
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -1099,19 +1116,21 @@ const AgentTab: React.FC<AgentTabProps> = ({
                     </button>
 
                     {/* Auto-detect Toggle */}
-                    <div className="flex items-center justify-between p-3 bg-surface/50 border border-border rounded-lg mb-2">
+                    <div 
+                        onClick={onAutoDetectToggle}
+                        className="flex items-center justify-between p-3 bg-surface/50 border border-border rounded-lg mb-2 cursor-pointer hover:bg-surfaceHover transition-colors"
+                    >
                         <div className="flex items-center gap-2">
                             <div className="text-xs">
                                 <div className="text-textMain font-medium">Auto-detect & remember</div>
                                 <div className="text-textMuted">Per customer preference</div>
                             </div>
                         </div>
-                        <button
-                            onClick={onAutoDetectToggle}
+                        <div
                             className={`w-9 h-5 rounded-full transition-colors ${formData.languageSettings.autoDetect ? 'bg-primary' : 'bg-gray-600'}`}
                         >
                             <div className={`w-4 h-4 rounded-full bg-white mt-0.5 transition-transform ${formData.languageSettings.autoDetect ? 'translate-x-4.5 ml-0.5' : 'translate-x-0.5'}`} />
-                        </button>
+                        </div>
                     </div>
 
                     {/* Supported Languages */}
@@ -1224,35 +1243,41 @@ const AgentTab: React.FC<AgentTabProps> = ({
                                 <span className="px-1.5 py-0.5 bg-purple-500/20 text-purple-300 text-[9px] font-bold rounded uppercase">AI-Powered</span>
                             </div>
                             
-                            <label className="flex items-center justify-between cursor-pointer">
+                            <div 
+                                onClick={() => onAdaptiveConfigToggle('mirrorFormality')}
+                                className="flex items-center justify-between cursor-pointer hover:bg-surfaceHover p-1 rounded transition-colors"
+                            >
                                 <span className="text-xs text-textMuted">Mirror formality level</span>
-                                <button
-                                    onClick={() => onAdaptiveConfigToggle('mirrorFormality')}
+                                <div
                                     className={`w-8 h-4.5 rounded-full transition-colors ${formData.styleSettings.adaptiveConfig.mirrorFormality ? 'bg-purple-500' : 'bg-gray-600'}`}
                                 >
                                     <div className={`w-3.5 h-3.5 rounded-full bg-white mt-0.5 transition-transform ${formData.styleSettings.adaptiveConfig.mirrorFormality ? 'translate-x-4' : 'translate-x-0.5'}`} />
-                                </button>
-                            </label>
+                                </div>
+                            </div>
                             
-                            <label className="flex items-center justify-between cursor-pointer">
+                            <div 
+                                onClick={() => onAdaptiveConfigToggle('mirrorLength')}
+                                className="flex items-center justify-between cursor-pointer hover:bg-surfaceHover p-1 rounded transition-colors"
+                            >
                                 <span className="text-xs text-textMuted">Match response length</span>
-                                <button
-                                    onClick={() => onAdaptiveConfigToggle('mirrorLength')}
+                                <div
                                     className={`w-8 h-4.5 rounded-full transition-colors ${formData.styleSettings.adaptiveConfig.mirrorLength ? 'bg-purple-500' : 'bg-gray-600'}`}
                                 >
                                     <div className={`w-3.5 h-3.5 rounded-full bg-white mt-0.5 transition-transform ${formData.styleSettings.adaptiveConfig.mirrorLength ? 'translate-x-4' : 'translate-x-0.5'}`} />
-                                </button>
-                            </label>
+                                </div>
+                            </div>
                             
-                            <label className="flex items-center justify-between cursor-pointer">
+                            <div 
+                                onClick={() => onAdaptiveConfigToggle('mirrorVocabulary')}
+                                className="flex items-center justify-between cursor-pointer hover:bg-surfaceHover p-1 rounded transition-colors"
+                            >
                                 <span className="text-xs text-textMuted">Adapt vocabulary</span>
-                                <button
-                                    onClick={() => onAdaptiveConfigToggle('mirrorVocabulary')}
+                                <div
                                     className={`w-8 h-4.5 rounded-full transition-colors ${formData.styleSettings.adaptiveConfig.mirrorVocabulary ? 'bg-purple-500' : 'bg-gray-600'}`}
                                 >
                                     <div className={`w-3.5 h-3.5 rounded-full bg-white mt-0.5 transition-transform ${formData.styleSettings.adaptiveConfig.mirrorVocabulary ? 'translate-x-4' : 'translate-x-0.5'}`} />
-                                </button>
-                            </label>
+                                </div>
+                            </div>
                         </div>
                     )}
                 </div>
@@ -1338,7 +1363,7 @@ const AddVariableForm: React.FC<AddVariableFormProps> = ({ onAdd, existingNames 
         return (
             <button
                 onClick={() => setIsAdding(true)}
-                className="w-full flex items-center justify-center gap-2 p-2.5 border border-dashed border-border rounded-lg text-xs text-textMuted hover:text-textMain hover:border-primary/50 hover:bg-primary/5 transition-all"
+                className="w-full flex items-center justify-center gap-2 p-3 text-xs text-textMuted hover:text-primary hover:bg-primary/5 transition-all"
             >
                 <Plus size={14} />
                 Add custom variable
@@ -1347,9 +1372,9 @@ const AddVariableForm: React.FC<AddVariableFormProps> = ({ onAdd, existingNames 
     }
 
     return (
-        <div className="p-3 bg-surface border border-border rounded-lg">
+        <div className="p-3 bg-purple-500/5">
             <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-medium text-textMain">New Variable</span>
+                <span className="text-xs font-medium text-purple-300">New Custom Variable</span>
                 <button 
                     onClick={() => { setIsAdding(false); setError(''); }}
                     className="text-textMuted hover:text-textMain"
@@ -1364,85 +1389,69 @@ const AddVariableForm: React.FC<AddVariableFormProps> = ({ onAdd, existingNames 
                 </div>
             )}
 
-            <div className="space-y-3">
-                {/* Variable Name */}
-                <div>
-                    <label className="text-[10px] text-textMuted uppercase tracking-wider block mb-1">Name *</label>
-                    <div className="flex items-center gap-1">
-                        <span className="text-textMuted text-sm font-mono">{'{{'}</span>
-                        <input
-                            type="text"
-                            value={name}
-                            onChange={(e) => {
-                                setName(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '_'));
-                                setError('');
-                            }}
-                            placeholder="variable_name"
-                            className="flex-1 bg-background border border-border rounded px-2 py-1.5 text-xs text-textMain font-mono outline-none focus:border-primary"
-                        />
-                        <span className="text-textMuted text-sm font-mono">{'}}'}</span>
-                    </div>
-                </div>
-
-                {/* Type & Secret Row */}
-                <div className="flex gap-3">
+            <div className="space-y-2">
+                {/* Row 1: Name & Type */}
+                <div className="flex gap-2">
                     <div className="flex-1">
-                        <label className="text-[10px] text-textMuted uppercase tracking-wider block mb-1">Type</label>
-                        <select
-                            value={type}
-                            onChange={(e) => setType(e.target.value as 'string' | 'number' | 'boolean')}
-                            className="w-full bg-background border border-border rounded px-2 py-1.5 text-xs text-textMain outline-none focus:border-primary"
-                        >
-                            <option value="string">String</option>
-                            <option value="number">Number</option>
-                            <option value="boolean">Boolean</option>
-                        </select>
-                    </div>
-                    <div className="flex items-end">
-                        <label className="flex items-center gap-2 cursor-pointer">
+                        <div className="flex items-center gap-1 bg-background border border-border rounded px-2 py-1.5">
+                            <span className="text-purple-400 text-xs font-mono">{'{{'}</span>
                             <input
-                                type="checkbox"
-                                checked={isSecret}
-                                onChange={(e) => setIsSecret(e.target.checked)}
-                                className="w-4 h-4 rounded border-border bg-background text-primary focus:ring-primary"
+                                type="text"
+                                value={name}
+                                onChange={(e) => {
+                                    setName(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '_'));
+                                    setError('');
+                                }}
+                                placeholder="variable_name"
+                                className="flex-1 bg-transparent text-xs text-textMain font-mono outline-none min-w-0"
                             />
-                            <span className="text-xs text-textMuted">Secret</span>
-                        </label>
+                            <span className="text-purple-400 text-xs font-mono">{'}}'}</span>
+                        </div>
                     </div>
+                    <select
+                        value={type}
+                        onChange={(e) => setType(e.target.value as 'string' | 'number' | 'boolean')}
+                        className="bg-background border border-border rounded px-2 py-1.5 text-xs text-textMain outline-none focus:border-primary"
+                    >
+                        <option value="string">String</option>
+                        <option value="number">Number</option>
+                        <option value="boolean">Boolean</option>
+                    </select>
+                    <label className="flex items-center gap-1.5 cursor-pointer px-2">
+                        <input
+                            type="checkbox"
+                            checked={isSecret}
+                            onChange={(e) => setIsSecret(e.target.checked)}
+                            className="w-3.5 h-3.5 rounded border-border bg-background text-primary"
+                        />
+                        <span className="text-[10px] text-textMuted">Secret</span>
+                    </label>
                 </div>
 
-                {/* Description */}
-                <div>
-                    <label className="text-[10px] text-textMuted uppercase tracking-wider block mb-1">Description</label>
+                {/* Row 2: Description & Placeholder */}
+                <div className="flex gap-2">
                     <input
                         type="text"
                         value={description}
                         onChange={(e) => setDescription(e.target.value)}
-                        placeholder="What this variable is for..."
-                        className="w-full bg-background border border-border rounded px-2 py-1.5 text-xs text-textMain outline-none focus:border-primary"
+                        placeholder="Description (optional)"
+                        className="flex-1 bg-background border border-border rounded px-2 py-1.5 text-xs text-textMain outline-none focus:border-primary"
                     />
-                </div>
-
-                {/* Placeholder */}
-                <div>
-                    <label className="text-[10px] text-textMuted uppercase tracking-wider block mb-1">Default/Placeholder</label>
                     <input
                         type="text"
                         value={placeholder}
                         onChange={(e) => setPlaceholder(e.target.value)}
-                        placeholder="Default value for testing..."
-                        className="w-full bg-background border border-border rounded px-2 py-1.5 text-xs text-textMain outline-none focus:border-primary"
+                        placeholder="Default value"
+                        className="flex-1 bg-background border border-border rounded px-2 py-1.5 text-xs text-textMain outline-none focus:border-primary"
                     />
+                    <button
+                        onClick={handleSubmit}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-500 text-white font-medium rounded text-xs hover:bg-purple-600 transition-colors"
+                    >
+                        <Plus size={12} />
+                        Add
+                    </button>
                 </div>
-
-                {/* Submit Button */}
-                <button
-                    onClick={handleSubmit}
-                    className="w-full flex items-center justify-center gap-2 py-2 bg-primary text-black font-medium rounded text-xs hover:bg-primaryHover transition-colors"
-                >
-                    <Check size={14} />
-                    Add Variable
-                </button>
             </div>
         </div>
     );
