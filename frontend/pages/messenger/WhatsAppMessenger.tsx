@@ -1310,14 +1310,14 @@ const WhatsAppSettingsModal: React.FC<SettingsModalProps> = ({ config, assistant
                                         readOnly
                                         value={import.meta.env.VITE_WEBHOOK_BASE_URL 
                                             ? `${import.meta.env.VITE_WEBHOOK_BASE_URL}/api/webhooks/whatsapp`
-                                            : `https://vitacoin.network/api/webhooks/whatsapp`}
+                                            : `https://callyy-production.up.railway.app/api/webhooks/whatsapp`}
                                         className="flex-1 px-4 py-2.5 bg-background border border-border rounded-lg text-textMain font-mono text-sm"
                                     />
                                     <button
                                         onClick={() => copyToClipboard(
                                             import.meta.env.VITE_WEBHOOK_BASE_URL 
                                                 ? `${import.meta.env.VITE_WEBHOOK_BASE_URL}/api/webhooks/whatsapp`
-                                                : `https://vitacoin.network/api/webhooks/whatsapp`
+                                                : `https://callyy-production.up.railway.app/api/webhooks/whatsapp`
                                         )}
                                         className="p-2.5 bg-surfaceHover rounded-lg hover:bg-surfaceHover/80 transition-colors"
                                     >
