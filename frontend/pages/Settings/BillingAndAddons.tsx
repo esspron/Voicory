@@ -1,10 +1,34 @@
 import React, { useState, useEffect } from 'react';
-import { CreditCard, Check, AlertCircle, Download, Plus, Info, Edit2, Loader2 } from 'lucide-react';
+import { CreditCard, Check, AlertCircle, Download, Plus, Info, Edit2, Loader2, Cpu, MessageSquare, Mic, Volume2 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { getUserProfile } from '../../services/callyyService';
 import { getUsageSummary, getCreditTransactions, CreditTransaction, UsageSummary } from '../../services/billingService';
 import { useAuth } from '../../contexts/AuthContext';
 import { UserProfile } from '../../types';
+
+// Provider logo/icon mapping
+const providerIcons: Record<string, { name: string; color: string; bgColor: string }> = {
+    'openai': { name: 'OpenAI', color: 'text-emerald-400', bgColor: 'bg-emerald-500/20' },
+    'anthropic': { name: 'Anthropic', color: 'text-orange-400', bgColor: 'bg-orange-500/20' },
+    'groq': { name: 'Groq', color: 'text-purple-400', bgColor: 'bg-purple-500/20' },
+    'together': { name: 'Together AI', color: 'text-blue-400', bgColor: 'bg-blue-500/20' },
+    'elevenlabs': { name: 'ElevenLabs', color: 'text-pink-400', bgColor: 'bg-pink-500/20' },
+    'deepgram': { name: 'Deepgram', color: 'text-cyan-400', bgColor: 'bg-cyan-500/20' },
+};
+
+// Model display names
+const modelDisplayNames: Record<string, string> = {
+    'gpt-4o': 'GPT-4o',
+    'gpt-4o-mini': 'GPT-4o Mini',
+    'gpt-4-turbo': 'GPT-4 Turbo',
+    'gpt-3.5-turbo': 'GPT-3.5 Turbo',
+    'claude-3.5-sonnet': 'Claude 3.5 Sonnet',
+    'claude-3-opus': 'Claude 3 Opus',
+    'claude-3-haiku': 'Claude 3 Haiku',
+    'llama-3.1-70b': 'Llama 3.1 70B',
+    'llama-3.1-8b': 'Llama 3.1 8B',
+    'mixtral-8x7b': 'Mixtral 8x7B',
+};
 
 const BillingAndAddons: React.FC = () => {
     const [hipaaEnabled, setHipaaEnabled] = useState(false);
@@ -164,6 +188,85 @@ const BillingAndAddons: React.FC = () => {
                         </ResponsiveContainer>
                     </div>
                 </div>
+
+                {/* Cost Breakdown by Component */}
+                {usageSummary && usageSummary.byModel.length > 0 && (
+                    <div className="bg-surface border border-border rounded-xl p-6 mt-6">
+                        <div className="flex items-center gap-2 mb-6">
+                            <Cpu size={20} className="text-primary" />
+                            <h3 className="text-lg font-semibold text-textMain">Cost Breakdown</h3>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {usageSummary.byModel.map((item, idx) => {
+                                const providerInfo = providerIcons[item.provider] || { name: item.provider, color: 'text-gray-400', bgColor: 'bg-gray-500/20' };
+                                const modelName = modelDisplayNames[item.model] || item.model;
+                                
+                                return (
+                                    <div key={idx} className="bg-background border border-border/50 rounded-lg p-4 hover:border-primary/30 transition-colors">
+                                        {/* Provider Badge */}
+                                        <div className="flex items-center justify-between mb-3">
+                                            <span className={`px-2 py-1 rounded-md text-xs font-medium ${providerInfo.bgColor} ${providerInfo.color}`}>
+                                                {providerInfo.name}
+                                            </span>
+                                            <span className="text-xs text-textMuted flex items-center gap-1">
+                                                <MessageSquare size={12} />
+                                                {item.count} {item.count === 1 ? 'request' : 'requests'}
+                                            </span>
+                                        </div>
+                                        
+                                        {/* Model Name */}
+                                        <h4 className="text-sm font-semibold text-textMain mb-2">{modelName}</h4>
+                                        
+                                        {/* Stats */}
+                                        <div className="space-y-2">
+                                            <div className="flex justify-between text-xs">
+                                                <span className="text-textMuted">Tokens Used</span>
+                                                <span className="text-textMain font-medium">{item.tokens.toLocaleString()}</span>
+                                            </div>
+                                            <div className="flex justify-between text-xs">
+                                                <span className="text-textMuted">Cost</span>
+                                                <span className="text-primary font-bold text-sm">₹{item.cost.toFixed(4)}</span>
+                                            </div>
+                                        </div>
+                                        
+                                        {/* Cost per 1K tokens */}
+                                        <div className="mt-3 pt-3 border-t border-border/50">
+                                            <div className="flex justify-between text-xs">
+                                                <span className="text-textMuted">Avg. cost/1K tokens</span>
+                                                <span className="text-textMuted">
+                                                    ₹{item.tokens > 0 ? ((item.cost / item.tokens) * 1000).toFixed(2) : '0.00'}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                        
+                        {/* Total Summary */}
+                        <div className="mt-6 pt-4 border-t border-border flex flex-wrap items-center justify-between gap-4">
+                            <div className="flex items-center gap-6">
+                                <div>
+                                    <span className="text-xs text-textMuted block">Total Requests</span>
+                                    <span className="text-lg font-bold text-textMain">
+                                        {usageSummary.byModel.reduce((sum, m) => sum + m.count, 0).toLocaleString()}
+                                    </span>
+                                </div>
+                                <div>
+                                    <span className="text-xs text-textMuted block">Total Tokens</span>
+                                    <span className="text-lg font-bold text-textMain">
+                                        {usageSummary.totalTokens.toLocaleString()}
+                                    </span>
+                                </div>
+                            </div>
+                            <div className="text-right">
+                                <span className="text-xs text-textMuted block">Total LLM Cost</span>
+                                <span className="text-2xl font-bold text-primary">₹{totalCost.toFixed(2)}</span>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Plans Section */}
@@ -452,8 +555,28 @@ const BillingAndAddons: React.FC = () => {
                                                         {tx.transactionType.charAt(0).toUpperCase() + tx.transactionType.slice(1)}
                                                     </span>
                                                 </td>
-                                                <td className="py-3 px-2 text-textMain max-w-xs truncate">
-                                                    {tx.description}
+                                                <td className="py-3 px-2 text-textMain max-w-xs">
+                                                    {/* Parse description to show component info */}
+                                                    {tx.description.includes('LLM usage:') ? (
+                                                        <div className="flex items-center gap-2">
+                                                            <Cpu size={14} className="text-primary flex-shrink-0" />
+                                                            <div className="truncate">
+                                                                <span className="text-textMain">{tx.description.replace('LLM usage: ', '')}</span>
+                                                            </div>
+                                                        </div>
+                                                    ) : tx.description.includes('TTS') ? (
+                                                        <div className="flex items-center gap-2">
+                                                            <Volume2 size={14} className="text-pink-400 flex-shrink-0" />
+                                                            <span className="truncate">{tx.description}</span>
+                                                        </div>
+                                                    ) : tx.description.includes('STT') ? (
+                                                        <div className="flex items-center gap-2">
+                                                            <Mic size={14} className="text-cyan-400 flex-shrink-0" />
+                                                            <span className="truncate">{tx.description}</span>
+                                                        </div>
+                                                    ) : (
+                                                        <span className="truncate">{tx.description}</span>
+                                                    )}
                                                 </td>
                                                 <td className={`py-3 px-2 text-right font-medium ${
                                                     tx.amount >= 0 ? 'text-green-400' : 'text-red-400'
@@ -476,17 +599,19 @@ const BillingAndAddons: React.FC = () => {
                     </div>
                 </div>
 
-                {/* Usage by Model */}
+                {/* Usage by Model - Detailed Table */}
                 {usageSummary && usageSummary.byModel.length > 0 && (
                     <div className="bg-surface border border-border rounded-xl">
                         <div className="p-6 border-b border-border">
-                            <h3 className="text-lg font-semibold text-textMain">Usage by Model</h3>
+                            <h3 className="text-lg font-semibold text-textMain">Detailed Usage Log</h3>
+                            <p className="text-xs text-textMuted mt-1">Breakdown of all AI component costs</p>
                         </div>
                         <div className="p-6">
                             <div className="overflow-x-auto">
                                 <table className="w-full text-sm">
                                     <thead>
                                         <tr className="border-b border-border">
+                                            <th className="text-left py-3 px-2 text-textMuted font-medium">Component</th>
                                             <th className="text-left py-3 px-2 text-textMuted font-medium">Provider</th>
                                             <th className="text-left py-3 px-2 text-textMuted font-medium">Model</th>
                                             <th className="text-right py-3 px-2 text-textMuted font-medium">Requests</th>
@@ -495,16 +620,38 @@ const BillingAndAddons: React.FC = () => {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {usageSummary.byModel.map((item, idx) => (
-                                            <tr key={idx} className="border-b border-border/50 hover:bg-background/30">
-                                                <td className="py-3 px-2 text-textMuted capitalize">{item.provider}</td>
-                                                <td className="py-3 px-2 text-textMain font-mono text-xs">{item.model}</td>
-                                                <td className="py-3 px-2 text-right text-textMain">{item.count.toLocaleString()}</td>
-                                                <td className="py-3 px-2 text-right text-textMain">{item.tokens.toLocaleString()}</td>
-                                                <td className="py-3 px-2 text-right text-primary font-medium">₹{item.cost.toFixed(2)}</td>
-                                            </tr>
-                                        ))}
+                                        {usageSummary.byModel.map((item, idx) => {
+                                            const providerInfo = providerIcons[item.provider] || { name: item.provider, color: 'text-gray-400', bgColor: 'bg-gray-500/20' };
+                                            const modelName = modelDisplayNames[item.model] || item.model;
+                                            
+                                            return (
+                                                <tr key={idx} className="border-b border-border/50 hover:bg-background/30">
+                                                    <td className="py-3 px-2">
+                                                        <div className="flex items-center gap-2">
+                                                            <Cpu size={14} className="text-primary" />
+                                                            <span className="text-textMain">LLM</span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="py-3 px-2">
+                                                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${providerInfo.bgColor} ${providerInfo.color}`}>
+                                                            {providerInfo.name}
+                                                        </span>
+                                                    </td>
+                                                    <td className="py-3 px-2 text-textMain font-medium">{modelName}</td>
+                                                    <td className="py-3 px-2 text-right text-textMain">{item.count.toLocaleString()}</td>
+                                                    <td className="py-3 px-2 text-right text-textMain">{item.tokens.toLocaleString()}</td>
+                                                    <td className="py-3 px-2 text-right text-primary font-bold">₹{item.cost.toFixed(4)}</td>
+                                                </tr>
+                                            );
+                                        })}
                                     </tbody>
+                                    <tfoot>
+                                        <tr className="bg-background/50">
+                                            <td colSpan={4} className="py-3 px-2 text-right text-textMuted font-medium">Total</td>
+                                            <td className="py-3 px-2 text-right text-textMain font-bold">{usageSummary.totalTokens.toLocaleString()}</td>
+                                            <td className="py-3 px-2 text-right text-primary font-bold text-base">₹{totalCost.toFixed(2)}</td>
+                                        </tr>
+                                    </tfoot>
                                 </table>
                             </div>
                         </div>
