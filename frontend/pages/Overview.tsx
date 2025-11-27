@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { ArrowUpRight, ArrowDownRight, PhoneCall, Clock, IndianRupee } from 'lucide-react';
+import { ArrowUpRight, ArrowDownRight, PhoneCall, Clock, IndianRupee, MessageSquare } from 'lucide-react';
 import { getCallLogs } from '../services/callyyService';
+import { getUsageSummary } from '../services/billingService';
 import type { CallLog } from '../types';
 
 const StatCard = ({ title, value, change, icon: Icon, trend }: any) => (
@@ -31,14 +32,29 @@ const Overview: React.FC = () => {
     const [callLogs, setCallLogs] = useState<CallLog[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    
+    // Usage metrics from billing
+    const [totalLLMCost, setTotalLLMCost] = useState(0);
+    const [totalMessages, setTotalMessages] = useState(0);
+    const [totalTokens, setTotalTokens] = useState(0);
 
     useEffect(() => {
         const fetchData = async () => {
             try {
                 console.log('Fetching call logs...');
-                const logs = await getCallLogs();
+                const [logs, usageSummary] = await Promise.all([
+                    getCallLogs(),
+                    getUsageSummary(7) // Last 7 days
+                ]);
                 console.log('Fetched logs:', logs);
+                console.log('Usage summary:', usageSummary);
                 setCallLogs(logs);
+                
+                // Set usage metrics
+                setTotalLLMCost(usageSummary.totalCost || 0);
+                setTotalMessages(usageSummary.byModel.reduce((sum, m) => sum + m.count, 0));
+                setTotalTokens(usageSummary.totalTokens || 0);
+                
                 setError(null);
             } catch (err) {
                 console.error('Error loading call logs:', err);
@@ -140,13 +156,20 @@ const Overview: React.FC = () => {
             </div>
 
             {/* Metrics Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <StatCard 
                     title="Total Cost" 
-                    value={loading ? "..." : `₹ ${totalCost.toFixed(2)}`}
+                    value={loading ? "..." : `₹ ${totalLLMCost.toFixed(2)}`}
                     change={costChange ? `${Math.abs(parseFloat(costChange))}%` : null}
                     trend={costTrend} 
                     icon={IndianRupee} 
+                />
+                <StatCard 
+                    title="Total Messages" 
+                    value={loading ? "..." : totalMessages.toString()}
+                    change={null}
+                    trend="up" 
+                    icon={MessageSquare} 
                 />
                 <StatCard 
                     title="Total Calls" 
