@@ -1,17 +1,82 @@
-import React, { useState } from 'react';
-import { CreditCard, Check, AlertCircle, Download, Plus, Info, Edit2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { CreditCard, Check, AlertCircle, Download, Plus, Info, Edit2, Loader2 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { getUserProfile } from '../../services/callyyService';
+import { getUsageSummary, getCreditTransactions, CreditTransaction, UsageSummary } from '../../services/billingService';
+import { useAuth } from '../../contexts/AuthContext';
+import { UserProfile } from '../../types';
 
 const BillingAndAddons: React.FC = () => {
     const [hipaaEnabled, setHipaaEnabled] = useState(false);
     const [autoReloadEnabled, setAutoReloadEnabled] = useState(false);
     const [dataRetentionEnabled, setDataRetentionEnabled] = useState(false);
+    
+    // Real data state
+    const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+    const [usageSummary, setUsageSummary] = useState<UsageSummary | null>(null);
+    const [transactions, setTransactions] = useState<CreditTransaction[]>([]);
+    const [loading, setLoading] = useState(true);
+    const { user } = useAuth();
 
-    // Mock data for the usage chart
-    const usageData = Array.from({ length: 30 }, (_, i) => ({
-        day: `2025-11-${i + 1}`,
-        mins: 0
-    }));
+    // Fetch data on mount
+    useEffect(() => {
+        const fetchData = async () => {
+            if (!user) {
+                setLoading(false);
+                return;
+            }
+            try {
+                const [profile, summary, txns] = await Promise.all([
+                    getUserProfile(),
+                    getUsageSummary(30),
+                    getCreditTransactions(20)
+                ]);
+                setUserProfile(profile);
+                setUsageSummary(summary);
+                setTransactions(txns);
+                if (profile) {
+                    setHipaaEnabled(profile.hipaaEnabled);
+                }
+            } catch (error) {
+                console.error('Error fetching billing data:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchData();
+    }, [user]);
+
+    // Prepare chart data from usage summary
+    const usageData = React.useMemo(() => {
+        if (!usageSummary?.byDay?.length) {
+            // Generate empty data for last 30 days
+            return Array.from({ length: 30 }, (_, i) => {
+                const date = new Date();
+                date.setDate(date.getDate() - (29 - i));
+                return {
+                    day: date.toISOString().split('T')[0],
+                    cost: 0
+                };
+            });
+        }
+        return usageSummary.byDay.map(d => ({
+            day: d.date,
+            cost: d.cost
+        }));
+    }, [usageSummary]);
+
+    const totalCost = usageSummary?.totalCost || 0;
+    const creditsBalance = userProfile?.creditsBalance || 0;
+    const planType = userProfile?.planType || 'PAYG';
+    const billingEmail = userProfile?.organizationEmail || user?.email || 'No email';
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center min-h-[400px]">
+                <Loader2 size={32} className="animate-spin text-primary" />
+            </div>
+        );
+    }
 
     return (
         <div className="max-w-7xl space-y-10 mb-20">
@@ -23,7 +88,7 @@ const BillingAndAddons: React.FC = () => {
                 
                 <div className="mb-8">
                     <div className="flex items-center gap-3 mb-2">
-                        <h2 className="text-3xl font-bold text-textMain">PAYG</h2>
+                        <h2 className="text-3xl font-bold text-textMain">{planType}</h2>
                         <span className="px-2 py-0.5 rounded-full bg-surface border border-border text-xs text-textMuted flex items-center gap-1">
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                             Current plan
@@ -32,7 +97,7 @@ const BillingAndAddons: React.FC = () => {
                     <p className="text-sm text-textMuted mb-4">Credit Balance:</p>
                     <div className="flex items-center gap-2 mb-6">
                         <span className="text-primary text-2xl font-bold">₹</span>
-                        <span className="text-4xl font-bold text-textMain">10</span>
+                        <span className="text-4xl font-bold text-textMain">{creditsBalance.toFixed(2)}</span>
                     </div>
                     <div className="flex gap-3">
                         <button className="px-4 py-2 bg-primary text-black font-semibold rounded-lg text-sm hover:bg-primaryHover transition-colors">
@@ -47,12 +112,12 @@ const BillingAndAddons: React.FC = () => {
                 <div className="bg-surface border border-border rounded-xl p-6">
                     <div className="flex justify-between items-start mb-6">
                         <div>
-                            <h3 className="text-lg font-semibold text-textMain">Minutes</h3>
-                            <p className="text-sm text-textMuted">The total number of Callyy minutes used</p>
+                            <h3 className="text-lg font-semibold text-textMain">Usage Costs</h3>
+                            <p className="text-sm text-textMuted">Total LLM and AI costs incurred</p>
                         </div>
                         <div className="text-right">
-                             <span className="text-2xl font-bold text-textMain">0</span>
-                             <span className="text-sm text-textMuted ml-1">Mins</span>
+                             <span className="text-2xl font-bold text-primary">₹{totalCost.toFixed(2)}</span>
+                             <span className="text-sm text-textMuted ml-1">spent</span>
                         </div>
                     </div>
 
@@ -67,7 +132,7 @@ const BillingAndAddons: React.FC = () => {
                         <ResponsiveContainer width="100%" height="100%">
                             <AreaChart data={usageData}>
                                 <defs>
-                                    <linearGradient id="colorMins" x1="0" y1="0" x2="0" y2="1">
+                                    <linearGradient id="colorCost" x1="0" y1="0" x2="0" y2="1">
                                         <stop offset="5%" stopColor="#2EC7B7" stopOpacity={0.1}/>
                                         <stop offset="95%" stopColor="#2EC7B7" stopOpacity={0}/>
                                     </linearGradient>
@@ -81,12 +146,20 @@ const BillingAndAddons: React.FC = () => {
                                     axisLine={false} 
                                     tickFormatter={(val, index) => index % 5 === 0 ? val : ''}
                                 />
-                                <YAxis stroke="#6B7280" fontSize={10} tickLine={false} axisLine={false} />
+                                <YAxis 
+                                    stroke="#6B7280" 
+                                    fontSize={10} 
+                                    tickLine={false} 
+                                    axisLine={false}
+                                    tickFormatter={(val) => `₹${val}`}
+                                />
                                 <Tooltip 
                                     contentStyle={{ backgroundColor: '#1B1E23', border: '1px solid #2D3139', borderRadius: '8px' }}
                                     itemStyle={{ color: '#EBEBEB' }}
+                                    formatter={(value: number) => [`₹${value.toFixed(4)}`, 'Cost']}
+                                    labelFormatter={(label) => `Date: ${label}`}
                                 />
-                                <Area type="monotone" dataKey="mins" stroke="#2EC7B7" strokeWidth={2} fillOpacity={1} fill="url(#colorMins)" />
+                                <Area type="monotone" dataKey="cost" stroke="#2EC7B7" strokeWidth={2} fillOpacity={1} fill="url(#colorCost)" />
                             </AreaChart>
                         </ResponsiveContainer>
                     </div>
@@ -262,7 +335,7 @@ const BillingAndAddons: React.FC = () => {
                         <div>
                             <label className="text-xs font-medium text-textMuted block mb-2">Billing Email</label>
                             <div className="bg-surface border border-border rounded-lg px-4 py-2.5 flex items-center justify-between group hover:border-gray-600 transition-colors">
-                                <span className="text-sm text-textMain">vishwasvermapvt@gmail.com</span>
+                                <span className="text-sm text-textMain">{billingEmail}</span>
                                 <button className="text-textMuted hover:text-textMain p-1 rounded hover:bg-background">
                                     <Edit2 size={14} />
                                 </button>
@@ -336,19 +409,107 @@ const BillingAndAddons: React.FC = () => {
             <div className="space-y-8 pt-8">
                 <div className="bg-surface border border-border rounded-xl">
                     <div className="flex justify-between items-center p-6 border-b border-border">
-                        <h3 className="text-lg font-semibold text-textMain">Credit Purchase History</h3>
+                        <h3 className="text-lg font-semibold text-textMain">Credit Transaction History</h3>
                         <button className="flex items-center gap-2 text-xs font-medium text-textMain border border-border hover:bg-surfaceHover px-3 py-1.5 rounded-lg transition-colors">
                             <Download size={14} />
                             Download Monthly Statement
                         </button>
                     </div>
                     <div className="p-6">
-                        <p className="text-xs text-textMuted mb-4">Credit purchases are charged to your payment method.</p>
-                        <div className="text-center py-8 text-textMuted text-sm">
-                            No data available
-                        </div>
+                        <p className="text-xs text-textMuted mb-4">Recent credit transactions including purchases and usage.</p>
+                        {transactions.length > 0 ? (
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm">
+                                    <thead>
+                                        <tr className="border-b border-border">
+                                            <th className="text-left py-3 px-2 text-textMuted font-medium">Date</th>
+                                            <th className="text-left py-3 px-2 text-textMuted font-medium">Type</th>
+                                            <th className="text-left py-3 px-2 text-textMuted font-medium">Description</th>
+                                            <th className="text-right py-3 px-2 text-textMuted font-medium">Amount</th>
+                                            <th className="text-right py-3 px-2 text-textMuted font-medium">Balance</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {transactions.map((tx) => (
+                                            <tr key={tx.id} className="border-b border-border/50 hover:bg-background/30">
+                                                <td className="py-3 px-2 text-textMuted">
+                                                    {new Date(tx.createdAt).toLocaleDateString('en-IN', {
+                                                        day: '2-digit',
+                                                        month: 'short',
+                                                        year: 'numeric',
+                                                        hour: '2-digit',
+                                                        minute: '2-digit'
+                                                    })}
+                                                </td>
+                                                <td className="py-3 px-2">
+                                                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                                                        tx.transactionType === 'purchase' ? 'bg-green-500/20 text-green-400' :
+                                                        tx.transactionType === 'usage' ? 'bg-orange-500/20 text-orange-400' :
+                                                        tx.transactionType === 'refund' ? 'bg-blue-500/20 text-blue-400' :
+                                                        tx.transactionType === 'bonus' ? 'bg-purple-500/20 text-purple-400' :
+                                                        'bg-primary/20 text-primary'
+                                                    }`}>
+                                                        {tx.transactionType.charAt(0).toUpperCase() + tx.transactionType.slice(1)}
+                                                    </span>
+                                                </td>
+                                                <td className="py-3 px-2 text-textMain max-w-xs truncate">
+                                                    {tx.description}
+                                                </td>
+                                                <td className={`py-3 px-2 text-right font-medium ${
+                                                    tx.amount >= 0 ? 'text-green-400' : 'text-red-400'
+                                                }`}>
+                                                    {tx.amount >= 0 ? '+' : ''}₹{tx.amount.toFixed(4)}
+                                                </td>
+                                                <td className="py-3 px-2 text-right text-textMain">
+                                                    ₹{tx.balanceAfter.toFixed(2)}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        ) : (
+                            <div className="text-center py-8 text-textMuted text-sm">
+                                No transactions yet
+                            </div>
+                        )}
                     </div>
                 </div>
+
+                {/* Usage by Model */}
+                {usageSummary && usageSummary.byModel.length > 0 && (
+                    <div className="bg-surface border border-border rounded-xl">
+                        <div className="p-6 border-b border-border">
+                            <h3 className="text-lg font-semibold text-textMain">Usage by Model</h3>
+                        </div>
+                        <div className="p-6">
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm">
+                                    <thead>
+                                        <tr className="border-b border-border">
+                                            <th className="text-left py-3 px-2 text-textMuted font-medium">Provider</th>
+                                            <th className="text-left py-3 px-2 text-textMuted font-medium">Model</th>
+                                            <th className="text-right py-3 px-2 text-textMuted font-medium">Requests</th>
+                                            <th className="text-right py-3 px-2 text-textMuted font-medium">Tokens</th>
+                                            <th className="text-right py-3 px-2 text-textMuted font-medium">Cost</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {usageSummary.byModel.map((item, idx) => (
+                                            <tr key={idx} className="border-b border-border/50 hover:bg-background/30">
+                                                <td className="py-3 px-2 text-textMuted capitalize">{item.provider}</td>
+                                                <td className="py-3 px-2 text-textMain font-mono text-xs">{item.model}</td>
+                                                <td className="py-3 px-2 text-right text-textMain">{item.count.toLocaleString()}</td>
+                                                <td className="py-3 px-2 text-right text-textMain">{item.tokens.toLocaleString()}</td>
+                                                <td className="py-3 px-2 text-right text-primary font-medium">₹{item.cost.toFixed(2)}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 <div className="bg-surface border border-border rounded-xl">
                     <div className="p-6 border-b border-border">
