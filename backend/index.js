@@ -2,11 +2,17 @@ const express = require('express');
 const cors = require('cors');
 const { createClient } = require('@supabase/supabase-js');
 const axios = require('axios');
+const OpenAI = require('openai');
 
 // Only load .env file in development (Railway injects env vars directly)
 if (process.env.NODE_ENV !== 'production') {
     require('dotenv').config();
 }
+
+// Initialize OpenAI client
+const openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY
+});
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -357,11 +363,156 @@ async function handleIncomingMessages(config, value) {
 
         console.log('Stored incoming message:', message.id);
 
-        // TODO: If chatbot is enabled, process with AI and send response
-        if (config.chatbot_enabled && config.assistant_id) {
-            // Queue for AI processing
-            console.log('Chatbot enabled - would process with assistant:', config.assistant_id);
+        // If chatbot is enabled, process with AI and send response
+        if (config.chatbot_enabled && config.assistant_id && message.type === 'text') {
+            await processWithAI(config, message, contact);
         }
+    }
+}
+
+// ============================================
+// AI CHATBOT PROCESSING
+// ============================================
+
+// Process incoming message with AI and send response
+async function processWithAI(config, message, contact) {
+    try {
+        console.log('Processing message with AI for assistant:', config.assistant_id);
+
+        // 1. Fetch assistant configuration
+        const { data: assistant, error: assistantError } = await supabase
+            .from('assistants')
+            .select('*')
+            .eq('id', config.assistant_id)
+            .single();
+
+        if (assistantError || !assistant) {
+            console.error('Failed to fetch assistant:', assistantError);
+            return;
+        }
+
+        console.log('Using assistant:', assistant.name, 'Model:', assistant.llm_model);
+
+        // 2. Get conversation history (last 20 messages for context)
+        const { data: history } = await supabase
+            .from('whatsapp_messages')
+            .select('direction, content, message_type, message_timestamp')
+            .eq('config_id', config.id)
+            .or(`from_number.eq.+${message.from},to_number.eq.+${message.from}`)
+            .order('message_timestamp', { ascending: true })
+            .limit(20);
+
+        // 3. Build messages array for OpenAI
+        const messages = [];
+
+        // System prompt
+        const systemPrompt = assistant.system_prompt || 
+            'You are a helpful, friendly AI assistant. Be conversational and helpful.';
+        
+        messages.push({
+            role: 'system',
+            content: systemPrompt
+        });
+
+        // Add conversation history
+        if (history && history.length > 0) {
+            for (const msg of history) {
+                if (msg.message_type === 'text' && msg.content?.body) {
+                    messages.push({
+                        role: msg.direction === 'inbound' ? 'user' : 'assistant',
+                        content: msg.content.body
+                    });
+                }
+            }
+        }
+
+        // Add current message (if not already in history)
+        const currentMsgText = message.text?.body;
+        if (currentMsgText) {
+            // Check if last message in history is the same
+            const lastHistoryMsg = history?.[history.length - 1];
+            if (!lastHistoryMsg || lastHistoryMsg.content?.body !== currentMsgText) {
+                messages.push({
+                    role: 'user',
+                    content: currentMsgText
+                });
+            }
+        }
+
+        console.log('Sending to OpenAI with', messages.length, 'messages');
+
+        // 4. Call OpenAI API
+        const completion = await openai.chat.completions.create({
+            model: assistant.llm_model || 'gpt-4o',
+            messages: messages,
+            temperature: parseFloat(assistant.temperature) || 0.7,
+            max_tokens: assistant.max_tokens || 1024
+        });
+
+        const aiResponse = completion.choices[0]?.message?.content;
+
+        if (!aiResponse) {
+            console.error('No response from OpenAI');
+            return;
+        }
+
+        console.log('AI Response:', aiResponse.substring(0, 100) + '...');
+
+        // 5. Send reply via WhatsApp API
+        await sendWhatsAppReply(config, message.from, aiResponse);
+
+    } catch (error) {
+        console.error('AI processing error:', error);
+    }
+}
+
+// Send WhatsApp reply message
+async function sendWhatsAppReply(config, toNumber, text) {
+    try {
+        const response = await axios.post(
+            `https://graph.facebook.com/v21.0/${config.phone_number_id}/messages`,
+            {
+                messaging_product: 'whatsapp',
+                recipient_type: 'individual',
+                to: toNumber,
+                type: 'text',
+                text: {
+                    body: text,
+                    preview_url: false
+                }
+            },
+            {
+                headers: {
+                    'Authorization': `Bearer ${config.access_token}`,
+                    'Content-Type': 'application/json'
+                }
+            }
+        );
+
+        const waMessageId = response.data?.messages?.[0]?.id;
+        console.log('WhatsApp reply sent:', waMessageId);
+
+        // Store outbound message in database
+        await supabase
+            .from('whatsapp_messages')
+            .insert({
+                wa_message_id: waMessageId,
+                config_id: config.id,
+                from_number: config.display_phone_number,
+                to_number: '+' + toNumber,
+                direction: 'outbound',
+                message_type: 'text',
+                content: { body: text },
+                status: 'sent',
+                is_from_bot: true,
+                assistant_id: config.assistant_id,
+                message_timestamp: new Date().toISOString()
+            });
+
+        return waMessageId;
+    } catch (error) {
+        console.error('Failed to send WhatsApp reply:', error.response?.data || error.message);
+        throw error;
     }
 }
 
