@@ -892,22 +892,26 @@ const Customers: React.FC = () => {
                                                     <div 
                                                         key={insight.id} 
                                                         className={`bg-background border rounded-lg p-3 ${
-                                                            insight.category === 'preference' ? 'border-blue-500/30' :
-                                                            insight.category === 'pain_point' ? 'border-red-500/30' :
-                                                            insight.category === 'opportunity' ? 'border-green-500/30' :
-                                                            insight.category === 'objection' ? 'border-orange-500/30' :
+                                                            insight.insightType === 'preference' ? 'border-blue-500/30' :
+                                                            insight.insightType === 'pain_point' ? 'border-red-500/30' :
+                                                            insight.insightType === 'opportunity' ? 'border-green-500/30' :
+                                                            insight.insightType === 'objection' ? 'border-orange-500/30' :
+                                                            insight.insightType === 'interest' ? 'border-purple-500/30' :
+                                                            insight.insightType === 'personal_info' ? 'border-cyan-500/30' :
                                                             'border-border'
                                                         }`}
                                                     >
                                                         <div className="flex items-start gap-2">
                                                             <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                                                                insight.category === 'preference' ? 'bg-blue-500/20 text-blue-400' :
-                                                                insight.category === 'pain_point' ? 'bg-red-500/20 text-red-400' :
-                                                                insight.category === 'opportunity' ? 'bg-green-500/20 text-green-400' :
-                                                                insight.category === 'objection' ? 'bg-orange-500/20 text-orange-400' :
+                                                                insight.insightType === 'preference' ? 'bg-blue-500/20 text-blue-400' :
+                                                                insight.insightType === 'pain_point' ? 'bg-red-500/20 text-red-400' :
+                                                                insight.insightType === 'opportunity' ? 'bg-green-500/20 text-green-400' :
+                                                                insight.insightType === 'objection' ? 'bg-orange-500/20 text-orange-400' :
+                                                                insight.insightType === 'interest' ? 'bg-purple-500/20 text-purple-400' :
+                                                                insight.insightType === 'personal_info' ? 'bg-cyan-500/20 text-cyan-400' :
                                                                 'bg-gray-500/20 text-gray-400'
                                                             }`}>
-                                                                {insight.category?.replace('_', ' ')}
+                                                                {insight.insightType?.replace('_', ' ')}
                                                             </span>
                                                             {insight.confidence && (
                                                                 <span className="text-[10px] text-textMuted">
@@ -915,9 +919,9 @@ const Customers: React.FC = () => {
                                                                 </span>
                                                             )}
                                                         </div>
-                                                        <p className="text-sm text-textMain mt-2">{insight.insight}</p>
-                                                        {insight.extractedFrom && (
-                                                            <p className="text-xs text-textMuted mt-1 italic">"{insight.extractedFrom}"</p>
+                                                        <p className="text-sm text-textMain mt-2">{insight.content}</p>
+                                                        {insight.sourceQuote && (
+                                                            <p className="text-xs text-textMuted mt-1 italic">"{insight.sourceQuote}"</p>
                                                         )}
                                                     </div>
                                                 ))}
