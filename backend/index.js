@@ -48,6 +48,74 @@ if (!supabaseUrl || !supabaseKey) {
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // ============================================
+// EMBEDDING FUNCTIONS (Token Optimization)
+// ============================================
+
+// Generate embedding for text using OpenAI
+async function generateEmbedding(text) {
+    if (!openai || !text) return null;
+    
+    try {
+        const response = await openai.embeddings.create({
+            model: 'text-embedding-3-small',
+            input: text.slice(0, 8000) // Max 8K chars
+        });
+        return response.data[0].embedding;
+    } catch (error) {
+        console.error('Error generating embedding:', error.message);
+        return null;
+    }
+}
+
+// Store message embedding
+async function storeMessageEmbedding(messageId, customerId, userId, content, role) {
+    if (!content || content.length < 5) return; // Skip very short messages
+    
+    const embedding = await generateEmbedding(content);
+    if (!embedding) return;
+    
+    try {
+        await supabase
+            .from('message_embeddings')
+            .insert({
+                message_id: messageId,
+                customer_id: customerId,
+                user_id: userId,
+                content: content,
+                role: role,
+                embedding: embedding
+            });
+        console.log('Stored embedding for message');
+    } catch (error) {
+        console.error('Error storing embedding:', error.message);
+    }
+}
+
+// Search for relevant messages using semantic similarity
+async function searchRelevantMessages(customerId, query, limit = 8) {
+    const queryEmbedding = await generateEmbedding(query);
+    if (!queryEmbedding) return [];
+    
+    try {
+        const { data, error } = await supabase.rpc('search_customer_messages', {
+            p_customer_id: customerId,
+            p_query_embedding: queryEmbedding,
+            p_limit: limit
+        });
+        
+        if (error) {
+            console.error('Error searching messages:', error);
+            return [];
+        }
+        
+        return data || [];
+    } catch (error) {
+        console.error('Error in semantic search:', error.message);
+        return [];
+    }
+}
+
+// ============================================
 // CUSTOMER MEMORY HELPER FUNCTIONS
 // ============================================
 
@@ -544,7 +612,7 @@ async function handleIncomingMessages(config, value) {
             content.address = message.location?.address;
         }
 
-        await supabase
+        const { data: insertedMessage } = await supabase
             .from('whatsapp_messages')
             .insert({
                 wa_message_id: message.id,
@@ -558,9 +626,17 @@ async function handleIncomingMessages(config, value) {
                 context_message_id: message.context?.id,
                 message_timestamp: new Date(parseInt(message.timestamp) * 1000).toISOString(),
                 customer_id: customerId
-            });
+            })
+            .select('id')
+            .single();
 
         console.log('Stored incoming message:', message.id, 'Customer:', customerId);
+
+        // Generate and store embedding for text messages (async, don't block)
+        if (message.type === 'text' && content.body && customerId && insertedMessage?.id) {
+            storeMessageEmbedding(insertedMessage.id, customerId, content.body, 'inbound', config.id)
+                .catch(err => console.error('Failed to store embedding:', err.message));
+        }
 
         // If chatbot is enabled, process with AI and send response
         if (config.chatbot_enabled && config.assistant_id && message.type === 'text') {
@@ -695,16 +771,36 @@ async function processWithAI(config, message, contact) {
             }
         }
 
-        // 3. Get conversation history (last 20 messages for context)
-        const { data: history } = await supabase
+        // 3. Get current message text first
+        const currentMsgText = message.text?.body;
+        
+        // 4. Get recent history (last 6 messages) + semantically relevant messages
+        // This hybrid approach ensures recent context + relevant past info
+        const { data: recentHistory } = await supabase
             .from('whatsapp_messages')
-            .select('direction, content, message_type, message_timestamp')
+            .select('id, direction, content, message_type, message_timestamp')
             .eq('config_id', config.id)
             .or(`from_number.eq.+${message.from},to_number.eq.+${message.from}`)
-            .order('message_timestamp', { ascending: true })
-            .limit(20);
+            .order('message_timestamp', { ascending: false })
+            .limit(6); // Only last 6 messages for recent context
+        
+        // Reverse to get chronological order
+        const history = recentHistory ? recentHistory.reverse() : [];
+        
+        // 5. If customer has embeddings, search for relevant past messages
+        let relevantPastMessages = [];
+        if (customerId && currentMsgText) {
+            // Check if user is asking about something from the past
+            const isRecallQuery = /recall|remember|order|previous|earlier|last time|before/i.test(currentMsgText);
+            
+            if (isRecallQuery) {
+                console.log('Recall query detected, searching embeddings...');
+                relevantPastMessages = await searchRelevantMessages(customerId, currentMsgText, 8);
+                console.log(`Found ${relevantPastMessages.length} relevant past messages via embeddings`);
+            }
+        }
 
-        // 4. Build messages array for OpenAI
+        // 6. Build messages array for OpenAI
         const messages = [];
 
         // System prompt - inject assistant name and memory
@@ -717,7 +813,7 @@ async function processWithAI(config, message, contact) {
         }
         
         // Add instruction to use conversation context
-        systemPrompt += `\n\nIMPORTANT: You have access to the full conversation history with this customer. When the customer asks about previous orders, details they mentioned, or anything from earlier in the conversation, refer back to that information. Never say you can't recall - use the conversation context provided.`;
+        systemPrompt += `\n\nIMPORTANT: You have access to the conversation history with this customer. When the customer asks about previous orders, details they mentioned, or anything from earlier, use the context provided. Never say you can't recall.`;
         
         // Inject customer memory if available
         if (customerMemory && assistant.memory_enabled) {
@@ -729,12 +825,23 @@ async function processWithAI(config, message, contact) {
             }
         }
         
+        // Add relevant past messages as context (from embeddings search)
+        if (relevantPastMessages.length > 0) {
+            systemPrompt += '\n\n--- RELEVANT PAST CONTEXT ---\n';
+            systemPrompt += 'Here are relevant messages from past conversations:\n';
+            relevantPastMessages.forEach((msg, i) => {
+                const speaker = msg.role === 'user' ? 'Customer' : 'You';
+                systemPrompt += `${speaker}: ${msg.content}\n`;
+            });
+            systemPrompt += '--- END PAST CONTEXT ---';
+        }
+        
         messages.push({
             role: 'system',
             content: systemPrompt
         });
 
-        // Add conversation history
+        // Add recent conversation history (last 6 messages only)
         if (history && history.length > 0) {
             for (const msg of history) {
                 if (msg.message_type === 'text' && msg.content?.body) {
@@ -747,7 +854,6 @@ async function processWithAI(config, message, contact) {
         }
 
         // Add current message (if not already in history)
-        const currentMsgText = message.text?.body;
         if (currentMsgText) {
             // Check if last message in history is the same
             const lastHistoryMsg = history?.[history.length - 1];
@@ -759,7 +865,7 @@ async function processWithAI(config, message, contact) {
             }
         }
 
-        console.log('Sending to OpenAI with', messages.length, 'messages');
+        console.log('Sending to OpenAI with', messages.length, 'messages (optimized with embeddings)');
 
         // 4. Call OpenAI API
         const completion = await openai.chat.completions.create({
@@ -906,29 +1012,67 @@ async function processWithAI(config, message, contact) {
                             }
                         }
                         
-                        // Store conversation record with analysis (channel = whatsapp)
-                        const { error: convError } = await supabase
-                            .from('customer_conversations')
-                            .insert({
-                                customer_id: customerId,
-                                assistant_id: assistant.id,
-                                user_id: config.user_id,
-                                channel: 'whatsapp',
-                                call_direction: 'inbound',
-                                started_at: new Date(history?.[0]?.message_timestamp || Date.now()).toISOString(),
-                                transcript: transcript,
-                                summary: analysis.summary,
-                                key_points: analysis.keyPoints || [],
-                                sentiment: analysis.sentiment,
-                                sentiment_score: analysis.sentimentScore,
-                                topics_discussed: analysis.topicsDiscussed || [],
-                                action_items: analysis.actionItems || []
-                            });
+                        // Store/update conversation record with analysis (channel = whatsapp)
+                        // Check if there's an existing conversation from today for this customer
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0);
                         
-                        if (convError) {
-                            console.error('Error storing conversation:', convError);
+                        const { data: existingConv } = await supabase
+                            .from('customer_conversations')
+                            .select('id')
+                            .eq('customer_id', customerId)
+                            .eq('channel', 'whatsapp')
+                            .gte('started_at', today.toISOString())
+                            .order('started_at', { ascending: false })
+                            .limit(1)
+                            .single();
+                        
+                        if (existingConv) {
+                            // Update existing conversation
+                            const { error: convError } = await supabase
+                                .from('customer_conversations')
+                                .update({
+                                    transcript: transcript,
+                                    summary: analysis.summary,
+                                    key_points: analysis.keyPoints || [],
+                                    sentiment: analysis.sentiment,
+                                    sentiment_score: analysis.sentimentScore,
+                                    topics_discussed: analysis.topicsDiscussed || [],
+                                    action_items: analysis.actionItems || [],
+                                    updated_at: new Date().toISOString()
+                                })
+                                .eq('id', existingConv.id);
+                            
+                            if (convError) {
+                                console.error('Error updating conversation:', convError);
+                            } else {
+                                console.log('Updated existing conversation for customer:', customerId);
+                            }
                         } else {
-                            console.log('Stored conversation with analysis for customer:', customerId);
+                            // Create new conversation
+                            const { error: convError } = await supabase
+                                .from('customer_conversations')
+                                .insert({
+                                    customer_id: customerId,
+                                    assistant_id: assistant.id,
+                                    user_id: config.user_id,
+                                    channel: 'whatsapp',
+                                    call_direction: 'inbound',
+                                    started_at: new Date(history?.[0]?.message_timestamp || Date.now()).toISOString(),
+                                    transcript: transcript,
+                                    summary: analysis.summary,
+                                    key_points: analysis.keyPoints || [],
+                                    sentiment: analysis.sentiment,
+                                    sentiment_score: analysis.sentimentScore,
+                                    topics_discussed: analysis.topicsDiscussed || [],
+                                    action_items: analysis.actionItems || []
+                                });
+                            
+                            if (convError) {
+                                console.error('Error storing conversation:', convError);
+                            } else {
+                                console.log('Created new conversation for customer:', customerId);
+                            }
                         }
                         
                         // Store extracted insights
@@ -1007,7 +1151,7 @@ async function sendWhatsAppReply(config, toNumber, text, customerId = null) {
         console.log('WhatsApp reply sent:', waMessageId);
 
         // Store outbound message in database
-        await supabase
+        const { data: insertedOutbound } = await supabase
             .from('whatsapp_messages')
             .insert({
                 wa_message_id: waMessageId,
@@ -1022,7 +1166,15 @@ async function sendWhatsAppReply(config, toNumber, text, customerId = null) {
                 assistant_id: config.assistant_id,
                 message_timestamp: new Date().toISOString(),
                 customer_id: customerId
-            });
+            })
+            .select('id')
+            .single();
+
+        // Generate and store embedding for outbound message (async, don't block)
+        if (text && customerId && insertedOutbound?.id) {
+            storeMessageEmbedding(insertedOutbound.id, customerId, text, 'outbound', config.id)
+                .catch(err => console.error('Failed to store outbound embedding:', err.message));
+        }
 
         return waMessageId;
     } catch (error) {
