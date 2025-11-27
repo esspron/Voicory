@@ -5,9 +5,9 @@ import {
     FlaskConical, Layout, Settings, Sparkles, Globe,
     ChevronRight, Plus, Mic, Zap, Search, Filter, FileText,
     X, Check, Clock, MessageSquare, Phone, ChevronDown, Loader2,
-    Brain, User, TrendingUp, AlertCircle, Heart, Lightbulb
+    Brain, User, TrendingUp, AlertCircle, Heart, Lightbulb, Trash2
 } from 'lucide-react';
-import { getAssistant, getVoices, getCallLogs, createAssistant, updateAssistant } from '../services/callyyService';
+import { getAssistant, getVoices, getCallLogs, createAssistant, updateAssistant, deleteAssistant } from '../services/callyyService';
 import { Assistant, Voice, CallLog, AssistantInput, MemoryConfig } from '../types';
 import VoiceSelectorModal from '../components/assistant-editor/VoiceSelectorModal';
 import LLMSelectorModal from '../components/assistant-editor/LLMSelectorModal';
@@ -45,6 +45,22 @@ const LANGUAGES = [
     { code: 'es', name: 'Spanish', flag: '🇪🇸' },
 ];
 
+// Timezone options
+const TIMEZONES = [
+    { value: 'Asia/Kolkata', label: 'India (IST)', offset: '+5:30' },
+    { value: 'America/New_York', label: 'Eastern Time (ET)', offset: '-5:00' },
+    { value: 'America/Chicago', label: 'Central Time (CT)', offset: '-6:00' },
+    { value: 'America/Denver', label: 'Mountain Time (MT)', offset: '-7:00' },
+    { value: 'America/Los_Angeles', label: 'Pacific Time (PT)', offset: '-8:00' },
+    { value: 'Europe/London', label: 'London (GMT)', offset: '+0:00' },
+    { value: 'Europe/Paris', label: 'Central European (CET)', offset: '+1:00' },
+    { value: 'Asia/Dubai', label: 'Dubai (GST)', offset: '+4:00' },
+    { value: 'Asia/Singapore', label: 'Singapore (SGT)', offset: '+8:00' },
+    { value: 'Asia/Tokyo', label: 'Japan (JST)', offset: '+9:00' },
+    { value: 'Australia/Sydney', label: 'Sydney (AEST)', offset: '+10:00' },
+    { value: 'Pacific/Auckland', label: 'New Zealand (NZST)', offset: '+12:00' },
+];
+
 interface AssistantFormData {
     name: string;
     systemPrompt: string;
@@ -59,6 +75,7 @@ interface AssistantFormData {
     maxTokens: number;
     interruptible: boolean;
     useDefaultPersonality: boolean;
+    timezone: string;
     ragEnabled: boolean;
     ragSimilarityThreshold: number;
     ragMaxResults: number;
@@ -83,19 +100,18 @@ const DEFAULT_MEMORY_CONFIG: MemoryConfig = {
 
 const DEFAULT_FORM_DATA: AssistantFormData = {
     name: 'New Assistant',
-    systemPrompt: `You are {{owner_name}}'s personal AI voice assistant.
-Your first message has already been delivered using the {{message}} variable.
-Call mode: {{call_mode}}
----
-IF call_mode is "message_delivery":
-You're calling to deliver a message on behalf of {{owner_name}}.
-AFTER your first message:
-- Ask: "Would you like to send any message back to {{owner_name}}?"
-- Listen to their FULL response - don't interrupt or rush
-- Let them speak freely and add multiple things
-- Confirm what you heard: "Got it! I'll let {{owner_name}} know you said: [repeat their message]"
-- Ask: "Anything else you'd like me to add?"`,
-    firstMessage: '{{message}}',
+    systemPrompt: `You are a helpful, friendly AI voice assistant. Your role is to assist callers with their questions and needs in a professional yet conversational manner.
+
+Guidelines:
+- Be warm, patient, and attentive to the caller's needs
+- Listen carefully and ask clarifying questions when needed
+- Provide clear, concise, and accurate information
+- If you don't know something, be honest and offer to help find the answer
+- Keep responses conversational and natural for voice
+- Be respectful of the caller's time
+
+You can be customized with specific knowledge, personality traits, and capabilities based on the business needs.`,
+    firstMessage: 'Hello! Thanks for calling. How can I help you today?',
     voiceId: null,
     elevenlabsModelId: 'eleven_turbo_v2_5',
     language: 'en',
@@ -106,6 +122,7 @@ AFTER your first message:
     maxTokens: 1024,
     interruptible: true,
     useDefaultPersonality: true,
+    timezone: 'Asia/Kolkata',
     ragEnabled: false,
     ragSimilarityThreshold: 0.7,
     ragMaxResults: 5,
@@ -134,6 +151,9 @@ const AssistantEditor: React.FC = () => {
     const [showVoiceModal, setShowVoiceModal] = useState(false);
     const [showLLMModal, setShowLLMModal] = useState(false);
     const [showLanguageModal, setShowLanguageModal] = useState(false);
+    const [showTimezoneModal, setShowTimezoneModal] = useState(false);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [deleting, setDeleting] = useState(false);
 
     // Track changes - skip during initial load and after save
     useEffect(() => {
@@ -172,6 +192,7 @@ const AssistantEditor: React.FC = () => {
                             maxTokens: assistant.maxTokens ?? 1024,
                             interruptible: assistant.interruptible ?? true,
                             useDefaultPersonality: assistant.useDefaultPersonality ?? true,
+                            timezone: assistant.timezone || 'Asia/Kolkata',
                             ragEnabled: assistant.ragEnabled ?? false,
                             ragSimilarityThreshold: assistant.ragSimilarityThreshold ?? 0.7,
                             ragMaxResults: assistant.ragMaxResults ?? 5,
@@ -218,6 +239,7 @@ const AssistantEditor: React.FC = () => {
                 maxTokens: formData.maxTokens,
                 interruptible: formData.interruptible,
                 useDefaultPersonality: formData.useDefaultPersonality,
+                timezone: formData.timezone,
                 ragEnabled: formData.ragEnabled,
                 ragSimilarityThreshold: formData.ragSimilarityThreshold,
                 ragMaxResults: formData.ragMaxResults,
@@ -274,6 +296,22 @@ const AssistantEditor: React.FC = () => {
         setShowLanguageModal(false);
     };
 
+    const handleDelete = async () => {
+        if (!assistantId || deleting) return;
+        
+        setDeleting(true);
+        try {
+            await deleteAssistant(assistantId);
+            navigate('/assistants', { replace: true });
+        } catch (error) {
+            console.error('Error deleting assistant:', error);
+            alert('Failed to delete assistant. Please try again.');
+        } finally {
+            setDeleting(false);
+            setShowDeleteConfirm(false);
+        }
+    };
+
     const currentLanguage = LANGUAGES.find(l => l.code === formData.language) || LANGUAGES[0];
 
     const renderTabContent = () => {
@@ -288,6 +326,7 @@ const AssistantEditor: React.FC = () => {
                         onOpenVoiceModal={() => setShowVoiceModal(true)}
                         onOpenLLMModal={() => setShowLLMModal(true)}
                         onOpenLanguageModal={() => setShowLanguageModal(true)}
+                        onOpenTimezoneModal={() => setShowTimezoneModal(true)}
                     />
                 );
             case 'memory':
@@ -340,6 +379,17 @@ const AssistantEditor: React.FC = () => {
                     </div>
                 </div>
                 <div className="flex items-center gap-3">
+                    {/* Delete button - only show for existing assistants */}
+                    {assistantId && (
+                        <button 
+                            onClick={() => setShowDeleteConfirm(true)}
+                            disabled={saving || deleting}
+                            className="flex items-center gap-2 px-3 py-2 bg-surface border border-border rounded-lg text-sm text-red-400 hover:bg-red-500/10 hover:border-red-500/50 transition-colors disabled:opacity-50"
+                            title="Delete assistant"
+                        >
+                            <Trash2 size={16} />
+                        </button>
+                    )}
                     <button 
                         className="flex items-center gap-2 px-4 py-2 bg-surface border border-border rounded-lg text-sm text-textMain hover:bg-surfaceHover transition-colors"
                         disabled={saving}
@@ -429,6 +479,98 @@ const AssistantEditor: React.FC = () => {
                     onClose={() => setShowLLMModal(false)}
                 />
             )}
+
+            {/* Timezone Modal */}
+            {showTimezoneModal && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+                    <div className="bg-surface border border-border rounded-xl w-full max-w-md mx-4 shadow-2xl">
+                        <div className="flex items-center justify-between p-4 border-b border-border">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+                                    <Globe size={20} className="text-primary" />
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-semibold text-textMain">Set Timezone</h3>
+                                    <p className="text-sm text-textMuted">Choose the timezone for this assistant</p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setShowTimezoneModal(false)}
+                                className="p-2 hover:bg-surfaceHover rounded-lg text-textMuted hover:text-textMain transition-colors"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+                        
+                        <div className="p-4 max-h-80 overflow-y-auto">
+                            <div className="space-y-1">
+                                {TIMEZONES.map((tz) => (
+                                    <button
+                                        key={tz.value}
+                                        onClick={() => {
+                                            setFormData({...formData, timezone: tz.value});
+                                            setShowTimezoneModal(false);
+                                        }}
+                                        className={`w-full flex items-center justify-between p-3 rounded-lg transition-colors ${
+                                            formData.timezone === tz.value
+                                                ? 'bg-primary/10 border border-primary/30'
+                                                : 'hover:bg-surfaceHover border border-transparent'
+                                        }`}
+                                    >
+                                        <span className="text-sm font-medium text-textMain">{tz.label}</span>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-xs text-textMuted font-mono">UTC{tz.offset}</span>
+                                            {formData.timezone === tz.value && (
+                                                <Check size={16} className="text-primary" />
+                                            )}
+                                        </div>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Delete Confirmation Modal */}
+            {showDeleteConfirm && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+                    <div className="bg-surface border border-border rounded-xl p-6 w-full max-w-md mx-4 shadow-2xl">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center">
+                                <Trash2 size={20} className="text-red-400" />
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-semibold text-textMain">Delete Assistant</h3>
+                                <p className="text-sm text-textMuted">This action cannot be undone</p>
+                            </div>
+                        </div>
+                        
+                        <p className="text-sm text-textMuted mb-6">
+                            Are you sure you want to delete <span className="font-medium text-textMain">"{formData.name}"</span>? 
+                            All associated data including call logs and configurations will be permanently removed.
+                        </p>
+                        
+                        <div className="flex items-center justify-end gap-3">
+                            <button
+                                onClick={() => setShowDeleteConfirm(false)}
+                                disabled={deleting}
+                                className="px-4 py-2 bg-surface border border-border rounded-lg text-sm text-textMain hover:bg-surfaceHover transition-colors disabled:opacity-50"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleDelete}
+                                disabled={deleting}
+                                className="px-4 py-2 bg-red-500 text-white font-medium rounded-lg text-sm hover:bg-red-600 transition-colors disabled:opacity-50 flex items-center gap-2"
+                            >
+                                {deleting ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                                {deleting ? 'Deleting...' : 'Delete'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
@@ -444,6 +586,7 @@ interface AgentTabProps {
     onOpenVoiceModal: () => void;
     onOpenLLMModal: () => void;
     onOpenLanguageModal: () => void;
+    onOpenTimezoneModal: () => void;
 }
 
 const AgentTab: React.FC<AgentTabProps> = ({
@@ -454,7 +597,9 @@ const AgentTab: React.FC<AgentTabProps> = ({
     onOpenVoiceModal,
     onOpenLLMModal,
     onOpenLanguageModal,
+    onOpenTimezoneModal,
 }) => {
+    const currentTimezone = TIMEZONES.find(tz => tz.value === formData.timezone) || TIMEZONES[0];
     return (
         <div className="flex h-full overflow-hidden">
             {/* Left Panel - Prompts */}
@@ -495,15 +640,21 @@ const AgentTab: React.FC<AgentTabProps> = ({
                         Type <code className="bg-surface px-1.5 py-0.5 rounded text-primary">{'{{'}</code> to add variables
                     </span>
                     <div className="flex items-center gap-3">
-                        <label className="flex items-center gap-2 cursor-pointer">
+                        <button 
+                            onClick={() => setFormData({...formData, useDefaultPersonality: !formData.useDefaultPersonality})}
+                            className="flex items-center gap-2 cursor-pointer"
+                        >
                             <div className={`w-9 h-5 rounded-full transition-colors ${formData.useDefaultPersonality ? 'bg-primary' : 'bg-gray-600'}`}>
                                 <div className={`w-4 h-4 rounded-full bg-white mt-0.5 transition-transform ${formData.useDefaultPersonality ? 'translate-x-4.5 ml-0.5' : 'translate-x-0.5'}`} />
                             </div>
                             <span className="text-xs text-textMain">Default personality</span>
-                        </label>
-                        <button className="flex items-center gap-1.5 px-2 py-1 text-xs text-textMuted hover:text-textMain hover:bg-surfaceHover rounded transition-colors">
+                        </button>
+                        <button 
+                            onClick={onOpenTimezoneModal}
+                            className="flex items-center gap-1.5 px-2 py-1 text-xs text-textMuted hover:text-textMain hover:bg-surfaceHover rounded transition-colors"
+                        >
                             <Globe size={12} />
-                            Set timezone
+                            {currentTimezone.label} ({currentTimezone.offset})
                         </button>
                     </div>
                 </div>
@@ -663,35 +814,23 @@ const MemoryTab: React.FC<MemoryTabProps> = ({ formData, setFormData }) => {
 
     return (
         <div className="p-6 overflow-y-auto h-full">
-            <div className="max-w-4xl">
-                {/* Hero Section */}
-                <div className="bg-gradient-to-br from-purple-500/10 via-primary/5 to-blue-500/10 border border-primary/20 rounded-2xl p-8 mb-8">
-                    <div className="flex items-start gap-6">
-                        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500 to-primary flex items-center justify-center flex-shrink-0">
-                            <Brain size={32} className="text-white" />
-                        </div>
-                        <div className="flex-1">
-                            <div className="flex items-center gap-3 mb-2">
-                                <h2 className="text-2xl font-bold text-textMain">Customer Memory</h2>
-                                <span className="px-2 py-0.5 bg-primary/20 text-primary text-xs font-bold rounded-full uppercase tracking-wide">
-                                    Exclusive
-                                </span>
-                            </div>
-                            <p className="text-textMuted leading-relaxed mb-4">
-                                Revolutionary AI memory that remembers every customer interaction. Your assistant builds a 
-                                deep understanding of each customer over time - their preferences, pain points, past conversations, 
-                                and relationship history. <span className="text-primary font-medium">No other platform offers this.</span>
-                            </p>
-                            <div className="flex items-center gap-2">
-                                <span className="text-sm text-textMain font-medium">Enable Memory</span>
-                                <button
-                                    onClick={() => setFormData(prev => ({ ...prev, memoryEnabled: !prev.memoryEnabled }))}
-                                    className={`w-12 h-7 rounded-full transition-colors relative ${formData.memoryEnabled ? 'bg-primary' : 'bg-gray-600'}`}
-                                >
-                                    <div className={`w-5 h-5 rounded-full bg-white absolute top-1 transition-transform ${formData.memoryEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
-                                </button>
-                            </div>
-                        </div>
+            <div className="max-w-4xl mx-auto">
+                {/* Header with Toggle */}
+                <div className="flex items-center justify-between mb-6">
+                    <div>
+                        <h2 className="text-xl font-semibold text-textMain">Customer Memory</h2>
+                        <p className="text-sm text-textMuted mt-1">
+                            AI memory that remembers every customer interaction
+                        </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <span className="text-sm text-textMuted">{formData.memoryEnabled ? 'Enabled' : 'Disabled'}</span>
+                        <button
+                            onClick={() => setFormData(prev => ({ ...prev, memoryEnabled: !prev.memoryEnabled }))}
+                            className={`w-12 h-7 rounded-full transition-colors relative ${formData.memoryEnabled ? 'bg-primary' : 'bg-gray-600'}`}
+                        >
+                            <div className={`w-5 h-5 rounded-full bg-white absolute top-1 transition-transform ${formData.memoryEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
+                        </button>
                     </div>
                 </div>
 
@@ -897,48 +1036,26 @@ Key points:
                         </div>
                     </>
                 ) : (
-                    /* Disabled State */
-                    <div className="border border-dashed border-border rounded-xl p-12 text-center">
-                        <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-purple-500/20 to-primary/20 flex items-center justify-center mx-auto mb-6">
-                            <Brain size={40} className="text-purple-400" />
-                        </div>
-                        <h3 className="text-xl font-semibold text-textMain mb-3">Unlock Customer Memory</h3>
-                        <p className="text-sm text-textMuted mb-6 max-w-lg mx-auto leading-relaxed">
-                            Enable memory to give your AI assistant the ability to remember every customer interaction. 
-                            Build deeper relationships with personalized conversations that reference past discussions, 
-                            preferences, and history.
-                        </p>
-                        
-                        <div className="flex flex-wrap justify-center gap-3 mb-6">
-                            <div className="flex items-center gap-2 px-3 py-1.5 bg-surface rounded-full text-xs text-textMuted">
-                                <Check size={14} className="text-primary" />
-                                Conversation Transcripts
+                    /* Disabled State - Simple */
+                    <div className="bg-surface border border-border rounded-xl p-8">
+                        <div className="flex items-start gap-4">
+                            <div className="w-12 h-12 rounded-xl bg-purple-500/20 flex items-center justify-center flex-shrink-0">
+                                <Brain size={24} className="text-purple-400" />
                             </div>
-                            <div className="flex items-center gap-2 px-3 py-1.5 bg-surface rounded-full text-xs text-textMuted">
-                                <Check size={14} className="text-primary" />
-                                AI-Generated Summaries
-                            </div>
-                            <div className="flex items-center gap-2 px-3 py-1.5 bg-surface rounded-full text-xs text-textMuted">
-                                <Check size={14} className="text-primary" />
-                                Customer Insights
-                            </div>
-                            <div className="flex items-center gap-2 px-3 py-1.5 bg-surface rounded-full text-xs text-textMuted">
-                                <Check size={14} className="text-primary" />
-                                Sentiment Tracking
-                            </div>
-                            <div className="flex items-center gap-2 px-3 py-1.5 bg-surface rounded-full text-xs text-textMuted">
-                                <Check size={14} className="text-primary" />
-                                Action Item Tracking
+                            <div className="flex-1">
+                                <h3 className="text-lg font-semibold text-textMain mb-2">Memory is disabled</h3>
+                                <p className="text-sm text-textMuted mb-4">
+                                    Enable memory to let your AI assistant remember customer interactions, 
+                                    extract insights, and provide personalized responses based on conversation history.
+                                </p>
+                                <div className="flex flex-wrap gap-2">
+                                    <span className="px-2.5 py-1 bg-background rounded-lg text-xs text-textMuted">Conversation History</span>
+                                    <span className="px-2.5 py-1 bg-background rounded-lg text-xs text-textMuted">AI Summaries</span>
+                                    <span className="px-2.5 py-1 bg-background rounded-lg text-xs text-textMuted">Customer Insights</span>
+                                    <span className="px-2.5 py-1 bg-background rounded-lg text-xs text-textMuted">Sentiment Tracking</span>
+                                </div>
                             </div>
                         </div>
-                        
-                        <button
-                            onClick={() => setFormData(prev => ({ ...prev, memoryEnabled: true }))}
-                            className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-500 to-primary text-white font-semibold rounded-xl hover:opacity-90 transition-opacity"
-                        >
-                            <Brain size={20} />
-                            Enable Customer Memory
-                        </button>
                     </div>
                 )}
             </div>
