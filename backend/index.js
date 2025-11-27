@@ -716,6 +716,9 @@ async function processWithAI(config, message, contact) {
             systemPrompt = `Your name is ${assistant.name}. When asked about your name, always say you are ${assistant.name}.\n\n${systemPrompt}`;
         }
         
+        // Add instruction to use conversation context
+        systemPrompt += `\n\nIMPORTANT: You have access to the full conversation history with this customer. When the customer asks about previous orders, details they mentioned, or anything from earlier in the conversation, refer back to that information. Never say you can't recall - use the conversation context provided.`;
+        
         // Inject customer memory if available
         if (customerMemory && assistant.memory_enabled) {
             const memoryConfig = assistant.memory_config || {};
