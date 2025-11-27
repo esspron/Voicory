@@ -41,6 +41,134 @@ if (!supabaseUrl || !supabaseKey) {
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+// ============================================
+// CUSTOMER MEMORY HELPER FUNCTIONS
+// ============================================
+
+// Format customer memory context for injection into system prompt
+function formatMemoryForPrompt(memoryContext, memoryConfig = {}) {
+    if (!memoryContext) return '';
+    
+    const lines = [];
+    lines.push('--- CUSTOMER MEMORY ---');
+    
+    // Customer basic info
+    if (memoryContext.customer) {
+        const c = memoryContext.customer;
+        lines.push(`Customer: ${c.name || 'Unknown'}`);
+        if (c.phone) lines.push(`Phone: ${c.phone}`);
+    }
+    
+    // Memory/relationship overview
+    if (memoryContext.memory && memoryConfig.includeSummary !== false) {
+        const m = memoryContext.memory;
+        lines.push('');
+        lines.push('Relationship:');
+        if (m.totalConversations) lines.push(`- Total conversations: ${m.totalConversations}`);
+        if (m.lastContact) lines.push(`- Last contact: ${new Date(m.lastContact).toLocaleDateString()}`);
+        if (m.averageSentiment !== undefined && m.averageSentiment !== null) {
+            const sentiment = m.averageSentiment > 0.3 ? 'Positive' : m.averageSentiment < -0.3 ? 'Negative' : 'Neutral';
+            lines.push(`- Overall sentiment: ${sentiment}`);
+        }
+        if (m.engagementScore) lines.push(`- Engagement score: ${m.engagementScore}/100`);
+        
+        // Personality and preferences
+        if (m.personalityTraits && m.personalityTraits.length > 0) {
+            lines.push('');
+            lines.push(`Personality: ${m.personalityTraits.join(', ')}`);
+        }
+        
+        if (m.interests && m.interests.length > 0) {
+            lines.push('');
+            lines.push(`Interests: ${m.interests.join(', ')}`);
+        }
+        
+        if (m.painPoints && m.painPoints.length > 0) {
+            lines.push('');
+            lines.push(`Pain points: ${m.painPoints.join(', ')}`);
+        }
+        
+        // Executive summary
+        if (m.executiveSummary) {
+            lines.push('');
+            lines.push(`Summary: ${m.executiveSummary}`);
+        }
+    }
+    
+    // Recent conversations
+    if (memoryContext.recentConversations && memoryContext.recentConversations.length > 0 && memoryConfig.rememberConversations !== false) {
+        lines.push('');
+        lines.push('--- RECENT CONVERSATIONS ---');
+        memoryContext.recentConversations.slice(0, 3).forEach((conv, i) => {
+            const date = new Date(conv.startedAt).toLocaleDateString();
+            const outcome = conv.outcome ? ` (${conv.outcome})` : '';
+            lines.push(`[${i + 1}] ${date}${outcome}`);
+            if (conv.summary) lines.push(`Summary: ${conv.summary}`);
+            if (conv.keyPoints && conv.keyPoints.length > 0) {
+                lines.push('Key points:');
+                conv.keyPoints.forEach(point => lines.push(`  - ${point}`));
+            }
+            lines.push('');
+        });
+    }
+    
+    // Key insights
+    if (memoryContext.keyInsights && memoryContext.keyInsights.length > 0 && memoryConfig.includeInsights !== false) {
+        lines.push('--- KEY INSIGHTS ---');
+        memoryContext.keyInsights.slice(0, 10).forEach(insight => {
+            const type = insight.insightType?.toUpperCase() || 'INFO';
+            lines.push(`[${type}] ${insight.content}`);
+        });
+    }
+    
+    lines.push('--- END MEMORY ---');
+    
+    return lines.join('\n');
+}
+
+// Analyze conversation and extract insights using AI
+async function analyzeConversationWithAI(transcript, assistantName) {
+    try {
+        const messages = transcript.map(m => `${m.role === 'user' ? 'Customer' : assistantName}: ${m.content}`).join('\n');
+        
+        const completion = await openai.chat.completions.create({
+            model: 'gpt-4o-mini', // Use cheaper model for analysis
+            messages: [
+                {
+                    role: 'system',
+                    content: `You are an expert at analyzing customer conversations. Extract insights from the following conversation.
+
+Return a JSON object with:
+{
+    "summary": "Brief 1-2 sentence summary of the conversation",
+    "keyPoints": ["key point 1", "key point 2"],
+    "sentiment": "positive" | "neutral" | "negative",
+    "sentimentScore": -1.0 to 1.0,
+    "topicsDiscussed": ["topic1", "topic2"],
+    "insights": [
+        {"type": "preference" | "objection" | "interest" | "pain_point" | "opportunity", "content": "insight text", "importance": "low" | "medium" | "high"}
+    ],
+    "actionItems": [{"task": "follow up on X", "priority": "high" | "medium" | "low"}]
+}`
+                },
+                {
+                    role: 'user',
+                    content: `Analyze this conversation:\n\n${messages}`
+                }
+            ],
+            temperature: 0.3,
+            max_tokens: 1000,
+            response_format: { type: 'json_object' }
+        });
+        
+        const result = JSON.parse(completion.choices[0]?.message?.content || '{}');
+        return result;
+    } catch (error) {
+        console.error('Error analyzing conversation:', error);
+        return null;
+    }
+}
+
 // Health check endpoint
 app.get('/', (req, res) => {
     res.json({ 
@@ -459,9 +587,64 @@ async function processWithAI(config, message, contact) {
             return;
         }
 
-        console.log('Using assistant:', assistant.name, 'Model:', assistant.llm_model, 'Status:', assistant.status);
+        console.log('Using assistant:', assistant.name, 'Model:', assistant.llm_model, 'Status:', assistant.status, 'Memory:', assistant.memory_enabled);
 
-        // 2. Get conversation history (last 20 messages for context)
+        // 2. Get or create customer for this contact (for memory tracking)
+        let customerId = null;
+        let customerMemory = null;
+        
+        if (assistant.memory_enabled) {
+            // Find or create customer by phone number
+            const phoneNumber = '+' + message.from;
+            const contactName = contact?.profile?.name || 'WhatsApp User';
+            
+            // Try to find existing customer
+            let { data: customer } = await supabase
+                .from('customers')
+                .select('id')
+                .eq('user_id', config.user_id)
+                .eq('phone_number', phoneNumber)
+                .single();
+            
+            if (!customer) {
+                // Create new customer
+                const { data: newCustomer, error: createError } = await supabase
+                    .from('customers')
+                    .insert({
+                        user_id: config.user_id,
+                        name: contactName,
+                        phone_number: phoneNumber,
+                        email: '',
+                        variables: {},
+                        has_memory: true
+                    })
+                    .select('id')
+                    .single();
+                
+                if (newCustomer) {
+                    customer = newCustomer;
+                    console.log('Created new customer:', customer.id);
+                }
+            }
+            
+            if (customer) {
+                customerId = customer.id;
+                
+                // Fetch customer memory context using the database function
+                const { data: memoryContext, error: memoryError } = await supabase
+                    .rpc('get_customer_context', { 
+                        p_customer_id: customerId,
+                        p_max_conversations: assistant.memory_config?.max_context_conversations || 5
+                    });
+                
+                if (memoryContext && !memoryError) {
+                    customerMemory = memoryContext;
+                    console.log('Loaded customer memory for:', customerMemory?.customer?.name || customerId);
+                }
+            }
+        }
+
+        // 3. Get conversation history (last 20 messages for context)
         const { data: history } = await supabase
             .from('whatsapp_messages')
             .select('direction, content, message_type, message_timestamp')
@@ -470,16 +653,26 @@ async function processWithAI(config, message, contact) {
             .order('message_timestamp', { ascending: true })
             .limit(20);
 
-        // 3. Build messages array for OpenAI
+        // 4. Build messages array for OpenAI
         const messages = [];
 
-        // System prompt - inject assistant name
+        // System prompt - inject assistant name and memory
         let systemPrompt = assistant.system_prompt || 
             'You are a helpful, friendly AI assistant. Be conversational and helpful.';
         
         // Prepend the assistant's identity if a name is set
         if (assistant.name) {
             systemPrompt = `Your name is ${assistant.name}. When asked about your name, always say you are ${assistant.name}.\n\n${systemPrompt}`;
+        }
+        
+        // Inject customer memory if available
+        if (customerMemory && assistant.memory_enabled) {
+            const memoryConfig = assistant.memory_config || {};
+            const memoryContext = formatMemoryForPrompt(customerMemory, memoryConfig);
+            if (memoryContext) {
+                systemPrompt = `${systemPrompt}\n\n${memoryContext}`;
+                console.log('Injected memory context for customer');
+            }
         }
         
         messages.push({
@@ -568,6 +761,100 @@ async function processWithAI(config, message, contact) {
 
         // 6. Send reply via WhatsApp API
         await sendWhatsAppReply(config, message.from, aiResponse);
+        
+        // 7. If memory is enabled, store conversation record and analyze for insights
+        if (assistant.memory_enabled && customerId) {
+            try {
+                // Build transcript from current exchange
+                const transcript = [];
+                
+                // Add history messages
+                if (history && history.length > 0) {
+                    for (const msg of history) {
+                        if (msg.message_type === 'text' && msg.content?.body) {
+                            transcript.push({
+                                role: msg.direction === 'inbound' ? 'user' : 'assistant',
+                                content: msg.content.body,
+                                timestamp: msg.message_timestamp
+                            });
+                        }
+                    }
+                }
+                
+                // Add current exchange
+                if (currentMsgText) {
+                    transcript.push({
+                        role: 'user',
+                        content: currentMsgText,
+                        timestamp: new Date().toISOString()
+                    });
+                }
+                transcript.push({
+                    role: 'assistant',
+                    content: aiResponse,
+                    timestamp: new Date().toISOString()
+                });
+                
+                // Analyze conversation periodically (every 5 messages or so)
+                const shouldAnalyze = transcript.length >= 5 && transcript.length % 5 === 0;
+                
+                if (shouldAnalyze && assistant.memory_config?.extractInsights) {
+                    console.log('Analyzing conversation for insights...');
+                    const analysis = await analyzeConversationWithAI(transcript.slice(-10), assistant.name);
+                    
+                    if (analysis) {
+                        // Store or update conversation record
+                        await supabase
+                            .from('customer_conversations')
+                            .insert({
+                                customer_id: customerId,
+                                assistant_id: assistant.id,
+                                user_id: config.user_id,
+                                call_direction: 'inbound',
+                                started_at: new Date(history?.[0]?.message_timestamp || Date.now()).toISOString(),
+                                transcript: transcript,
+                                summary: analysis.summary,
+                                key_points: analysis.keyPoints || [],
+                                sentiment: analysis.sentiment,
+                                sentiment_score: analysis.sentimentScore,
+                                topics_discussed: analysis.topicsDiscussed || [],
+                                action_items: analysis.actionItems || []
+                            });
+                        
+                        // Store extracted insights
+                        if (analysis.insights && analysis.insights.length > 0) {
+                            const insightsToInsert = analysis.insights.map(insight => ({
+                                customer_id: customerId,
+                                user_id: config.user_id,
+                                insight_type: insight.type || 'custom',
+                                content: insight.content,
+                                importance: insight.importance || 'medium',
+                                confidence: 0.8
+                            }));
+                            
+                            await supabase
+                                .from('customer_insights')
+                                .insert(insightsToInsert);
+                            
+                            console.log('Stored', insightsToInsert.length, 'insights for customer');
+                        }
+                    }
+                }
+                
+                // Update customer last interaction
+                await supabase
+                    .from('customers')
+                    .update({
+                        last_interaction: new Date().toISOString(),
+                        has_memory: true
+                    })
+                    .eq('id', customerId);
+                    
+            } catch (memoryError) {
+                console.error('Error updating customer memory:', memoryError);
+                // Don't throw - memory update failure shouldn't break the main flow
+            }
+        }
 
     } catch (error) {
         console.error('AI processing error:', error);
