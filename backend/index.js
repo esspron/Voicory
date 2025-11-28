@@ -928,25 +928,25 @@ async function processWithAI(config, message, contact) {
         
         // Build language instruction
         let languageInstruction = '';
-        if (languageSettings.default && languageSettings.default !== 'en') {
-            const langNames = {
-                'hi': 'Hindi', 'hi-Latn': 'Hinglish (Hindi written in English letters)',
-                'ta': 'Tamil', 'te': 'Telugu', 'mr': 'Marathi', 'bn': 'Bengali',
-                'gu': 'Gujarati', 'kn': 'Kannada', 'ml': 'Malayalam', 'pa': 'Punjabi',
-                'es': 'Spanish', 'es-MX': 'Mexican Spanish', 'fr': 'French', 'de': 'German',
-                'it': 'Italian', 'pt': 'Portuguese', 'pt-BR': 'Brazilian Portuguese',
-                'nl': 'Dutch', 'pl': 'Polish', 'ru': 'Russian', 'ja': 'Japanese',
-                'ko': 'Korean', 'zh': 'Chinese (Mandarin)', 'ar': 'Arabic', 'tr': 'Turkish',
-                'en-GB': 'British English', 'en-AU': 'Australian English'
-            };
-            const langName = langNames[languageSettings.default] || languageSettings.default;
-            languageInstruction = `\n\nLANGUAGE: You MUST respond in ${langName}. All your responses should be in ${langName}, not English.`;
-            
-            if (languageSettings.autoDetect) {
-                languageInstruction += ` However, if the customer writes in a different language, adapt and respond in their language.`;
-            }
-        } else if (languageSettings.autoDetect) {
-            languageInstruction = `\n\nLANGUAGE: Detect the customer's language and respond in the same language they use.`;
+        const langNames = {
+            'en': 'English', 'en-GB': 'British English', 'en-AU': 'Australian English',
+            'hi': 'Hindi', 'hi-Latn': 'Hinglish (Hindi written in English letters)',
+            'ta': 'Tamil', 'te': 'Telugu', 'mr': 'Marathi', 'bn': 'Bengali',
+            'gu': 'Gujarati', 'kn': 'Kannada', 'ml': 'Malayalam', 'pa': 'Punjabi',
+            'es': 'Spanish', 'es-MX': 'Mexican Spanish', 'fr': 'French', 'de': 'German',
+            'it': 'Italian', 'pt': 'Portuguese', 'pt-BR': 'Brazilian Portuguese',
+            'nl': 'Dutch', 'pl': 'Polish', 'ru': 'Russian', 'ja': 'Japanese',
+            'ko': 'Korean', 'zh': 'Chinese (Mandarin)', 'ar': 'Arabic', 'tr': 'Turkish'
+        };
+        const defaultLang = languageSettings.default || 'en';
+        const langName = langNames[defaultLang] || defaultLang;
+        
+        if (languageSettings.autoDetect) {
+            // Auto-detect ON: Respond in customer's language
+            languageInstruction = `\n\nLANGUAGE: Detect the customer's language and respond in the same language they use. If they write in Hindi, respond in Hindi. If they write in Hinglish (Hindi in English letters), respond in Hinglish. Match their language preference.`;
+        } else {
+            // Auto-detect OFF: Always use the configured default language
+            languageInstruction = `\n\nLANGUAGE: You MUST ALWAYS respond in ${langName} regardless of what language the customer uses. Even if the customer writes in Hindi, Hinglish, or any other language, you must respond ONLY in ${langName}. Do not switch languages to match the customer.`;
         }
         
         // Build style instruction
