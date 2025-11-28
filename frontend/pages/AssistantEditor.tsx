@@ -1,15 +1,16 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { 
-    Save, Play, Bot, GitBranch, BookOpen, BarChart3, Wrench, 
-    FlaskConical, Layout, Settings, Sparkles, Globe,
-    ChevronRight, Plus, Mic, Zap, Search, Filter, FileText,
-    X, Check, Clock, MessageSquare, Phone, ChevronDown, Loader2,
-    Brain, User, TrendingUp, AlertCircle, Heart, Lightbulb, Trash2,
-    Languages, Palette, Variable, Code
-} from 'lucide-react';
+import {
+    FloppyDisk, Play, Robot, GitBranch, BookOpen, ChartBar, Wrench,
+    Flask, Gear, Sparkle, Globe,
+    CaretRight, Plus, Microphone, Lightning, MagnifyingGlass, Funnel, FileText,
+    X, Check, Clock, ChatCircle, Phone, CaretDown, CircleNotch,
+    Brain, User, TrendUp, Warning, Heart, Lightbulb, Trash,
+    Translate, Palette, BracketsCurly, Code, SquaresFour, TestTube, Layout,
+    PaperPlaneTilt, SpeakerHigh
+} from '@phosphor-icons/react';
 import { getAssistant, getVoices, getCallLogs, createAssistant, updateAssistant, deleteAssistant } from '../services/voicoryService';
-import { 
+import {
     Assistant, Voice, CallLog, AssistantInput, MemoryConfig,
     LanguageSettings, StyleSettings, StyleMode, AdaptiveStyleConfig,
     DynamicVariable, DynamicVariablesConfig,
@@ -19,17 +20,21 @@ import {
 } from '../types';
 import VoiceSelectorModal from '../components/assistant-editor/VoiceSelectorModal';
 import LLMSelectorModal from '../components/assistant-editor/LLMSelectorModal';
+import PromptGeneratorModal from '../components/assistant-editor/PromptGeneratorModal';
+import Select from '../components/ui/Select';
+import { FadeIn } from '../components/ui/FadeIn';
+import { useAuth } from '../contexts/AuthContext';
 
 // Tab definitions - Added Memory tab
 const TABS = [
-    { id: 'agent', label: 'Agent', icon: Bot, isNew: false },
+    { id: 'agent', label: 'Agent', icon: Robot, isNew: false },
     { id: 'memory', label: 'Memory', icon: Brain, isNew: true, highlight: true },
     { id: 'workflow', label: 'Workflow', icon: GitBranch, isNew: true },
     { id: 'knowledge-base', label: 'Knowledge Base', icon: BookOpen },
-    { id: 'analysis', label: 'Analysis', icon: BarChart3 },
+    { id: 'analysis', label: 'Analysis', icon: ChartBar },
     { id: 'tools', label: 'Tools', icon: Wrench },
-    { id: 'tests', label: 'Tests', icon: FlaskConical, isNew: true },
-    { id: 'widget', label: 'Widget', icon: Layout },
+    { id: 'tests', label: 'Tests', icon: TestTube, isNew: true },
+    { id: 'widget', label: 'Widget', icon: SquaresFour },
 ] as const;
 
 type TabId = typeof TABS[number]['id'];
@@ -150,14 +155,16 @@ const AssistantEditor: React.FC = () => {
     const [assistantId, setAssistantId] = useState<string | null>(null);
     const skipChangeDetection = useRef(false);
     const initialLoadComplete = useRef(false);
-    
+
     // Modal states
     const [showVoiceModal, setShowVoiceModal] = useState(false);
     const [showLLMModal, setShowLLMModal] = useState(false);
     const [showLanguageModal, setShowLanguageModal] = useState(false);
     const [showTimezoneModal, setShowTimezoneModal] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [showPromptGenerator, setShowPromptGenerator] = useState(false);
     const [deleting, setDeleting] = useState(false);
+    const [showChatSidebar, setShowChatSidebar] = useState(false);
 
     // Track changes - skip during initial load and after save
     useEffect(() => {
@@ -172,11 +179,15 @@ const AssistantEditor: React.FC = () => {
 
     useEffect(() => {
         const fetchData = async () => {
+            // Reset to loading state
+            setLoading(true);
+            initialLoadComplete.current = false;
+            
             try {
                 // Fetch voices
                 const voicesData = await getVoices();
                 setVoices(voicesData);
-                
+
                 // If editing existing assistant, fetch it
                 if (id && id !== 'new') {
                     const assistant = await getAssistant(id);
@@ -211,6 +222,11 @@ const AssistantEditor: React.FC = () => {
                         const voice = voicesData.find(v => v.id === assistant.voiceId);
                         if (voice) setSelectedVoice(voice);
                     }
+                } else {
+                    // Reset to defaults for new assistant
+                    setAssistantId(null);
+                    setFormData({ ...DEFAULT_FORM_DATA });
+                    setSelectedVoice(null);
                 }
                 // Mark initial load complete after setting form data
                 setTimeout(() => {
@@ -228,7 +244,7 @@ const AssistantEditor: React.FC = () => {
 
     const handleSave = async (publish: boolean = false) => {
         if (saving) return;
-        
+
         setSaving(true);
         try {
             const inputData: AssistantInput = {
@@ -273,7 +289,7 @@ const AssistantEditor: React.FC = () => {
                 skipChangeDetection.current = true;
                 setFormData(prev => ({ ...prev, status: savedAssistant!.status }));
                 setHasChanges(false);
-                
+
                 // Navigate to the saved assistant if creating new
                 if (!assistantId) {
                     navigate(`/assistants/${savedAssistant.id}`, { replace: true });
@@ -300,8 +316,8 @@ const AssistantEditor: React.FC = () => {
 
     // Language settings handlers
     const handleDefaultLanguageSelect = (langCode: string) => {
-        setFormData({ 
-            ...formData, 
+        setFormData({
+            ...formData,
             languageSettings: { ...formData.languageSettings, default: langCode }
         });
         setShowLanguageModal(false);
@@ -310,9 +326,9 @@ const AssistantEditor: React.FC = () => {
     const handleAutoDetectToggle = () => {
         setFormData(prev => ({
             ...prev,
-            languageSettings: { 
-                ...prev.languageSettings, 
-                autoDetect: !prev.languageSettings.autoDetect 
+            languageSettings: {
+                ...prev.languageSettings,
+                autoDetect: !prev.languageSettings.autoDetect
             }
         }));
     };
@@ -362,7 +378,7 @@ const AssistantEditor: React.FC = () => {
 
     const handleDelete = async () => {
         if (!assistantId || deleting) return;
-        
+
         setDeleting(true);
         try {
             await deleteAssistant(assistantId);
@@ -376,13 +392,62 @@ const AssistantEditor: React.FC = () => {
         }
     };
 
+    // Handle applying generated prompt from AI
+    const handleApplyGeneratedPrompt = (data: {
+        systemPrompt: string;
+        firstMessage: string;
+        suggestedVariables?: Array<{ name: string; description: string; example?: string }>;
+        suggestedAgentName?: string;
+    }) => {
+        setFormData(prev => {
+            const newData = { ...prev };
+            
+            // Apply system prompt
+            if (data.systemPrompt) {
+                newData.systemPrompt = data.systemPrompt;
+            }
+            
+            // Apply first message
+            if (data.firstMessage) {
+                newData.firstMessage = data.firstMessage;
+            }
+            
+            // Apply suggested agent name if current name is default
+            if (data.suggestedAgentName && prev.name === 'New Assistant') {
+                newData.name = data.suggestedAgentName;
+            }
+            
+            // Add suggested variables to dynamic variables
+            if (data.suggestedVariables && data.suggestedVariables.length > 0) {
+                const existingVarNames = prev.dynamicVariables.variables.map(v => v.name);
+                const newVariables = data.suggestedVariables
+                    .filter(v => !existingVarNames.includes(v.name))
+                    .map(v => ({
+                        name: v.name,
+                        type: 'string' as const,
+                        description: v.description,
+                        placeholder: v.example || ''
+                    }));
+                
+                if (newVariables.length > 0) {
+                    newData.dynamicVariables = {
+                        ...prev.dynamicVariables,
+                        variables: [...prev.dynamicVariables.variables, ...newVariables]
+                    };
+                }
+            }
+            
+            return newData;
+        });
+    };
+
     const currentLanguage = SUPPORTED_LANGUAGES.find(l => l.code === formData.languageSettings.default) || SUPPORTED_LANGUAGES[0];
 
     const renderTabContent = () => {
         switch (activeTab) {
             case 'agent':
                 return (
-                    <AgentTab 
+                    <AgentTab
                         formData={formData}
                         setFormData={setFormData}
                         selectedVoice={selectedVoice}
@@ -400,7 +465,7 @@ const AssistantEditor: React.FC = () => {
                 );
             case 'memory':
                 return (
-                    <MemoryTab 
+                    <MemoryTab
                         formData={formData}
                         setFormData={setFormData}
                     />
@@ -411,39 +476,41 @@ const AssistantEditor: React.FC = () => {
                 return <KnowledgeBaseTab />;
             case 'analysis':
                 return <AnalysisTab />;
+            case 'tests':
+                return <TestsTab assistantId={assistantId} formData={formData} selectedVoice={selectedVoice} />;
             default:
                 return <PlaceholderTab tabName={activeTab} />;
         }
     };
 
     return (
-        <div className="flex flex-col h-full bg-background">
+        <FadeIn className="flex flex-col h-full bg-background">
             {/* Header */}
-            <div className="h-16 border-b border-border flex items-center justify-between px-6 bg-surface/50 backdrop-blur-sm sticky top-0 z-20">
+            <div className="h-16 border-b border-white/5 flex items-center justify-between px-6 bg-surface/80 backdrop-blur-xl sticky top-0 z-20">
                 <div className="flex items-center gap-4">
                     <div className="flex flex-col">
                         <div className="flex items-center gap-2">
-                            <input 
-                                type="text" 
+                            <input
+                                type="text"
                                 value={formData.name}
-                                onChange={(e) => setFormData({...formData, name: e.target.value})}
-                                className="bg-transparent text-textMain font-semibold text-lg outline-none placeholder:text-textMuted focus:underline decoration-border decoration-dashed underline-offset-4 min-w-0 w-auto max-w-[200px]"
+                                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                className="bg-transparent text-textMain font-semibold text-lg outline-none placeholder:text-textMuted focus:underline decoration-primary/50 decoration-dashed underline-offset-4 min-w-0 w-auto max-w-[200px]"
                                 placeholder="Assistant Name"
                                 size={formData.name.length || 10}
                             />
                             {!assistantId && (
-                                <span className="px-2 py-0.5 bg-primary/20 text-primary text-xs font-medium rounded-full flex-shrink-0">
+                                <span className="px-2.5 py-0.5 bg-gradient-to-r from-primary/20 to-primary/10 text-primary text-xs font-semibold rounded-full flex-shrink-0 border border-primary/20">
                                     New
                                 </span>
                             )}
                             {hasChanges && assistantId && (
-                                <span className="px-2 py-0.5 bg-yellow-500/20 text-yellow-400 text-xs font-medium rounded-full flex-shrink-0">
+                                <span className="px-2.5 py-0.5 bg-gradient-to-r from-amber-500/20 to-amber-500/10 text-amber-400 text-xs font-semibold rounded-full flex-shrink-0 border border-amber-500/20">
                                     Unsaved
                                 </span>
                             )}
                         </div>
-                        <span className="text-xs text-textMuted flex items-center gap-1">
-                            <span className={`w-1.5 h-1.5 rounded-full ${formData.status === 'active' ? 'bg-emerald-500' : formData.status === 'draft' ? 'bg-gray-400' : 'bg-yellow-500'}`}></span>
+                        <span className="text-xs text-textMuted flex items-center gap-1.5">
+                            <span className={`w-2 h-2 rounded-full ${formData.status === 'active' ? 'bg-emerald-500 shadow-lg shadow-emerald-500/50' : formData.status === 'draft' ? 'bg-gray-400' : 'bg-yellow-500'}`}></span>
                             {formData.status === 'active' ? 'Published' : formData.status === 'draft' ? 'Draft' : 'Inactive'}
                         </span>
                     </div>
@@ -451,37 +518,57 @@ const AssistantEditor: React.FC = () => {
                 <div className="flex items-center gap-3">
                     {/* Delete button - only show for existing assistants */}
                     {assistantId && (
-                        <button 
+                        <button
                             onClick={() => setShowDeleteConfirm(true)}
                             disabled={saving || deleting}
-                            className="flex items-center gap-2 px-3 py-2 bg-surface border border-border rounded-lg text-sm text-red-400 hover:bg-red-500/10 hover:border-red-500/50 transition-colors disabled:opacity-50"
+                            className="group flex items-center gap-2 px-3 py-2.5 bg-surface/50 border border-white/10 rounded-xl text-sm text-red-400 hover:bg-red-500/10 hover:border-red-500/30 transition-all disabled:opacity-50"
                             title="Delete assistant"
                         >
-                            <Trash2 size={16} />
+                            <Trash size={16} weight="bold" className="group-hover:scale-110 transition-transform" />
                         </button>
                     )}
-                    <button 
-                        className="flex items-center gap-2 px-4 py-2 bg-surface border border-border rounded-lg text-sm text-textMain hover:bg-surfaceHover transition-colors"
+                    {/* Test - goes to Tests tab for test cases */}
+                    <button
+                        onClick={() => setActiveTab('tests')}
+                        className="group flex items-center gap-2 px-4 py-2.5 bg-surface/50 border border-white/10 rounded-xl text-sm text-textMain hover:bg-white/5 hover:border-white/20 transition-all"
                         disabled={saving}
                     >
-                        <Play size={16} />
+                        <Play size={16} weight="fill" className="group-hover:scale-110 transition-transform" />
                         Test
                     </button>
-                    <button 
+                    {/* Chat - opens sidebar for text chat preview */}
+                    <button
+                        onClick={() => setShowChatSidebar(true)}
+                        className="group flex items-center gap-2 px-4 py-2.5 bg-surface/50 border border-white/10 rounded-xl text-sm text-textMain hover:bg-white/5 hover:border-white/20 transition-all"
+                        disabled={saving}
+                    >
+                        <ChatCircle size={16} weight="fill" className="group-hover:scale-110 transition-transform" />
+                        Chat
+                    </button>
+                    {/* Talk to Assistant - Voice call (coming soon) */}
+                    <button
+                        className="group flex items-center gap-2 px-4 py-2.5 bg-primary/10 border border-primary/30 rounded-xl text-sm text-primary hover:bg-primary/20 transition-all cursor-not-allowed opacity-70"
+                        disabled
+                        title="Voice calling coming soon"
+                    >
+                        <Phone size={16} weight="fill" />
+                        Talk to Assistant
+                    </button>
+                    <button
                         onClick={() => handleSave(false)}
                         disabled={saving || !hasChanges}
-                        className="flex items-center gap-2 px-4 py-2 bg-surface border border-border rounded-lg text-sm text-textMain hover:bg-surfaceHover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="group flex items-center gap-2 px-4 py-2.5 bg-surface/50 border border-white/10 rounded-xl text-sm text-textMain hover:bg-white/5 hover:border-white/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                        {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                        {saving ? <CircleNotch size={16} weight="bold" className="animate-spin" /> : <FloppyDisk size={16} weight="bold" className="group-hover:scale-110 transition-transform" />}
                         Save
                     </button>
                     {formData.status !== 'active' && (
-                        <button 
+                        <button
                             onClick={() => handleSave(true)}
                             disabled={saving}
-                            className="flex items-center gap-2 px-4 py-2 bg-primary text-black font-semibold rounded-lg text-sm hover:bg-primaryHover transition-colors disabled:opacity-50"
+                            className="group flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-primary to-primary/80 text-white font-semibold rounded-xl text-sm hover:shadow-lg hover:shadow-primary/25 hover:-translate-y-0.5 transition-all disabled:opacity-50"
                         >
-                            {saving ? <Loader2 size={16} className="animate-spin" /> : <Zap size={16} />}
+                            {saving ? <CircleNotch size={16} weight="bold" className="animate-spin" /> : <Lightning size={16} weight="fill" className="group-hover:scale-110 transition-transform" />}
                             Publish
                         </button>
                     )}
@@ -489,31 +576,36 @@ const AssistantEditor: React.FC = () => {
             </div>
 
             {/* Tabs */}
-            <div className="border-b border-border bg-surface/30">
-                <div className="flex items-center gap-1 px-6 overflow-x-auto">
+            <div className="border-b border-white/5 bg-surface/50 backdrop-blur-sm">
+                <div className="flex items-center gap-1 px-6 py-2 overflow-x-auto scrollbar-thin">
                     {TABS.map((tab) => {
                         const Icon = tab.icon;
                         const isHighlighted = 'highlight' in tab && tab.highlight;
+                        const isActive = activeTab === tab.id;
                         return (
                             <button
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id)}
                                 className={`
-                                    flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap
-                                    ${activeTab === tab.id 
-                                        ? 'border-primary text-textMain' 
-                                        : 'border-transparent text-textMuted hover:text-textMain hover:border-border'
+                                    group relative flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-xl transition-all duration-200 whitespace-nowrap
+                                    ${isActive
+                                        ? 'bg-gradient-to-r from-primary/15 to-primary/5 text-textMain border border-primary/20 shadow-lg shadow-primary/5'
+                                        : 'text-textMuted hover:text-textMain hover:bg-white/[0.03] border border-transparent'
                                     }
                                 `}
                             >
-                                <Icon size={16} className={isHighlighted ? 'text-purple-400' : ''} />
+                                <Icon
+                                    size={18}
+                                    weight={isActive ? "fill" : "regular"}
+                                    className={`transition-all ${isHighlighted ? 'text-purple-400' : isActive ? 'text-primary' : 'group-hover:text-primary'}`}
+                                />
                                 {tab.label}
                                 {isHighlighted ? (
-                                    <span className="px-1.5 py-0.5 bg-gradient-to-r from-purple-500 to-primary text-white text-[10px] font-bold rounded uppercase">
+                                    <span className="px-1.5 py-0.5 bg-gradient-to-r from-purple-500 to-violet-600 text-white text-[10px] font-bold rounded-md uppercase shadow-lg shadow-purple-500/25">
                                         New
                                     </span>
                                 ) : tab.isNew && (
-                                    <span className="px-1.5 py-0.5 bg-gray-600 text-gray-300 text-[10px] font-medium rounded">
+                                    <span className="px-1.5 py-0.5 bg-white/10 text-textMuted text-[10px] font-medium rounded-md">
                                         New
                                     </span>
                                 )}
@@ -536,7 +628,7 @@ const AssistantEditor: React.FC = () => {
                     onSelect={handleVoiceSelect}
                     onClose={() => setShowVoiceModal(false)}
                     elevenlabsModelId={formData.elevenlabsModelId}
-                    onModelChange={(modelId) => setFormData({...formData, elevenlabsModelId: modelId})}
+                    onModelChange={(modelId) => setFormData({ ...formData, elevenlabsModelId: modelId })}
                 />
             )}
 
@@ -552,26 +644,26 @@ const AssistantEditor: React.FC = () => {
 
             {/* Language Selector Modal */}
             {showLanguageModal && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
-                    <div className="bg-surface border border-border rounded-xl w-full max-w-lg mx-4 shadow-2xl max-h-[80vh] flex flex-col">
-                        <div className="flex items-center justify-between p-4 border-b border-border flex-shrink-0">
+                <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50">
+                    <div className="bg-surface/95 backdrop-blur-xl border border-white/10 rounded-2xl w-full max-w-lg mx-4 shadow-2xl max-h-[80vh] flex flex-col overflow-hidden">
+                        <div className="flex items-center justify-between p-5 border-b border-white/5 flex-shrink-0">
                             <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-                                    <Languages size={20} className="text-primary" />
+                                <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
+                                    <Translate size={22} weight="duotone" className="text-primary" />
                                 </div>
                                 <div>
                                     <h3 className="text-lg font-semibold text-textMain">Select Default Language</h3>
-                                    <p className="text-sm text-textMuted">28 languages supported with Multilingual v2</p>
+                                    <p className="text-sm text-textMuted/70">28 languages supported with Multilingual v2</p>
                                 </div>
                             </div>
                             <button
                                 onClick={() => setShowLanguageModal(false)}
-                                className="p-2 hover:bg-surfaceHover rounded-lg text-textMuted hover:text-textMain transition-colors"
+                                className="p-2.5 hover:bg-white/5 rounded-xl text-textMuted hover:text-textMain transition-all"
                             >
-                                <X size={18} />
+                                <X size={18} weight="bold" />
                             </button>
                         </div>
-                        
+
                         <div className="p-4 overflow-y-auto flex-1">
                             {/* Group by region */}
                             {['English', 'India', 'Europe', 'Asia', 'Other'].map((region) => {
@@ -583,7 +675,7 @@ const AssistantEditor: React.FC = () => {
                                     return false;
                                 });
                                 if (regionLanguages.length === 0) return null;
-                                
+
                                 return (
                                     <div key={region} className="mb-4">
                                         <div className="text-xs font-medium text-textMuted uppercase tracking-wider mb-2">{region}</div>
@@ -592,11 +684,10 @@ const AssistantEditor: React.FC = () => {
                                                 <button
                                                     key={lang.code}
                                                     onClick={() => handleDefaultLanguageSelect(lang.code)}
-                                                    className={`flex items-center gap-2 p-2.5 rounded-lg transition-colors text-left ${
-                                                        formData.languageSettings.default === lang.code
-                                                            ? 'bg-primary/10 border border-primary/30'
-                                                            : 'hover:bg-surfaceHover border border-transparent'
-                                                    }`}
+                                                    className={`flex items-center gap-2 p-2.5 rounded-lg transition-colors text-left ${formData.languageSettings.default === lang.code
+                                                        ? 'bg-primary/10 border border-primary/30'
+                                                        : 'hover:bg-surfaceHover border border-transparent'
+                                                        }`}
                                                 >
                                                     <span className="text-lg">{lang.flag}</span>
                                                     <div className="flex-1 min-w-0">
@@ -621,40 +712,39 @@ const AssistantEditor: React.FC = () => {
 
             {/* Timezone Modal */}
             {showTimezoneModal && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
-                    <div className="bg-surface border border-border rounded-xl w-full max-w-md mx-4 shadow-2xl">
-                        <div className="flex items-center justify-between p-4 border-b border-border">
+                <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50">
+                    <div className="bg-surface/95 backdrop-blur-xl border border-white/10 rounded-2xl w-full max-w-md mx-4 shadow-2xl overflow-hidden">
+                        <div className="flex items-center justify-between p-5 border-b border-white/5">
                             <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-                                    <Globe size={20} className="text-primary" />
+                                <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
+                                    <Globe size={22} weight="duotone" className="text-primary" />
                                 </div>
                                 <div>
                                     <h3 className="text-lg font-semibold text-textMain">Set Timezone</h3>
-                                    <p className="text-sm text-textMuted">Choose the timezone for this assistant</p>
+                                    <p className="text-sm text-textMuted/70">Choose the timezone for this assistant</p>
                                 </div>
                             </div>
                             <button
                                 onClick={() => setShowTimezoneModal(false)}
-                                className="p-2 hover:bg-surfaceHover rounded-lg text-textMuted hover:text-textMain transition-colors"
+                                className="p-2.5 hover:bg-white/5 rounded-xl text-textMuted hover:text-textMain transition-all"
                             >
-                                <X size={18} />
+                                <X size={18} weight="bold" />
                             </button>
                         </div>
-                        
+
                         <div className="p-4 max-h-80 overflow-y-auto">
                             <div className="space-y-1">
                                 {TIMEZONES.map((tz) => (
                                     <button
                                         key={tz.value}
                                         onClick={() => {
-                                            setFormData({...formData, timezone: tz.value});
+                                            setFormData({ ...formData, timezone: tz.value });
                                             setShowTimezoneModal(false);
                                         }}
-                                        className={`w-full flex items-center justify-between p-3 rounded-lg transition-colors ${
-                                            formData.timezone === tz.value
-                                                ? 'bg-primary/10 border border-primary/30'
-                                                : 'hover:bg-surfaceHover border border-transparent'
-                                        }`}
+                                        className={`w-full flex items-center justify-between p-3 rounded-lg transition-colors ${formData.timezone === tz.value
+                                            ? 'bg-primary/10 border border-primary/30'
+                                            : 'hover:bg-surfaceHover border border-transparent'
+                                            }`}
                                     >
                                         <span className="text-sm font-medium text-textMain">{tz.label}</span>
                                         <div className="flex items-center gap-2">
@@ -673,44 +763,54 @@ const AssistantEditor: React.FC = () => {
 
             {/* Delete Confirmation Modal */}
             {showDeleteConfirm && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
-                    <div className="bg-surface border border-border rounded-xl p-6 w-full max-w-md mx-4 shadow-2xl">
+                <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50">
+                    <div className="bg-surface/95 backdrop-blur-xl border border-white/10 rounded-2xl p-6 w-full max-w-md mx-4 shadow-2xl">
                         <div className="flex items-center gap-3 mb-4">
-                            <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center">
-                                <Trash2 size={20} className="text-red-400" />
+                            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-red-500/20 to-red-600/10 flex items-center justify-center">
+                                <Trash size={24} weight="duotone" className="text-red-400" />
                             </div>
                             <div>
                                 <h3 className="text-lg font-semibold text-textMain">Delete Assistant</h3>
-                                <p className="text-sm text-textMuted">This action cannot be undone</p>
+                                <p className="text-sm text-textMuted/70">This action cannot be undone</p>
                             </div>
                         </div>
-                        
+
                         <p className="text-sm text-textMuted mb-6">
-                            Are you sure you want to delete <span className="font-medium text-textMain">"{formData.name}"</span>? 
+                            Are you sure you want to delete <span className="font-medium text-textMain">"{formData.name}"</span>?
                             All associated data including call logs and configurations will be permanently removed.
                         </p>
-                        
+
                         <div className="flex items-center justify-end gap-3">
                             <button
                                 onClick={() => setShowDeleteConfirm(false)}
                                 disabled={deleting}
-                                className="px-4 py-2 bg-surface border border-border rounded-lg text-sm text-textMain hover:bg-surfaceHover transition-colors disabled:opacity-50"
+                                className="px-4 py-2.5 bg-surface/50 border border-white/10 rounded-xl text-sm text-textMain hover:bg-white/5 transition-all disabled:opacity-50"
                             >
                                 Cancel
                             </button>
                             <button
                                 onClick={handleDelete}
                                 disabled={deleting}
-                                className="px-4 py-2 bg-red-500 text-white font-medium rounded-lg text-sm hover:bg-red-600 transition-colors disabled:opacity-50 flex items-center gap-2"
+                                className="px-5 py-2.5 bg-gradient-to-r from-red-500 to-red-600 text-white font-medium rounded-xl text-sm hover:shadow-lg hover:shadow-red-500/25 transition-all disabled:opacity-50 flex items-center gap-2"
                             >
-                                {deleting ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                                {deleting ? <CircleNotch size={16} weight="bold" className="animate-spin" /> : <Trash size={16} weight="bold" />}
                                 {deleting ? 'Deleting...' : 'Delete'}
                             </button>
                         </div>
                     </div>
                 </div>
             )}
-        </div>
+
+            {/* Chat Sidebar - Preview/Talk to Agent */}
+            {showChatSidebar && (
+                <ChatSidebar
+                    assistantId={assistantId}
+                    formData={formData}
+                    selectedVoice={selectedVoice}
+                    onClose={() => setShowChatSidebar(false)}
+                />
+            )}
+        </FadeIn>
     );
 };
 
@@ -731,6 +831,7 @@ interface AgentTabProps {
     onRemoveSupportedLanguage: (langCode: string) => void;
     onStyleModeSelect: (mode: StyleMode) => void;
     onAdaptiveConfigToggle: (key: 'mirrorFormality' | 'mirrorLength' | 'mirrorVocabulary') => void;
+    onOpenPromptGenerator: () => void;
 }
 
 const AgentTab: React.FC<AgentTabProps> = ({
@@ -747,15 +848,23 @@ const AgentTab: React.FC<AgentTabProps> = ({
     onRemoveSupportedLanguage,
     onStyleModeSelect,
     onAdaptiveConfigToggle,
+    onOpenPromptGenerator,
 }) => {
     const [showAddLanguageDropdown, setShowAddLanguageDropdown] = useState(false);
     const currentTimezone = TIMEZONES.find(tz => tz.value === formData.timezone) || TIMEZONES[0];
-    
+    const isFirstAutoDetectRun = useRef(true);
+
     // Auto-detect {{variables}} in system prompt and first message
     useEffect(() => {
+        // Skip the first run to avoid triggering "Unsaved" on initial load
+        if (isFirstAutoDetectRun.current) {
+            isFirstAutoDetectRun.current = false;
+            return;
+        }
+
         const systemVarNames = SYSTEM_VARIABLES.map(v => v.name);
         const existingCustomVarNames = formData.dynamicVariables.variables.map(v => v.name);
-        
+
         // Extract all {{variable}} patterns from prompts
         const allText = `${formData.systemPrompt} ${formData.firstMessage}`;
         const varPattern = /\{\{([a-zA-Z_][a-zA-Z0-9_]*)\}\}/g;
@@ -764,7 +873,7 @@ const AgentTab: React.FC<AgentTabProps> = ({
         while ((match = varPattern.exec(allText)) !== null) {
             foundVars.add(match[1].toLowerCase());
         }
-        
+
         // Find variables that are NOT system vars and NOT already in custom vars
         const newVarsToAdd: DynamicVariable[] = [];
         foundVars.forEach(varName => {
@@ -776,7 +885,7 @@ const AgentTab: React.FC<AgentTabProps> = ({
                 });
             }
         });
-        
+
         // Add new variables if any found
         if (newVarsToAdd.length > 0) {
             setFormData(prev => ({
@@ -788,13 +897,13 @@ const AgentTab: React.FC<AgentTabProps> = ({
             }));
         }
     }, [formData.systemPrompt, formData.firstMessage]);
-    
+
     // Get supported languages that are not already added
     const availableLanguages = SUPPORTED_LANGUAGES.filter(
-        lang => lang.code !== formData.languageSettings.default && 
-                !formData.languageSettings.supported.includes(lang.code)
+        lang => lang.code !== formData.languageSettings.default &&
+            !formData.languageSettings.supported.includes(lang.code)
     );
-    
+
     // Get the actual language objects for supported languages
     const supportedLanguageObjects = formData.languageSettings.supported
         .map(code => SUPPORTED_LANGUAGES.find(l => l.code === code))
@@ -803,19 +912,24 @@ const AgentTab: React.FC<AgentTabProps> = ({
     return (
         <div className="flex h-full overflow-hidden">
             {/* Left Panel - Prompts */}
-            <div className="flex-1 overflow-y-auto p-6 border-r border-border">
+            <div className="flex-1 overflow-y-auto p-6 border-r border-white/5">
                 {/* Section Header */}
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
-                        <h3 className="text-sm font-medium text-textMain">System prompt</h3>
-                        <a href="#" className="text-textMuted hover:text-primary">
+                        <h3 className="text-sm font-semibold text-textMain">System prompt</h3>
+                        <a href="#" className="text-textMuted/50 hover:text-primary transition-colors">
                             <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="inline">
-                                <path d="M3.5 2.5H2.5C1.94772 2.5 1.5 2.94772 1.5 3.5V9.5C1.5 10.0523 1.94772 10.5 2.5 10.5H8.5C9.05228 10.5 9.5 10.0523 9.5 9.5V8.5M6.5 1.5H10.5M10.5 1.5V5.5M10.5 1.5L5 7" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/>
+                                <path d="M3.5 2.5H2.5C1.94772 2.5 1.5 2.94772 1.5 3.5V9.5C1.5 10.0523 1.94772 10.5 2.5 10.5H8.5C9.05228 10.5 9.5 10.0523 9.5 9.5V8.5M6.5 1.5H10.5M10.5 1.5V5.5M10.5 1.5L5 7" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" />
                             </svg>
                         </a>
                     </div>
-                    <button className="p-1.5 hover:bg-surfaceHover rounded text-textMuted hover:text-primary transition-colors" title="Enhance with AI">
-                        <Sparkles size={16} />
+                    <button 
+                        onClick={onOpenPromptGenerator}
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 hover:bg-primary/10 rounded-lg text-textMuted hover:text-primary transition-all group border border-transparent hover:border-primary/20" 
+                        title="Generate with AI"
+                    >
+                        <Sparkle size={16} weight="fill" className="group-hover:scale-110 transition-transform" />
+                        <span className="text-xs font-medium">AI Generate</span>
                     </button>
                 </div>
 
@@ -823,13 +937,13 @@ const AgentTab: React.FC<AgentTabProps> = ({
                 <div className="relative mb-4">
                     <textarea
                         value={formData.systemPrompt}
-                        onChange={(e) => setFormData({...formData, systemPrompt: e.target.value})}
-                        className="w-full h-64 bg-surface border border-border rounded-xl p-4 text-sm text-textMain outline-none focus:border-primary resize-none font-mono leading-relaxed"
+                        onChange={(e) => setFormData({ ...formData, systemPrompt: e.target.value })}
+                        className="w-full h-64 bg-surface/50 border border-white/10 rounded-xl p-4 text-sm text-textMain outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10 resize-none font-mono leading-relaxed transition-all"
                         placeholder="Enter system instructions..."
                     />
-                    <button className="absolute top-3 right-3 p-1 hover:bg-surfaceHover rounded text-textMuted hover:text-textMain" title="Expand">
+                    <button className="absolute top-3 right-3 p-1.5 hover:bg-white/10 rounded-lg text-textMuted/50 hover:text-textMain transition-all" title="Expand">
                         <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                            <path d="M9 1H13M13 1V5M13 1L8 6M5 13H1M1 13V9M1 13L6 8" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/>
+                            <path d="M9 1H13M13 1V5M13 1L8 6M5 13H1M1 13V9M1 13L6 8" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
                     </button>
                 </div>
@@ -840,17 +954,17 @@ const AgentTab: React.FC<AgentTabProps> = ({
                         Type <code className="bg-surface px-1.5 py-0.5 rounded text-primary">{'{{'}</code> to add variables
                     </span>
                     <div className="flex items-center gap-3">
-                        <button 
+                        <button
                             type="button"
-                            onClick={() => setFormData(prev => ({...prev, useDefaultPersonality: !prev.useDefaultPersonality}))}
+                            onClick={() => setFormData(prev => ({ ...prev, useDefaultPersonality: !prev.useDefaultPersonality }))}
                             className="flex items-center gap-2 cursor-pointer"
                         >
                             <div className={`w-9 h-5 rounded-full transition-colors ${formData.useDefaultPersonality ? 'bg-primary' : 'bg-gray-600'}`}>
-                                <div className={`w-4 h-4 rounded-full bg-white mt-0.5 transition-transform ${formData.useDefaultPersonality ? 'translate-x-4.5 ml-0.5' : 'translate-x-0.5'}`} />
+                                <div className={`w-4 h-4 rounded-full bg-white mt-0.5 transition-transform ${formData.useDefaultPersonality ? 'translate-x-4 ml-0.5' : 'translate-x-0.5'}`} />
                             </div>
                             <span className="text-xs text-textMain">Default personality</span>
                         </button>
-                        <button 
+                        <button
                             type="button"
                             onClick={onOpenTimezoneModal}
                             className="flex items-center gap-1.5 px-2 py-1 text-xs text-textMuted hover:text-textMain hover:bg-surfaceHover rounded transition-colors"
@@ -863,8 +977,8 @@ const AgentTab: React.FC<AgentTabProps> = ({
 
                 {/* First Message Section */}
                 <div className="mb-4">
-                    <h3 className="text-sm font-medium text-textMain mb-1">First message</h3>
-                    <p className="text-xs text-textMuted mb-3">
+                    <h3 className="text-sm font-semibold text-textMain mb-1">First message</h3>
+                    <p className="text-xs text-textMuted/70 mb-3">
                         The first message the agent will say. If empty, the agent will wait for the user to start the conversation.{' '}
                         <a href="#" className="text-primary hover:underline">Disclosure Requirements ↗</a>
                     </p>
@@ -873,13 +987,13 @@ const AgentTab: React.FC<AgentTabProps> = ({
                 <div className="relative mb-4">
                     <textarea
                         value={formData.firstMessage}
-                        onChange={(e) => setFormData({...formData, firstMessage: e.target.value})}
-                        className="w-full h-24 bg-surface border border-border rounded-xl p-4 text-sm text-textMain outline-none focus:border-primary resize-none font-mono"
+                        onChange={(e) => setFormData({ ...formData, firstMessage: e.target.value })}
+                        className="w-full h-24 bg-surface/50 border border-white/10 rounded-xl p-4 text-sm text-textMain outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10 resize-none font-mono transition-all"
                         placeholder="Hello! How can I help you today?"
                     />
-                    <button className="absolute top-3 right-3 p-1 hover:bg-surfaceHover rounded text-textMuted hover:text-textMain" title="Expand">
+                    <button className="absolute top-3 right-3 p-1.5 hover:bg-white/10 rounded-lg text-textMuted/50 hover:text-textMain transition-all" title="Expand">
                         <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                            <path d="M9 1H13M13 1V5M13 1L8 6M5 13H1M1 13V9M1 13L6 8" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/>
+                            <path d="M9 1H13M13 1V5M13 1L8 6M5 13H1M1 13V9M1 13L6 8" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
                     </button>
                 </div>
@@ -889,203 +1003,107 @@ const AgentTab: React.FC<AgentTabProps> = ({
                     <span className="text-xs text-textMuted">
                         Type <code className="bg-surface px-1.5 py-0.5 rounded text-primary">{'{{'}</code> to add variables
                     </span>
-                    <button 
+                    <button
                         type="button"
-                        onClick={() => setFormData(prev => ({...prev, interruptible: !prev.interruptible}))}
+                        onClick={() => setFormData(prev => ({ ...prev, interruptible: !prev.interruptible }))}
                         className="flex items-center gap-2 cursor-pointer"
                     >
                         <div className={`w-9 h-5 rounded-full transition-colors ${formData.interruptible ? 'bg-primary' : 'bg-gray-600'}`}>
-                            <div className={`w-4 h-4 rounded-full bg-white mt-0.5 transition-transform ${formData.interruptible ? 'translate-x-4.5 ml-0.5' : 'translate-x-0.5'}`} />
+                            <div className={`w-4 h-4 rounded-full bg-white mt-0.5 transition-transform ${formData.interruptible ? 'translate-x-4 ml-0.5' : 'translate-x-0.5'}`} />
                         </div>
                         <span className="text-xs text-textMain">Interruptible</span>
                     </button>
                 </div>
 
                 {/* ============================================
-                    DYNAMIC VARIABLES SECTION (Unified View)
+                    SYSTEM VARIABLES SECTION (Simplified)
                     ============================================ */}
                 <div className="mb-6">
                     <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
-                            <Variable size={16} className="text-textMuted" />
-                            <h3 className="text-sm font-medium text-textMain">Dynamic Variables</h3>
-                            <span className="px-1.5 py-0.5 bg-primary/20 text-primary text-[10px] font-bold rounded uppercase">New</span>
+                            <BracketsCurly size={16} weight="bold" className="text-textMuted" />
+                            <h3 className="text-sm font-semibold text-textMain">System Variables</h3>
                         </div>
-                        <a 
-                            href="https://elevenlabs.io/docs/agents-platform/customization/personalization/dynamic-variables" 
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-textMuted hover:text-primary text-xs flex items-center gap-1"
+                        <button
+                            onClick={() => setFormData(prev => ({
+                                ...prev,
+                                dynamicVariables: {
+                                    ...prev.dynamicVariables,
+                                    enableSystemVariables: !prev.dynamicVariables.enableSystemVariables
+                                }
+                            }))}
+                            className="flex items-center gap-1.5"
                         >
-                            Learn more ↗
-                        </a>
+                            <div className={`w-9 h-5 rounded-full transition-colors ${formData.dynamicVariables.enableSystemVariables ? 'bg-primary' : 'bg-gray-600'}`}>
+                                <div className={`w-4 h-4 rounded-full bg-white mt-0.5 transition-transform ${formData.dynamicVariables.enableSystemVariables ? 'translate-x-4 ml-0.5' : 'translate-x-0.5'}`} />
+                            </div>
+                        </button>
                     </div>
-                    <p className="text-xs text-textMuted mb-4">
-                        Use <code className="bg-surface px-1.5 py-0.5 rounded text-primary font-mono">{'{{variable_name}}'}</code> in prompts to personalize conversations.
+                    <p className="text-xs text-textMuted mb-3">
+                        Use these variables in your prompts: <code className="bg-surface px-1 py-0.5 rounded text-primary font-mono text-[11px]">{'{{customer_name}}'}</code>
                     </p>
 
-                    {/* Unified Variables List */}
-                    <div className="bg-surface border border-border rounded-xl overflow-hidden">
-                        {/* Header */}
-                        <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-surface/50">
-                            <div className="flex items-center gap-2">
-                                <span className="text-xs font-medium text-textMain">All Variables</span>
-                                <span className="px-1.5 py-0.5 bg-primary/20 text-primary text-[10px] font-medium rounded">
-                                    {(formData.dynamicVariables.enableSystemVariables ? SYSTEM_VARIABLES.length : 0) + formData.dynamicVariables.variables.length}
-                                </span>
-                            </div>
-                            <button
-                                onClick={() => setFormData(prev => ({
-                                    ...prev,
-                                    dynamicVariables: {
-                                        ...prev.dynamicVariables,
-                                        enableSystemVariables: !prev.dynamicVariables.enableSystemVariables
-                                    }
-                                }))}
-                                className="flex items-center gap-1.5 text-xs text-textMuted hover:text-textMain transition-colors"
-                            >
-                                <span>{formData.dynamicVariables.enableSystemVariables ? 'System vars ON' : 'System vars OFF'}</span>
-                                <div className={`w-7 h-4 rounded-full transition-colors ${formData.dynamicVariables.enableSystemVariables ? 'bg-primary' : 'bg-gray-600'}`}>
-                                    <div className={`w-3 h-3 rounded-full bg-white mt-0.5 transition-transform ${formData.dynamicVariables.enableSystemVariables ? 'translate-x-3.5' : 'translate-x-0.5'}`} />
-                                </div>
-                            </button>
-                        </div>
-
-                        {/* Variables Grid */}
-                        <div className="p-3">
-                            <div className="grid grid-cols-1 gap-2">
-                                {/* System Variables */}
-                                {formData.dynamicVariables.enableSystemVariables && SYSTEM_VARIABLES.map((variable) => (
-                                    <div 
+                    {/* System Variables List */}
+                    {formData.dynamicVariables.enableSystemVariables && (
+                        <div className="bg-surface border border-border rounded-lg p-3">
+                            <div className="grid grid-cols-2 gap-2">
+                                {SYSTEM_VARIABLES.map((variable) => (
+                                    <div
                                         key={variable.name}
-                                        className="flex items-center justify-between p-2.5 bg-blue-500/5 border border-blue-500/20 rounded-lg"
+                                        className="flex items-center gap-2 p-2 bg-blue-500/5 border border-blue-500/20 rounded-lg"
                                     >
-                                        <div className="flex items-center gap-3">
-                                            <code className="px-2 py-1 bg-blue-500/10 rounded text-xs font-mono text-blue-300">
-                                                {`{{${variable.name}}}`}
-                                            </code>
-                                            <span className="text-xs text-textMuted">{variable.description}</span>
-                                        </div>
-                                        <span className="px-1.5 py-0.5 bg-blue-500/20 text-blue-300 text-[9px] font-medium rounded uppercase">System</span>
+                                        <code className="px-1.5 py-0.5 bg-blue-500/10 rounded text-[10px] font-mono text-blue-300">
+                                            {`{{${variable.name}}}`}
+                                        </code>
                                     </div>
                                 ))}
-
-                                {/* Custom Variables */}
-                                {formData.dynamicVariables.variables.map((variable, index) => (
-                                    <div 
-                                        key={`custom-${index}`}
-                                        className="flex items-center justify-between p-2.5 bg-purple-500/5 border border-purple-500/20 rounded-lg group"
-                                    >
-                                        <div className="flex items-center gap-3">
-                                            <code className="px-2 py-1 bg-purple-500/10 rounded text-xs font-mono text-purple-300">
-                                                {`{{${variable.name}}}`}
-                                            </code>
-                                            <div className="flex flex-col">
-                                                <span className="text-xs text-textMuted">
-                                                    {variable.description || 'Custom variable'}
-                                                </span>
-                                                {variable.placeholder && (
-                                                    <span className="text-[10px] text-textMuted">
-                                                        Default: <span className="text-purple-300">{variable.placeholder}</span>
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <span className="px-1.5 py-0.5 bg-purple-500/20 text-purple-300 text-[9px] font-medium rounded uppercase">
-                                                {variable.type}
-                                            </span>
-                                            {variable.isSecret && (
-                                                <span className="px-1.5 py-0.5 bg-red-500/20 text-red-400 text-[9px] font-medium rounded uppercase">Secret</span>
-                                            )}
-                                            <button
-                                                onClick={() => {
-                                                    const newVars = [...formData.dynamicVariables.variables];
-                                                    newVars.splice(index, 1);
-                                                    setFormData(prev => ({
-                                                        ...prev,
-                                                        dynamicVariables: { ...prev.dynamicVariables, variables: newVars }
-                                                    }));
-                                                }}
-                                                className="p-1 text-textMuted hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
-                                            >
-                                                <X size={14} />
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))}
-
-                                {/* Empty State */}
-                                {!formData.dynamicVariables.enableSystemVariables && formData.dynamicVariables.variables.length === 0 && (
-                                    <div className="text-center py-6">
-                                        <Variable size={24} className="mx-auto text-textMuted mb-2" />
-                                        <p className="text-xs text-textMuted">No variables defined</p>
-                                        <p className="text-[10px] text-textMuted mt-1">Enable system variables or add custom ones</p>
-                                    </div>
-                                )}
                             </div>
+                            <p className="text-[10px] text-textMuted mt-3">
+                                💡 For full customer context (preferences, history, addresses), enable <span className="text-primary font-medium">Memory</span> in the Model tab.
+                            </p>
                         </div>
-
-                        {/* Add Variable Footer */}
-                        <div className="border-t border-border">
-                            <AddVariableForm 
-                                onAdd={(variable) => {
-                                    setFormData(prev => ({
-                                        ...prev,
-                                        dynamicVariables: {
-                                            ...prev.dynamicVariables,
-                                            variables: [...prev.dynamicVariables.variables, variable]
-                                        }
-                                    }));
-                                }}
-                                existingNames={[
-                                    ...formData.dynamicVariables.variables.map(v => v.name),
-                                    ...SYSTEM_VARIABLES.map(v => v.name)
-                                ]}
-                            />
-                        </div>
-                    </div>
+                    )}
                 </div>
             </div>
 
             {/* Right Panel - Voice, Language, LLM */}
-            <div className="w-80 overflow-y-auto p-6 bg-surface/20">
+            <div className="w-80 overflow-y-auto p-6 bg-surface/30 backdrop-blur-sm">
                 {/* Voices Section */}
                 <div className="mb-6">
                     <div className="flex items-center justify-between mb-2">
-                        <h3 className="text-sm font-medium text-textMain">Voices</h3>
-                        <button className="p-1 hover:bg-surfaceHover rounded text-textMuted hover:text-textMain" title="Voice Settings">
-                            <Settings size={14} />
+                        <h3 className="text-sm font-semibold text-textMain">Voices</h3>
+                        <button className="p-1.5 hover:bg-white/5 rounded-lg text-textMuted hover:text-textMain transition-all" title="Voice Settings">
+                            <Gear size={14} weight="bold" />
                         </button>
                     </div>
-                    <p className="text-xs text-textMuted mb-3">
+                    <p className="text-xs text-textMuted/70 mb-3">
                         Select the voice you want to use for the agent.
                     </p>
 
                     {/* Selected Voice */}
                     <button
                         onClick={onOpenVoiceModal}
-                        className="w-full flex items-center justify-between p-3 bg-surface border border-border rounded-lg hover:border-primary/50 transition-colors group"
+                        className="w-full flex items-center justify-between p-3.5 bg-surface/50 border border-white/10 rounded-xl hover:border-primary/30 hover:bg-white/[0.03] transition-all group"
                     >
                         <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary/30 to-primary/10 flex items-center justify-center">
-                                <Mic size={14} className="text-primary" />
+                            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary/30 to-primary/10 flex items-center justify-center">
+                                <Microphone size={16} weight="fill" className="text-primary" />
                             </div>
                             <div className="text-left">
                                 <div className="text-sm font-medium text-textMain">
                                     {selectedVoice?.name || 'Select Voice'}
                                 </div>
                                 {selectedVoice && (
-                                    <div className="text-[10px] text-primary font-medium">Primary</div>
+                                    <div className="text-[10px] text-primary font-semibold">Primary</div>
                                 )}
                             </div>
                         </div>
-                        <ChevronRight size={16} className="text-textMuted group-hover:text-textMain transition-colors" />
+                        <CaretRight size={16} weight="bold" className="text-textMuted group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
                     </button>
 
                     {/* Add Additional Voice */}
-                    <button className="w-full flex items-center gap-2 mt-2 p-2 text-xs text-textMuted hover:text-textMain hover:bg-surfaceHover rounded transition-colors">
-                        <Plus size={14} />
+                    <button className="w-full flex items-center gap-2 mt-2 p-2 text-xs text-textMuted hover:text-primary hover:bg-white/5 rounded-lg transition-all">
+                        <Plus size={14} weight="bold" />
                         Add additional voice
                     </button>
                 </div>
@@ -1093,30 +1111,30 @@ const AgentTab: React.FC<AgentTabProps> = ({
                 {/* Language Section - Enhanced */}
                 <div className="mb-6">
                     <div className="flex items-center gap-2 mb-2">
-                        <Languages size={16} className="text-textMuted" />
-                        <h3 className="text-sm font-medium text-textMain">Language</h3>
+                        <Translate size={16} weight="bold" className="text-textMuted" />
+                        <h3 className="text-sm font-semibold text-textMain">Language</h3>
                     </div>
-                    <p className="text-xs text-textMuted mb-3">
+                    <p className="text-xs text-textMuted/70 mb-3">
                         Choose languages and enable auto-detection per customer.
                     </p>
 
                     {/* Default Language */}
                     <button
                         onClick={onOpenLanguageModal}
-                        className="w-full flex items-center justify-between p-3 bg-surface border border-border rounded-lg hover:border-primary/50 transition-colors group mb-2"
+                        className="w-full flex items-center justify-between p-3.5 bg-surface/50 border border-white/10 rounded-xl hover:border-primary/30 hover:bg-white/[0.03] transition-all group mb-2"
                     >
                         <div className="flex items-center gap-3">
-                            <span className="text-lg">{currentLanguage.flag}</span>
+                            <span className="text-xl">{currentLanguage.flag}</span>
                             <div className="text-left">
                                 <div className="text-sm font-medium text-textMain">{currentLanguage.name}</div>
-                                <div className="text-[10px] text-primary font-medium">Default</div>
+                                <div className="text-[10px] text-primary font-semibold">Default</div>
                             </div>
                         </div>
-                        <ChevronRight size={16} className="text-textMuted group-hover:text-textMain transition-colors" />
+                        <CaretRight size={16} weight="bold" className="text-textMuted group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
                     </button>
 
                     {/* Auto-detect Toggle */}
-                    <div 
+                    <div
                         onClick={onAutoDetectToggle}
                         className="flex items-center justify-between p-3 bg-surface/50 border border-border rounded-lg mb-2 cursor-pointer hover:bg-surfaceHover transition-colors"
                     >
@@ -1129,7 +1147,7 @@ const AgentTab: React.FC<AgentTabProps> = ({
                         <div
                             className={`w-9 h-5 rounded-full transition-colors ${formData.languageSettings.autoDetect ? 'bg-primary' : 'bg-gray-600'}`}
                         >
-                            <div className={`w-4 h-4 rounded-full bg-white mt-0.5 transition-transform ${formData.languageSettings.autoDetect ? 'translate-x-4.5 ml-0.5' : 'translate-x-0.5'}`} />
+                            <div className={`w-4 h-4 rounded-full bg-white mt-0.5 transition-transform ${formData.languageSettings.autoDetect ? 'translate-x-4 ml-0.5' : 'translate-x-0.5'}`} />
                         </div>
                     </div>
 
@@ -1137,13 +1155,13 @@ const AgentTab: React.FC<AgentTabProps> = ({
                     {supportedLanguageObjects.length > 0 && (
                         <div className="flex flex-wrap gap-1.5 mb-2">
                             {supportedLanguageObjects.map((lang) => lang && (
-                                <div 
+                                <div
                                     key={lang.code}
                                     className="flex items-center gap-1.5 px-2 py-1 bg-surface border border-border rounded-md text-xs"
                                 >
                                     <span>{lang.flag}</span>
                                     <span className="text-textMain">{lang.name}</span>
-                                    <button 
+                                    <button
                                         onClick={() => onRemoveSupportedLanguage(lang.code)}
                                         className="text-textMuted hover:text-red-400 transition-colors"
                                     >
@@ -1156,14 +1174,14 @@ const AgentTab: React.FC<AgentTabProps> = ({
 
                     {/* Add Additional Language Dropdown */}
                     <div className="relative">
-                        <button 
+                        <button
                             onClick={() => setShowAddLanguageDropdown(!showAddLanguageDropdown)}
                             className="w-full flex items-center gap-2 p-2 text-xs text-textMuted hover:text-textMain hover:bg-surfaceHover rounded transition-colors"
                         >
                             <Plus size={14} />
                             Add supported language
                         </button>
-                        
+
                         {showAddLanguageDropdown && (
                             <div className="absolute left-0 right-0 top-full mt-1 bg-surface border border-border rounded-lg shadow-lg z-10 max-h-48 overflow-y-auto">
                                 {availableLanguages.slice(0, 10).map((lang) => (
@@ -1195,10 +1213,10 @@ const AgentTab: React.FC<AgentTabProps> = ({
                 {/* Communication Style Section - NEW */}
                 <div className="mb-6">
                     <div className="flex items-center gap-2 mb-2">
-                        <Palette size={16} className="text-textMuted" />
-                        <h3 className="text-sm font-medium text-textMain">Communication Style</h3>
+                        <Palette size={16} weight="bold" className="text-textMuted" />
+                        <h3 className="text-sm font-semibold text-textMain">Communication Style</h3>
                     </div>
-                    <p className="text-xs text-textMuted mb-3">
+                    <p className="text-xs text-textMuted/70 mb-3">
                         How the AI should communicate with customers.
                     </p>
 
@@ -1207,27 +1225,27 @@ const AgentTab: React.FC<AgentTabProps> = ({
                         {STYLE_OPTIONS.map((style) => {
                             const isSelected = formData.styleSettings.mode === style.mode;
                             const colorClasses = {
-                                blue: isSelected ? 'border-blue-500 bg-blue-500/10' : 'border-border hover:border-blue-500/50',
-                                green: isSelected ? 'border-emerald-500 bg-emerald-500/10' : 'border-border hover:border-emerald-500/50',
-                                yellow: isSelected ? 'border-yellow-500 bg-yellow-500/10' : 'border-border hover:border-yellow-500/50',
-                                purple: isSelected ? 'border-purple-500 bg-purple-500/10' : 'border-border hover:border-purple-500/50',
+                                blue: isSelected ? 'border-blue-500/50 bg-blue-500/10 shadow-lg shadow-blue-500/10' : 'border-white/10 hover:border-blue-500/30 hover:bg-blue-500/5',
+                                green: isSelected ? 'border-emerald-500/50 bg-emerald-500/10 shadow-lg shadow-emerald-500/10' : 'border-white/10 hover:border-emerald-500/30 hover:bg-emerald-500/5',
+                                yellow: isSelected ? 'border-yellow-500/50 bg-yellow-500/10 shadow-lg shadow-yellow-500/10' : 'border-white/10 hover:border-yellow-500/30 hover:bg-yellow-500/5',
+                                purple: isSelected ? 'border-purple-500/50 bg-purple-500/10 shadow-lg shadow-purple-500/10' : 'border-white/10 hover:border-purple-500/30 hover:bg-purple-500/5',
                             };
                             return (
                                 <button
                                     key={style.mode}
                                     onClick={() => onStyleModeSelect(style.mode)}
-                                    className={`p-3 rounded-lg border transition-all text-left ${colorClasses[style.color as keyof typeof colorClasses]}`}
+                                    className={`p-3 rounded-xl border transition-all text-left ${colorClasses[style.color as keyof typeof colorClasses]}`}
                                 >
                                     <div className="flex items-center gap-2 mb-1">
                                         <span className="text-base">{style.icon}</span>
-                                        <span className={`text-xs font-medium ${isSelected ? 'text-textMain' : 'text-textMuted'}`}>
+                                        <span className={`text-xs font-semibold ${isSelected ? 'text-textMain' : 'text-textMuted'}`}>
                                             {style.label}
                                         </span>
                                         {isSelected && (
-                                            <Check size={12} className="text-primary ml-auto" />
+                                            <Check size={12} weight="bold" className="text-primary ml-auto" />
                                         )}
                                     </div>
-                                    <p className="text-[10px] text-textMuted leading-tight">
+                                    <p className="text-[10px] text-textMuted/70 leading-tight">
                                         {style.description}
                                     </p>
                                 </button>
@@ -1242,8 +1260,8 @@ const AgentTab: React.FC<AgentTabProps> = ({
                                 <span className="text-xs font-medium text-purple-300">Adaptive Settings</span>
                                 <span className="px-1.5 py-0.5 bg-purple-500/20 text-purple-300 text-[9px] font-bold rounded uppercase">AI-Powered</span>
                             </div>
-                            
-                            <div 
+
+                            <div
                                 onClick={() => onAdaptiveConfigToggle('mirrorFormality')}
                                 className="flex items-center justify-between cursor-pointer hover:bg-surfaceHover p-1 rounded transition-colors"
                             >
@@ -1254,8 +1272,8 @@ const AgentTab: React.FC<AgentTabProps> = ({
                                     <div className={`w-3.5 h-3.5 rounded-full bg-white mt-0.5 transition-transform ${formData.styleSettings.adaptiveConfig.mirrorFormality ? 'translate-x-4' : 'translate-x-0.5'}`} />
                                 </div>
                             </div>
-                            
-                            <div 
+
+                            <div
                                 onClick={() => onAdaptiveConfigToggle('mirrorLength')}
                                 className="flex items-center justify-between cursor-pointer hover:bg-surfaceHover p-1 rounded transition-colors"
                             >
@@ -1266,8 +1284,8 @@ const AgentTab: React.FC<AgentTabProps> = ({
                                     <div className={`w-3.5 h-3.5 rounded-full bg-white mt-0.5 transition-transform ${formData.styleSettings.adaptiveConfig.mirrorLength ? 'translate-x-4' : 'translate-x-0.5'}`} />
                                 </div>
                             </div>
-                            
-                            <div 
+
+                            <div
                                 onClick={() => onAdaptiveConfigToggle('mirrorVocabulary')}
                                 className="flex items-center justify-between cursor-pointer hover:bg-surfaceHover p-1 rounded transition-colors"
                             >
@@ -1284,172 +1302,23 @@ const AgentTab: React.FC<AgentTabProps> = ({
 
                 {/* LLM Section */}
                 <div>
-                    <h3 className="text-sm font-medium text-textMain mb-2">LLM</h3>
-                    <p className="text-xs text-textMuted mb-3">
+                    <h3 className="text-sm font-semibold text-textMain mb-2">LLM</h3>
+                    <p className="text-xs text-textMuted/70 mb-3">
                         Select which provider and model to use for the LLM.
                     </p>
 
                     {/* Selected LLM */}
                     <button
                         onClick={onOpenLLMModal}
-                        className="w-full flex items-center justify-between p-3 bg-surface border border-border rounded-lg hover:border-primary/50 transition-colors group"
+                        className="w-full flex items-center justify-between p-3.5 bg-surface/50 border border-white/10 rounded-xl hover:border-primary/30 hover:bg-white/[0.03] transition-all group"
                     >
                         <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500/30 to-purple-500/30 flex items-center justify-center">
-                                <Zap size={14} className="text-blue-400" />
+                            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500/30 to-purple-500/30 flex items-center justify-center">
+                                <Lightning size={16} weight="fill" className="text-blue-400" />
                             </div>
                             <div className="text-sm font-medium text-textMain">{formData.llmModel}</div>
                         </div>
-                        <ChevronRight size={16} className="text-textMuted group-hover:text-textMain transition-colors" />
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-// ============================================
-// ADD VARIABLE FORM (Helper component)
-// ============================================
-interface AddVariableFormProps {
-    onAdd: (variable: DynamicVariable) => void;
-    existingNames: string[];
-}
-
-const AddVariableForm: React.FC<AddVariableFormProps> = ({ onAdd, existingNames }) => {
-    const [isAdding, setIsAdding] = useState(false);
-    const [name, setName] = useState('');
-    const [type, setType] = useState<'string' | 'number' | 'boolean'>('string');
-    const [description, setDescription] = useState('');
-    const [placeholder, setPlaceholder] = useState('');
-    const [isSecret, setIsSecret] = useState(false);
-    const [error, setError] = useState('');
-
-    const handleSubmit = () => {
-        // Validate name
-        const cleanName = name.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_');
-        if (!cleanName) {
-            setError('Variable name is required');
-            return;
-        }
-        if (existingNames.includes(cleanName)) {
-            setError('Variable name already exists');
-            return;
-        }
-        if (cleanName.startsWith('system__')) {
-            setError('Cannot use system__ prefix');
-            return;
-        }
-
-        onAdd({
-            name: cleanName,
-            type,
-            description: description.trim() || undefined,
-            placeholder: placeholder.trim() || undefined,
-            isSecret,
-        });
-
-        // Reset form
-        setName('');
-        setType('string');
-        setDescription('');
-        setPlaceholder('');
-        setIsSecret(false);
-        setError('');
-        setIsAdding(false);
-    };
-
-    if (!isAdding) {
-        return (
-            <button
-                onClick={() => setIsAdding(true)}
-                className="w-full flex items-center justify-center gap-2 p-3 text-xs text-textMuted hover:text-primary hover:bg-primary/5 transition-all"
-            >
-                <Plus size={14} />
-                Add custom variable
-            </button>
-        );
-    }
-
-    return (
-        <div className="p-3 bg-purple-500/5">
-            <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-medium text-purple-300">New Custom Variable</span>
-                <button 
-                    onClick={() => { setIsAdding(false); setError(''); }}
-                    className="text-textMuted hover:text-textMain"
-                >
-                    <X size={14} />
-                </button>
-            </div>
-
-            {error && (
-                <div className="mb-3 p-2 bg-red-500/10 border border-red-500/30 rounded text-xs text-red-400">
-                    {error}
-                </div>
-            )}
-
-            <div className="space-y-2">
-                {/* Row 1: Name & Type */}
-                <div className="flex gap-2">
-                    <div className="flex-1">
-                        <div className="flex items-center gap-1 bg-background border border-border rounded px-2 py-1.5">
-                            <span className="text-purple-400 text-xs font-mono">{'{{'}</span>
-                            <input
-                                type="text"
-                                value={name}
-                                onChange={(e) => {
-                                    setName(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '_'));
-                                    setError('');
-                                }}
-                                placeholder="variable_name"
-                                className="flex-1 bg-transparent text-xs text-textMain font-mono outline-none min-w-0"
-                            />
-                            <span className="text-purple-400 text-xs font-mono">{'}}'}</span>
-                        </div>
-                    </div>
-                    <select
-                        value={type}
-                        onChange={(e) => setType(e.target.value as 'string' | 'number' | 'boolean')}
-                        className="bg-background border border-border rounded px-2 py-1.5 text-xs text-textMain outline-none focus:border-primary"
-                    >
-                        <option value="string">String</option>
-                        <option value="number">Number</option>
-                        <option value="boolean">Boolean</option>
-                    </select>
-                    <label className="flex items-center gap-1.5 cursor-pointer px-2">
-                        <input
-                            type="checkbox"
-                            checked={isSecret}
-                            onChange={(e) => setIsSecret(e.target.checked)}
-                            className="w-3.5 h-3.5 rounded border-border bg-background text-primary"
-                        />
-                        <span className="text-[10px] text-textMuted">Secret</span>
-                    </label>
-                </div>
-
-                {/* Row 2: Description & Placeholder */}
-                <div className="flex gap-2">
-                    <input
-                        type="text"
-                        value={description}
-                        onChange={(e) => setDescription(e.target.value)}
-                        placeholder="Description (optional)"
-                        className="flex-1 bg-background border border-border rounded px-2 py-1.5 text-xs text-textMain outline-none focus:border-primary"
-                    />
-                    <input
-                        type="text"
-                        value={placeholder}
-                        onChange={(e) => setPlaceholder(e.target.value)}
-                        placeholder="Default value"
-                        className="flex-1 bg-background border border-border rounded px-2 py-1.5 text-xs text-textMain outline-none focus:border-primary"
-                    />
-                    <button
-                        onClick={handleSubmit}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-500 text-white font-medium rounded text-xs hover:bg-purple-600 transition-colors"
-                    >
-                        <Plus size={12} />
-                        Add
+                        <CaretRight size={16} weight="bold" className="text-textMuted group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
                     </button>
                 </div>
             </div>
@@ -1502,23 +1371,23 @@ const MemoryTab: React.FC<MemoryTabProps> = ({ formData, setFormData }) => {
                     <>
                         {/* Features Grid */}
                         <div className="grid grid-cols-3 gap-4 mb-8">
-                            <div className="bg-surface border border-border rounded-xl p-5">
+                            <div className="bg-surface border border-white/10 rounded-xl p-5">
                                 <div className="w-10 h-10 rounded-lg bg-blue-500/20 flex items-center justify-center mb-3">
-                                    <MessageSquare size={20} className="text-blue-400" />
+                                    <ChatCircle size={20} weight="duotone" className="text-blue-400" />
                                 </div>
                                 <h3 className="font-medium text-textMain mb-1">Conversation History</h3>
                                 <p className="text-xs text-textMuted">Full transcripts and AI summaries of every past call</p>
                             </div>
-                            <div className="bg-surface border border-border rounded-xl p-5">
+                            <div className="bg-surface border border-white/10 rounded-xl p-5">
                                 <div className="w-10 h-10 rounded-lg bg-purple-500/20 flex items-center justify-center mb-3">
-                                    <Lightbulb size={20} className="text-purple-400" />
+                                    <Lightbulb size={20} weight="duotone" className="text-purple-400" />
                                 </div>
                                 <h3 className="font-medium text-textMain mb-1">Smart Insights</h3>
                                 <p className="text-xs text-textMuted">Auto-extracted preferences, objections & opportunities</p>
                             </div>
-                            <div className="bg-surface border border-border rounded-xl p-5">
+                            <div className="bg-surface border border-white/10 rounded-xl p-5">
                                 <div className="w-10 h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center mb-3">
-                                    <Heart size={20} className="text-emerald-400" />
+                                    <Heart size={20} weight="duotone" className="text-emerald-400" />
                                 </div>
                                 <h3 className="font-medium text-textMain mb-1">Sentiment Tracking</h3>
                                 <p className="text-xs text-textMuted">Monitor customer satisfaction over time</p>
@@ -1526,12 +1395,12 @@ const MemoryTab: React.FC<MemoryTabProps> = ({ formData, setFormData }) => {
                         </div>
 
                         {/* Configuration */}
-                        <div className="bg-surface border border-border rounded-xl p-6 mb-6">
+                        <div className="bg-surface border border-white/10 rounded-xl p-6 mb-6">
                             <h3 className="font-semibold text-textMain mb-4 flex items-center gap-2">
-                                <Settings size={18} />
+                                <Gear size={18} weight="duotone" />
                                 Memory Configuration
                             </h3>
-                            
+
                             <div className="space-y-4">
                                 {/* Remember Conversations */}
                                 <div className="flex items-center justify-between py-2">
@@ -1595,30 +1464,35 @@ const MemoryTab: React.FC<MemoryTabProps> = ({ formData, setFormData }) => {
                                         <div className="text-sm font-medium text-textMain">Context Window</div>
                                         <div className="text-xs text-textMuted">Number of past conversations to include in context</div>
                                     </div>
-                                    <select
-                                        value={formData.memoryConfig.maxContextConversations}
-                                        onChange={(e) => updateMemoryConfig('maxContextConversations', parseInt(e.target.value))}
-                                        className="bg-background border border-border rounded-lg px-3 py-1.5 text-sm text-textMain outline-none focus:border-primary"
-                                    >
-                                        <option value={3}>3 conversations</option>
-                                        <option value={5}>5 conversations</option>
-                                        <option value={10}>10 conversations</option>
-                                        <option value={15}>15 conversations</option>
-                                    </select>
+                                    <div className="w-48">
+                                        <Select
+                                            value={{
+                                                value: formData.memoryConfig.maxContextConversations.toString(),
+                                                label: `${formData.memoryConfig.maxContextConversations} conversations`
+                                            }}
+                                            onChange={(option) => updateMemoryConfig('maxContextConversations', parseInt(option.value))}
+                                            options={[
+                                                { value: '3', label: '3 conversations' },
+                                                { value: '5', label: '5 conversations' },
+                                                { value: '10', label: '10 conversations' },
+                                                { value: '15', label: '15 conversations' }
+                                            ]}
+                                        />
+                                    </div>
                                 </div>
                             </div>
                         </div>
 
                         {/* What Gets Injected */}
-                        <div className="bg-surface border border-border rounded-xl p-6">
+                        <div className="bg-surface border border-white/10 rounded-xl p-6">
                             <h3 className="font-semibold text-textMain mb-4 flex items-center gap-2">
-                                <Zap size={18} className="text-primary" />
+                                <Lightning size={18} weight="fill" className="text-primary" />
                                 Context Injected Into Calls
                             </h3>
                             <p className="text-xs text-textMuted mb-4">
                                 When memory is enabled, the following information is automatically added to the system prompt for each call:
                             </p>
-                            
+
                             <div className="space-y-3">
                                 <label className="flex items-center gap-3 cursor-pointer">
                                     <input
@@ -1632,7 +1506,7 @@ const MemoryTab: React.FC<MemoryTabProps> = ({ formData, setFormData }) => {
                                         <div className="text-xs text-textMuted">Executive summary of who this customer is</div>
                                     </div>
                                 </label>
-                                
+
                                 <label className="flex items-center gap-3 cursor-pointer">
                                     <input
                                         type="checkbox"
@@ -1645,7 +1519,7 @@ const MemoryTab: React.FC<MemoryTabProps> = ({ formData, setFormData }) => {
                                         <div className="text-xs text-textMuted">Important preferences, objections, and opportunities</div>
                                     </div>
                                 </label>
-                                
+
                                 <label className="flex items-center gap-3 cursor-pointer">
                                     <input
                                         type="checkbox"
@@ -1662,13 +1536,13 @@ const MemoryTab: React.FC<MemoryTabProps> = ({ formData, setFormData }) => {
                         </div>
 
                         {/* Example Preview */}
-                        <div className="mt-6 p-4 bg-background rounded-xl border border-dashed border-border">
+                        <div className="mt-6 p-4 bg-background rounded-xl border border-dashed border-white/10">
                             <div className="flex items-center gap-2 mb-3">
-                                <AlertCircle size={14} className="text-textMuted" />
+                                <Warning size={14} weight="duotone" className="text-textMuted" />
                                 <span className="text-xs font-medium text-textMuted uppercase tracking-wide">Example Memory Context</span>
                             </div>
                             <pre className="text-xs text-textMuted font-mono whitespace-pre-wrap leading-relaxed">
-{`--- CUSTOMER MEMORY ---
+                                {`--- CUSTOMER MEMORY ---
 Customer: Rahul Sharma
 
 Relationship:
@@ -1701,15 +1575,15 @@ Key points:
                     </>
                 ) : (
                     /* Disabled State - Simple */
-                    <div className="bg-surface border border-border rounded-xl p-8">
+                    <div className="bg-surface border border-white/10 rounded-xl p-8">
                         <div className="flex items-start gap-4">
                             <div className="w-12 h-12 rounded-xl bg-purple-500/20 flex items-center justify-center flex-shrink-0">
-                                <Brain size={24} className="text-purple-400" />
+                                <Brain size={24} weight="duotone" className="text-purple-400" />
                             </div>
                             <div className="flex-1">
                                 <h3 className="text-lg font-semibold text-textMain mb-2">Memory is disabled</h3>
                                 <p className="text-sm text-textMuted mb-4">
-                                    Enable memory to let your AI assistant remember customer interactions, 
+                                    Enable memory to let your AI assistant remember customer interactions,
                                     extract insights, and provide personalized responses based on conversation history.
                                 </p>
                                 <div className="flex flex-wrap gap-2">
@@ -1741,23 +1615,23 @@ const ToolsTab: React.FC = () => {
                             Define custom functions that the agent can call during conversations.
                         </p>
                     </div>
-                    <button className="flex items-center gap-2 px-4 py-2 bg-primary text-black font-medium rounded-lg text-sm hover:bg-primaryHover transition-colors">
-                        <Plus size={16} />
+                    <button className="flex items-center gap-2 px-4 py-2 bg-primary text-white font-medium rounded-xl text-sm hover:shadow-lg hover:shadow-primary/25 transition-all">
+                        <Plus size={16} weight="bold" />
                         Add Tool
                     </button>
                 </div>
 
                 {/* Empty State */}
-                <div className="border border-dashed border-border rounded-xl p-12 text-center">
-                    <div className="w-16 h-16 rounded-2xl bg-surface border border-border flex items-center justify-center mx-auto mb-4">
-                        <Wrench size={28} className="text-textMuted" />
+                <div className="border border-dashed border-white/10 rounded-xl p-12 text-center">
+                    <div className="w-16 h-16 rounded-2xl bg-surface border border-white/10 flex items-center justify-center mx-auto mb-4">
+                        <Wrench size={28} weight="duotone" className="text-textMuted" />
                     </div>
                     <h3 className="text-lg font-medium text-textMain mb-2">No tools configured</h3>
                     <p className="text-sm text-textMuted mb-4 max-w-md mx-auto">
                         Tools allow your agent to perform actions like booking appointments, looking up information, or triggering workflows.
                     </p>
-                    <button className="flex items-center gap-2 px-4 py-2 bg-surface border border-border rounded-lg text-sm text-textMain hover:bg-surfaceHover transition-colors mx-auto">
-                        <Plus size={16} />
+                    <button className="flex items-center gap-2 px-4 py-2 bg-surface border border-white/10 rounded-xl text-sm text-textMain hover:bg-white/5 transition-all mx-auto">
+                        <Plus size={16} weight="bold" />
                         Create your first tool
                     </button>
                 </div>
@@ -1782,15 +1656,15 @@ const KnowledgeBaseTab: React.FC = () => {
                 <div className="flex items-center justify-between mb-6">
                     <h2 className="text-2xl font-semibold text-textMain">Agent Knowledge Base</h2>
                     <div className="flex items-center gap-3">
-                        <button 
+                        <button
                             onClick={() => setShowRAGConfig(!showRAGConfig)}
-                            className="flex items-center gap-2 px-4 py-2 bg-surface border border-border rounded-lg text-sm text-textMain hover:bg-surfaceHover transition-colors"
+                            className="flex items-center gap-2 px-4 py-2 bg-surface border border-white/10 rounded-xl text-sm text-textMain hover:bg-white/5 transition-all"
                         >
-                            <Settings size={16} />
+                            <Gear size={16} weight="bold" />
                             Configure RAG
                         </button>
-                        <button className="flex items-center gap-2 px-4 py-2 bg-primary text-black font-medium rounded-lg text-sm hover:bg-primaryHover transition-colors">
-                            <Plus size={16} />
+                        <button className="flex items-center gap-2 px-4 py-2 bg-primary text-white font-medium rounded-xl text-sm hover:shadow-lg hover:shadow-primary/25 transition-all">
+                            <Plus size={16} weight="bold" />
                             Add document
                         </button>
                     </div>
@@ -1798,35 +1672,35 @@ const KnowledgeBaseTab: React.FC = () => {
 
                 {/* Search */}
                 <div className="relative mb-4">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-textMuted" size={18} />
+                    <MagnifyingGlass className="absolute left-4 top-1/2 -translate-y-1/2 text-textMuted" size={18} weight="bold" />
                     <input
                         type="text"
                         placeholder="Search Knowledge Base..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full bg-surface border border-border rounded-lg pl-12 pr-4 py-3 text-sm text-textMain outline-none focus:border-primary"
+                        className="w-full bg-surface border border-white/10 rounded-xl pl-12 pr-4 py-3 text-sm text-textMain outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10 transition-all"
                     />
                 </div>
 
                 {/* Type Filter */}
                 <div className="flex items-center gap-2 mb-6">
-                    <button className="flex items-center gap-1.5 px-3 py-1.5 bg-surface border border-border rounded-lg text-sm text-textMuted hover:text-textMain hover:border-primary/50 transition-colors">
-                        <Plus size={14} />
+                    <button className="flex items-center gap-1.5 px-3 py-1.5 bg-surface border border-white/10 rounded-xl text-sm text-textMuted hover:text-textMain hover:border-primary/30 transition-all">
+                        <Plus size={14} weight="bold" />
                         Type
                     </button>
                 </div>
 
                 {/* Empty State */}
-                <div className="bg-surface/50 border border-border rounded-xl p-12 text-center">
-                    <div className="w-14 h-14 rounded-xl bg-surface border border-border flex items-center justify-center mx-auto mb-4">
-                        <FileText size={24} className="text-textMuted" />
+                <div className="bg-surface/50 border border-white/10 rounded-xl p-12 text-center">
+                    <div className="w-14 h-14 rounded-xl bg-surface border border-white/10 flex items-center justify-center mx-auto mb-4">
+                        <FileText size={24} weight="duotone" className="text-textMuted" />
                     </div>
                     <h3 className="text-lg font-medium text-textMain mb-2">No documents found</h3>
                     <p className="text-sm text-textMuted mb-6">
                         This agent has no attached documents yet.
                     </p>
-                    <button className="inline-flex items-center gap-2 px-5 py-2.5 bg-surface border border-border rounded-lg text-sm font-medium text-textMain hover:bg-surfaceHover transition-colors">
-                        <Plus size={16} />
+                    <button className="inline-flex items-center gap-2 px-5 py-2.5 bg-surface border border-white/10 rounded-xl text-sm font-medium text-textMain hover:bg-white/5 transition-all">
+                        <Plus size={16} weight="bold" />
                         Add document
                     </button>
                 </div>
@@ -1834,17 +1708,17 @@ const KnowledgeBaseTab: React.FC = () => {
 
             {/* RAG Configuration Sidebar */}
             {showRAGConfig && (
-                <div className="w-80 border-l border-border bg-surface/30 overflow-y-auto p-6">
+                <div className="w-80 border-l border-white/5 bg-surface/30 overflow-y-auto p-6">
                     <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center gap-2">
-                            <Settings size={18} className="text-textMuted" />
+                            <Gear size={18} weight="duotone" className="text-textMuted" />
                             <h3 className="font-medium text-textMain">RAG configuration</h3>
                         </div>
-                        <button 
+                        <button
                             onClick={() => setShowRAGConfig(false)}
-                            className="p-1 hover:bg-surfaceHover rounded text-textMuted hover:text-textMain"
+                            className="p-1.5 hover:bg-white/5 rounded-lg text-textMuted hover:text-textMain transition-all"
                         >
-                            <X size={16} />
+                            <X size={16} weight="bold" />
                         </button>
                     </div>
 
@@ -1944,33 +1818,33 @@ const AnalysisTab: React.FC = () => {
 
             {/* Search */}
             <div className="relative mb-4">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-textMuted" size={18} />
+                <MagnifyingGlass className="absolute left-4 top-1/2 -translate-y-1/2 text-textMuted" size={18} weight="bold" />
                 <input
                     type="text"
                     placeholder="Search conversations..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full bg-surface border border-border rounded-lg pl-12 pr-4 py-3 text-sm text-textMain outline-none focus:border-primary"
+                    className="w-full bg-surface border border-white/10 rounded-xl pl-12 pr-4 py-3 text-sm text-textMain outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10 transition-all"
                 />
             </div>
 
             {/* Filters */}
             <div className="flex flex-wrap items-center gap-2 mb-6">
                 {['Date After', 'Date Before', 'Call status', 'Duration'].map((filter) => (
-                    <button 
+                    <button
                         key={filter}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-surface border border-border rounded-lg text-sm text-textMuted hover:text-textMain hover:border-primary/50 transition-colors"
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-surface border border-white/10 rounded-xl text-sm text-textMuted hover:text-textMain hover:border-primary/30 transition-all"
                     >
-                        <Plus size={14} />
+                        <Plus size={14} weight="bold" />
                         {filter}
                     </button>
                 ))}
             </div>
 
             {/* Table */}
-            <div className="bg-surface border border-border rounded-xl overflow-hidden">
+            <div className="bg-surface border border-white/10 rounded-xl overflow-hidden">
                 {/* Table Header */}
-                <div className="grid grid-cols-5 gap-4 px-4 py-3 border-b border-border text-sm font-medium text-textMuted">
+                <div className="grid grid-cols-5 gap-4 px-4 py-3 border-b border-white/5 text-sm font-medium text-textMuted">
                     <div>Date</div>
                     <div>Assistant</div>
                     <div>Duration</div>
@@ -1984,17 +1858,17 @@ const AnalysisTab: React.FC = () => {
                 ) : callLogs.length === 0 ? (
                     <div className="p-8 text-center text-textMuted">No conversations found</div>
                 ) : (
-                    <div className="divide-y divide-border">
+                    <div className="divide-y divide-white/5">
                         {callLogs.map((log) => (
-                            <div key={log.id} className="grid grid-cols-5 gap-4 px-4 py-3 items-center hover:bg-surfaceHover transition-colors cursor-pointer">
+                            <div key={log.id} className="grid grid-cols-5 gap-4 px-4 py-3 items-center hover:bg-white/[0.02] transition-colors cursor-pointer">
                                 <div className="flex items-center gap-2">
-                                    <ChevronRight size={16} className="text-textMuted" />
+                                    <CaretRight size={16} weight="bold" className="text-textMuted" />
                                     <span className="text-sm text-textMain">{log.date}</span>
                                 </div>
                                 <div className="text-sm text-textMain">{log.assistantName}</div>
                                 <div className="text-sm text-textMain font-mono">{log.duration}</div>
                                 <div>
-                                    <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(log.status)}`}>
+                                    <span className={`px-2 py-1 rounded-lg text-xs font-medium ${getStatusColor(log.status)}`}>
                                         {log.status === 'completed' ? 'Successful' : log.status === 'failed' ? 'Failed' : 'Ongoing'}
                                     </span>
                                 </div>
@@ -2011,6 +1885,350 @@ const AnalysisTab: React.FC = () => {
 };
 
 // ============================================
+// TESTS TAB - For creating test cases
+// ============================================
+interface TestsTabProps {
+    assistantId: string | null;
+    formData: AssistantFormData;
+    selectedVoice: Voice | null;
+}
+
+const TestsTab: React.FC<TestsTabProps> = ({ assistantId }) => {
+    return (
+        <div className="p-6 overflow-y-auto h-full">
+            <div className="max-w-4xl">
+                {/* Header */}
+                <div className="mb-6">
+                    <h2 className="text-xl font-semibold text-textMain mb-2">Test Cases</h2>
+                    <p className="text-sm text-textMuted">
+                        Create automated test scenarios to validate your agent's behavior and responses.
+                    </p>
+                </div>
+
+                {/* Coming Soon Card */}
+                <div className="border border-dashed border-border rounded-2xl p-12 text-center bg-surface/30">
+                    <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/20 flex items-center justify-center mx-auto mb-6">
+                        <TestTube size={36} weight="duotone" className="text-primary" />
+                    </div>
+                    <h3 className="text-xl font-semibold text-textMain mb-3">Automated Testing Coming Soon</h3>
+                    <p className="text-sm text-textMuted mb-8 max-w-lg mx-auto leading-relaxed">
+                        Create test scenarios with expected inputs and outputs. Run automated tests to ensure your agent 
+                        behaves correctly across different conversations and edge cases.
+                    </p>
+                    
+                    {/* Feature Preview */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-2xl mx-auto mb-8">
+                        <div className="bg-surface/50 border border-white/5 rounded-xl p-4 text-left">
+                            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center mb-3">
+                                <ChatCircle size={20} className="text-primary" />
+                            </div>
+                            <h4 className="text-sm font-medium text-textMain mb-1">Conversation Tests</h4>
+                            <p className="text-xs text-textMuted">Define multi-turn conversations with expected responses</p>
+                        </div>
+                        <div className="bg-surface/50 border border-white/5 rounded-xl p-4 text-left">
+                            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center mb-3">
+                                <Check size={20} className="text-primary" />
+                            </div>
+                            <h4 className="text-sm font-medium text-textMain mb-1">Assertions</h4>
+                            <p className="text-xs text-textMuted">Validate response content, tone, and language</p>
+                        </div>
+                        <div className="bg-surface/50 border border-white/5 rounded-xl p-4 text-left">
+                            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center mb-3">
+                                <Play size={20} className="text-primary" />
+                            </div>
+                            <h4 className="text-sm font-medium text-textMain mb-1">Batch Testing</h4>
+                            <p className="text-xs text-textMuted">Run all tests with one click before publishing</p>
+                        </div>
+                    </div>
+
+                    <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 border border-primary/20 rounded-xl">
+                        <Sparkle size={16} className="text-primary" />
+                        <span className="text-sm text-primary font-medium">Coming in Q1 2026</span>
+                    </div>
+                </div>
+
+                {/* Tip */}
+                <div className="mt-6 p-4 bg-surface/50 border border-white/5 rounded-xl flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center flex-shrink-0">
+                        <Lightbulb size={16} className="text-blue-400" />
+                    </div>
+                    <div>
+                        <h4 className="text-sm font-medium text-textMain mb-1">Pro Tip</h4>
+                        <p className="text-xs text-textMuted">
+                            Use the <strong className="text-textMain">Chat</strong> button in the header to manually test your agent's 
+                            responses before publishing. This helps you verify the configuration is working correctly.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// ============================================
+// CHAT SIDEBAR - Preview/Talk to Agent
+// ============================================
+interface ChatMessage {
+    id: string;
+    role: 'user' | 'assistant';
+    content: string;
+    timestamp: Date;
+    usage?: {
+        inputTokens: number;
+        outputTokens: number;
+        totalTokens: number;
+        cost: number | null;
+        balance: number | null;
+    };
+}
+
+interface ChatSidebarProps {
+    assistantId: string | null;
+    formData: AssistantFormData;
+    selectedVoice: Voice | null;
+    onClose: () => void;
+}
+
+const ChatSidebar: React.FC<ChatSidebarProps> = ({ assistantId, formData, selectedVoice, onClose }) => {
+    const [messages, setMessages] = useState<ChatMessage[]>([]);
+    const [inputValue, setInputValue] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const messagesEndRef = useRef<HTMLDivElement>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    // Get user for billing
+    const { user } = useAuth();
+
+    // Always use Railway backend (even in dev) since local backend may not be running
+    const BACKEND_URL = 'https://callyy-production.up.railway.app';
+
+    const scrollToBottom = () => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    };
+
+    useEffect(() => {
+        scrollToBottom();
+    }, [messages]);
+
+    useEffect(() => {
+        inputRef.current?.focus();
+    }, []);
+
+    const getAIResponse = async (userMessage: string): Promise<string> => {
+        const conversationHistory = messages.map(msg => ({
+            role: msg.role,
+            content: msg.content
+        }));
+
+        const response = await fetch(`${BACKEND_URL}/api/test-chat`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                message: userMessage,
+                conversationHistory,
+                assistantId,
+                userId: user?.id,
+                assistantConfig: {
+                    name: formData.name,
+                    systemPrompt: formData.systemPrompt,
+                    firstMessage: formData.firstMessage,
+                    languageSettings: formData.languageSettings,
+                    styleSettings: formData.styleSettings,
+                    llmModel: formData.llmModel,
+                    temperature: formData.temperature,
+                    maxTokens: formData.maxTokens,
+                }
+            }),
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.error || 'Failed to get response');
+        }
+
+        const data = await response.json();
+        return data.response;
+    };
+
+    const handleSend = async () => {
+        if (!inputValue.trim() || isLoading) return;
+
+        setError(null);
+        const userMessage: ChatMessage = {
+            id: `user-${Date.now()}`,
+            role: 'user',
+            content: inputValue.trim(),
+            timestamp: new Date(),
+        };
+
+        setMessages(prev => [...prev, userMessage]);
+        setInputValue('');
+        setIsLoading(true);
+
+        try {
+            const response = await getAIResponse(userMessage.content);
+            const assistantMessage: ChatMessage = {
+                id: `assistant-${Date.now()}`,
+                role: 'assistant',
+                content: response,
+                timestamp: new Date(),
+            };
+            setMessages(prev => [...prev, assistantMessage]);
+        } catch (err) {
+            console.error('Error generating response:', err);
+            setError(err instanceof Error ? err.message : 'Failed to get response');
+        } finally {
+            setIsLoading(false);
+            inputRef.current?.focus();
+        }
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            handleSend();
+        }
+    };
+
+    const handleClearChat = () => {
+        setMessages([]);
+        setError(null);
+    };
+
+    const formatTime = (date: Date) => {
+        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    };
+
+    return (
+        <div className="fixed inset-y-0 right-0 w-[420px] bg-background border-l border-white/10 shadow-2xl z-50 flex flex-col">
+            {/* Header */}
+            <div className="h-16 px-4 border-b border-white/5 flex items-center justify-between bg-surface/80 backdrop-blur-xl">
+                <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center">
+                        <Robot size={20} weight="duotone" className="text-primary" />
+                    </div>
+                    <div>
+                        <h4 className="text-sm font-semibold text-textMain">{formData.name || 'Assistant'}</h4>
+                        <p className="text-xs text-textMuted">
+                            {selectedVoice ? selectedVoice.name : 'Chat Preview'}
+                        </p>
+                    </div>
+                </div>
+                <div className="flex items-center gap-2">
+                    <button 
+                        onClick={handleClearChat} 
+                        className="p-2 text-textMuted hover:text-textMain hover:bg-surface rounded-lg transition-colors"
+                        title="Clear chat"
+                    >
+                        <Trash size={16} />
+                    </button>
+                    <button 
+                        onClick={onClose} 
+                        className="p-2 text-textMuted hover:text-textMain hover:bg-surface rounded-lg transition-colors"
+                    >
+                        <X size={18} weight="bold" />
+                    </button>
+                </div>
+            </div>
+
+            {/* Messages */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                {messages.length === 0 ? (
+                    <div className="h-full flex items-center justify-center">
+                        <div className="text-center max-w-xs">
+                            <div className="w-14 h-14 rounded-2xl bg-surface border border-white/5 flex items-center justify-center mx-auto mb-4">
+                                <ChatCircle size={24} weight="duotone" className="text-textMuted" />
+                            </div>
+                            <h4 className="text-sm font-medium text-textMain mb-2">Chat with {formData.name || 'your agent'}</h4>
+                            <p className="text-xs text-textMuted leading-relaxed">
+                                Test your agent's responses before deploying to WhatsApp or phone.
+                            </p>
+                            {!assistantId && (
+                                <p className="text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2 mt-4">
+                                    💡 Save to test with full config
+                                </p>
+                            )}
+                        </div>
+                    </div>
+                ) : (
+                    <>
+                        {messages.map((message) => (
+                            <div key={message.id} className={`flex gap-3 ${message.role === 'user' ? 'flex-row-reverse' : ''}`}>
+                                <div className={`flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center ${
+                                    message.role === 'user' ? 'bg-blue-500/20' : 'bg-gradient-to-br from-primary/20 to-primary/10'
+                                }`}>
+                                    {message.role === 'user' ? <User size={16} className="text-blue-400" /> : <Robot size={16} className="text-primary" />}
+                                </div>
+                                <div className={`flex flex-col max-w-[75%] ${message.role === 'user' ? 'items-end' : 'items-start'}`}>
+                                    <div className={`px-4 py-2.5 rounded-2xl ${
+                                        message.role === 'user'
+                                            ? 'bg-blue-500/20 text-textMain rounded-tr-md'
+                                            : 'bg-surface border border-white/5 text-textMain rounded-tl-md'
+                                    }`}>
+                                        <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                                    </div>
+                                    <span className="text-[10px] text-textMuted mt-1 px-2">{formatTime(message.timestamp)}</span>
+                                </div>
+                            </div>
+                        ))}
+                        {isLoading && (
+                            <div className="flex gap-3">
+                                <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center">
+                                    <Robot size={16} className="text-primary" />
+                                </div>
+                                <div className="px-4 py-3 bg-surface border border-white/5 rounded-2xl rounded-tl-md">
+                                    <div className="flex gap-1">
+                                        <div className="w-2 h-2 bg-textMuted/50 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                                        <div className="w-2 h-2 bg-textMuted/50 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                                        <div className="w-2 h-2 bg-textMuted/50 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                        {error && (
+                            <div className="flex gap-3 items-start">
+                                <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-red-500/20 flex items-center justify-center">
+                                    <Warning size={16} className="text-red-400" />
+                                </div>
+                                <div className="px-4 py-3 bg-red-500/10 border border-red-500/20 rounded-2xl rounded-tl-md">
+                                    <p className="text-sm text-red-400">{error}</p>
+                                    <button onClick={() => setError(null)} className="text-xs text-red-400/70 hover:text-red-400 mt-1">Dismiss</button>
+                                </div>
+                            </div>
+                        )}
+                        <div ref={messagesEndRef} />
+                    </>
+                )}
+            </div>
+
+            {/* Input */}
+            <div className="p-4 border-t border-white/5 bg-surface/50">
+                <div className="flex items-center gap-3">
+                    <input
+                        ref={inputRef}
+                        type="text"
+                        value={inputValue}
+                        onChange={(e) => setInputValue(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                        placeholder="Type a message..."
+                        disabled={isLoading}
+                        className="flex-1 px-4 py-3 bg-surface border border-white/10 rounded-xl text-sm text-textMain placeholder:text-textMuted focus:outline-none focus:border-primary/50 transition-colors disabled:opacity-50"
+                    />
+                    <button
+                        onClick={handleSend}
+                        disabled={!inputValue.trim() || isLoading}
+                        className="w-11 h-11 flex items-center justify-center bg-primary text-black rounded-xl hover:bg-primaryHover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        {isLoading ? <CircleNotch size={18} className="animate-spin" /> : <PaperPlaneTilt size={18} weight="fill" />}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// ============================================
 // PLACEHOLDER TAB
 // ============================================
 const PlaceholderTab: React.FC<{ tabName: string }> = ({ tabName }) => {
@@ -2018,17 +2236,12 @@ const PlaceholderTab: React.FC<{ tabName: string }> = ({ tabName }) => {
         'workflow': {
             title: 'Workflow Builder',
             description: 'Design complex conversation flows with branching logic and conditions.',
-            icon: <GitBranch size={28} className="text-textMuted" />
-        },
-        'tests': {
-            title: 'Test Scenarios',
-            description: 'Create and run automated tests to validate your agent behavior.',
-            icon: <FlaskConical size={28} className="text-textMuted" />
+            icon: <GitBranch size={28} weight="duotone" className="text-textMuted" />
         },
         'widget': {
             title: 'Widget Configuration',
             description: 'Customize the embedded widget appearance and behavior.',
-            icon: <Layout size={28} className="text-textMuted" />
+            icon: <Layout size={28} weight="duotone" className="text-textMuted" />
         },
     };
 

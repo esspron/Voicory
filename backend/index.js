@@ -359,6 +359,117 @@ app.get('/health', (req, res) => {
 });
 
 // ============================================
+// SYSTEM PROMPT GENERATOR - AI-powered prompt creation
+// Generates professional system prompts based on user description
+// ============================================
+app.post('/api/generate-prompt', async (req, res) => {
+    try {
+        if (!openai) {
+            return res.status(503).json({ error: 'AI service not available' });
+        }
+
+        const { description, businessName, agentName } = req.body;
+
+        if (!description) {
+            return res.status(400).json({ error: 'Description is required' });
+        }
+
+        console.log('Generating prompt for:', description);
+
+        const systemPromptForGenerator = `You are an expert at creating system prompts for AI voice assistants. 
+Your task is to generate a professional, detailed system prompt based on the user's description.
+
+IMPORTANT RULES:
+1. Create a prompt that is conversational and natural for voice calls
+2. Include personality traits and communication style
+3. Add specific instructions for common scenarios in the described business/use case
+4. Use dynamic variables where appropriate:
+   - {{customer_name}} - Customer's name from their profile
+   - {{customer_phone}} - Customer's phone number
+   - {{current_time}} - Current time
+   - {{current_date}} - Today's date
+   - {{assistant_name}} - The assistant's name
+   - You can also suggest CUSTOM variables the user might want to add using {{variable_name}} syntax
+
+5. Structure the prompt with clear sections:
+   - Identity/Role introduction
+   - Core responsibilities
+   - Communication guidelines
+   - Handling specific scenarios
+   - Important rules/boundaries
+
+6. Make it professional yet warm and helpful
+7. Keep it concise but comprehensive (aim for 300-600 words)
+8. DO NOT include any markdown formatting, headers, or bullet points that wouldn't work in a plain text system prompt
+9. Write in a natural, flowing style that defines who the assistant is
+
+ALSO generate:
+- A suggested first message greeting that the assistant should say when a call starts
+- Suggest 2-3 custom variables that would be useful for this specific use case (beyond the system variables)
+
+Return your response in this exact JSON format:
+{
+    "systemPrompt": "The complete system prompt text here...",
+    "firstMessage": "Hello! Thanks for calling [Business Name]. This is [Name], how can I help you today?",
+    "suggestedVariables": [
+        {"name": "variable_name", "description": "What this variable is for", "example": "Example value"}
+    ],
+    "suggestedAgentName": "A good name for this agent if user didn't specify"
+}`;
+
+        const userMessage = `Create a system prompt for the following:
+
+Description: ${description}
+${businessName ? `Business Name: ${businessName}` : ''}
+${agentName ? `Agent Name: ${agentName}` : ''}
+
+Generate a comprehensive, professional system prompt that will make this AI assistant helpful and effective for this use case.`;
+
+        const completion = await openai.chat.completions.create({
+            model: 'gpt-4o',
+            messages: [
+                { role: 'system', content: systemPromptForGenerator },
+                { role: 'user', content: userMessage }
+            ],
+            temperature: 0.7,
+            max_tokens: 2000,
+            response_format: { type: 'json_object' }
+        });
+
+        const responseText = completion.choices[0]?.message?.content;
+        
+        if (!responseText) {
+            return res.status(500).json({ error: 'No response from AI' });
+        }
+
+        let result;
+        try {
+            result = JSON.parse(responseText);
+        } catch (parseError) {
+            console.error('Failed to parse AI response:', responseText);
+            return res.status(500).json({ error: 'Failed to parse AI response' });
+        }
+
+        // Log usage
+        const inputTokens = completion.usage?.prompt_tokens || 0;
+        const outputTokens = completion.usage?.completion_tokens || 0;
+        console.log('Prompt generation completed:', { inputTokens, outputTokens });
+
+        res.json({
+            systemPrompt: result.systemPrompt,
+            firstMessage: result.firstMessage,
+            suggestedVariables: result.suggestedVariables || [],
+            suggestedAgentName: result.suggestedAgentName,
+            usage: { inputTokens, outputTokens }
+        });
+
+    } catch (error) {
+        console.error('Prompt generation error:', error);
+        res.status(500).json({ error: error.message || 'Failed to generate prompt' });
+    }
+});
+
+// ============================================
 // TEST CHAT ENDPOINT - For testing agents in the dashboard
 // Uses the SAME logic as WhatsApp processWithAI
 // ============================================
@@ -372,7 +483,8 @@ app.post('/api/test-chat', async (req, res) => {
             message, 
             conversationHistory = [], 
             assistantId,  // If saved, use this to fetch from DB
-            assistantConfig  // Fallback for unsaved assistants
+            assistantConfig,  // Fallback for unsaved assistants
+            userId  // Required for billing - passed from frontend
         } = req.body;
 
         if (!message) {
@@ -384,6 +496,7 @@ app.post('/api/test-chat', async (req, res) => {
         }
 
         let assistant;
+        let billingUserId = userId; // User ID for billing purposes
 
         // If assistantId provided, fetch from database (same as WhatsApp)
         if (assistantId) {
@@ -398,7 +511,11 @@ app.post('/api/test-chat', async (req, res) => {
                 return res.status(404).json({ error: 'Assistant not found' });
             }
             assistant = data;
-            console.log('Test chat - Using saved assistant:', assistant.name);
+            // Use assistant's user_id for billing if not provided
+            if (!billingUserId) {
+                billingUserId = assistant.user_id;
+            }
+            console.log('Test chat - Using saved assistant:', assistant.name, 'Billing user:', billingUserId);
         } else {
             // Use passed config for unsaved assistants (convert to DB format)
             assistant = {
@@ -413,7 +530,12 @@ app.post('/api/test-chat', async (req, res) => {
                 dynamic_variables: assistantConfig.dynamicVariables,
                 timezone: assistantConfig.timezone || 'Asia/Kolkata'
             };
-            console.log('Test chat - Using unsaved config:', assistant.name);
+            console.log('Test chat - Using unsaved config:', assistant.name, 'Billing user:', billingUserId);
+        }
+
+        // Require userId for billing
+        if (!billingUserId) {
+            return res.status(400).json({ error: 'userId is required for billing' });
         }
 
         // ===== SAME LOGIC AS processWithAI =====
@@ -537,10 +659,57 @@ app.post('/api/test-chat', async (req, res) => {
             return res.status(500).json({ error: 'No response from AI' });
         }
 
+        // ===== BILLING: Log LLM usage and deduct credits (SAME as WhatsApp) =====
+        const inputTokens = completion.usage?.prompt_tokens || 0;
+        const outputTokens = completion.usage?.completion_tokens || 0;
+        const modelUsed = assistant.llm_model || 'gpt-4o';
+        const provider = assistant.llm_provider || 'openai';
+
+        let usageCost = null;
+        let newBalance = null;
+
+        if (inputTokens > 0 || outputTokens > 0) {
+            try {
+                const { data: usageResult, error: usageError } = await supabase.rpc('log_llm_usage', {
+                    p_user_id: billingUserId,
+                    p_assistant_id: assistantId || null,
+                    p_provider: provider,
+                    p_model: modelUsed,
+                    p_input_tokens: inputTokens,
+                    p_output_tokens: outputTokens,
+                    p_call_log_id: null,
+                    p_conversation_id: null
+                });
+
+                if (usageError) {
+                    console.error('Failed to log test chat LLM usage:', usageError);
+                } else {
+                    usageCost = usageResult?.cost_inr;
+                    newBalance = usageResult?.balance;
+                    console.log('Test chat LLM usage logged:', {
+                        model: modelUsed,
+                        inputTokens,
+                        outputTokens,
+                        cost: usageCost,
+                        newBalance: newBalance
+                    });
+                }
+            } catch (logError) {
+                console.error('Error logging test chat LLM usage:', logError);
+            }
+        }
+
         res.json({ 
             response,
             model: model,
-            assistantName: assistant.name
+            assistantName: assistant.name,
+            usage: {
+                inputTokens,
+                outputTokens,
+                totalTokens: inputTokens + outputTokens,
+                cost: usageCost,
+                balance: newBalance
+            }
         });
 
     } catch (error) {
