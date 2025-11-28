@@ -3,6 +3,8 @@ const cors = require('cors');
 const { createClient } = require('@supabase/supabase-js');
 const axios = require('axios');
 const OpenAI = require('openai');
+const cheerio = require('cheerio');
+const xml2js = require('xml2js');
 
 // Only load .env file in development (Railway injects env vars directly)
 if (process.env.NODE_ENV !== 'production') {
@@ -359,6 +361,979 @@ app.get('/health', (req, res) => {
 });
 
 // ============================================
+// WEB CRAWLER API ENDPOINTS
+// ============================================
+
+/**
+ * Discover sitemap and pages from a website URL
+ * POST /api/crawler/discover
+ * Body: { url: string }
+ * Returns: { domain, pages: [{ url, title?, lastmod? }], sitemapFound: boolean }
+ */
+app.post('/api/crawler/discover', async (req, res) => {
+    try {
+        const { url } = req.body;
+
+        if (!url) {
+            return res.status(400).json({ error: 'URL is required' });
+        }
+
+        // Parse and validate URL
+        let parsedUrl;
+        try {
+            parsedUrl = new URL(url.startsWith('http') ? url : `https://${url}`);
+        } catch {
+            return res.status(400).json({ error: 'Invalid URL format' });
+        }
+
+        const baseUrl = `${parsedUrl.protocol}//${parsedUrl.host}`;
+        const domain = parsedUrl.host;
+
+        console.log('Discovering pages for:', baseUrl);
+
+        const allPages = new Map(); // Use Map to dedupe by URL
+        let sitemapFound = false;
+
+        // Common sitemap locations to try
+        const sitemapUrls = [
+            `${baseUrl}/sitemap.xml`,
+            `${baseUrl}/sitemap_index.xml`,
+            `${baseUrl}/sitemap/sitemap.xml`,
+            `${baseUrl}/sitemaps/sitemap.xml`,
+            `${baseUrl}/wp-sitemap.xml`,
+        ];
+
+        // Also check robots.txt for sitemap location
+        try {
+            const robotsResponse = await axios.get(`${baseUrl}/robots.txt`, {
+                timeout: 10000,
+                headers: { 'User-Agent': 'Voicory-Crawler/1.0' }
+            });
+
+            const sitemapMatches = robotsResponse.data.match(/Sitemap:\s*(.+)/gi);
+            if (sitemapMatches) {
+                for (const match of sitemapMatches) {
+                    const sitemapUrl = match.replace(/Sitemap:\s*/i, '').trim();
+                    if (!sitemapUrls.includes(sitemapUrl)) {
+                        sitemapUrls.unshift(sitemapUrl); // Prioritize sitemaps from robots.txt
+                    }
+                }
+            }
+        } catch (robotsError) {
+            console.log('No robots.txt found or error reading it');
+        }
+
+        // Try each sitemap URL
+        for (const sitemapUrl of sitemapUrls) {
+            try {
+                console.log('Trying sitemap:', sitemapUrl);
+                const sitemapResponse = await axios.get(sitemapUrl, {
+                    timeout: 15000,
+                    headers: { 
+                        'User-Agent': 'Voicory-Crawler/1.0',
+                        'Accept': 'application/xml, text/xml, */*'
+                    }
+                });
+
+                const pages = await parseSitemap(sitemapResponse.data, baseUrl);
+                if (pages.length > 0) {
+                    sitemapFound = true;
+                    for (const page of pages) {
+                        if (!allPages.has(page.url)) {
+                            allPages.set(page.url, page);
+                        }
+                    }
+                    console.log(`Found ${pages.length} pages in sitemap: ${sitemapUrl}`);
+                }
+            } catch (sitemapError) {
+                console.log(`Sitemap not found at: ${sitemapUrl}`);
+            }
+        }
+
+        // If no sitemap found, crawl the homepage for links
+        if (!sitemapFound || allPages.size === 0) {
+            console.log('No sitemap found, crawling homepage for links...');
+            try {
+                const homepageLinks = await crawlPageForLinks(baseUrl, baseUrl);
+                for (const link of homepageLinks) {
+                    if (!allPages.has(link.url)) {
+                        allPages.set(link.url, link);
+                    }
+                }
+                // Always add the homepage
+                if (!allPages.has(baseUrl)) {
+                    allPages.set(baseUrl, { url: baseUrl, title: 'Homepage' });
+                }
+            } catch (crawlError) {
+                console.error('Error crawling homepage:', crawlError.message);
+            }
+        }
+
+        // Convert Map to array and sort
+        const pagesArray = Array.from(allPages.values())
+            .filter(page => page.url.startsWith(baseUrl)) // Only same-domain URLs
+            .sort((a, b) => a.url.localeCompare(b.url))
+            .slice(0, 500); // Limit to 500 pages
+
+        console.log(`Discovered ${pagesArray.length} pages for ${domain}`);
+
+        res.json({
+            domain,
+            baseUrl,
+            pages: pagesArray,
+            totalPages: pagesArray.length,
+            sitemapFound
+        });
+
+    } catch (error) {
+        console.error('Page discovery error:', error.message);
+        res.status(500).json({ error: error.message || 'Failed to discover pages' });
+    }
+});
+
+/**
+ * Parse sitemap XML and return array of page URLs
+ */
+async function parseSitemap(xmlData, baseUrl) {
+    const pages = [];
+    
+    try {
+        const parser = new xml2js.Parser({ explicitArray: false });
+        const result = await parser.parseStringPromise(xmlData);
+
+        // Handle sitemap index (contains references to other sitemaps)
+        if (result.sitemapindex?.sitemap) {
+            const sitemaps = Array.isArray(result.sitemapindex.sitemap) 
+                ? result.sitemapindex.sitemap 
+                : [result.sitemapindex.sitemap];
+
+            console.log(`Found sitemap index with ${sitemaps.length} sitemaps`);
+
+            // Fetch and parse each sub-sitemap (limit to first 10 to avoid overload)
+            for (const sitemap of sitemaps.slice(0, 10)) {
+                const sitemapLoc = sitemap.loc;
+                if (sitemapLoc) {
+                    try {
+                        const subResponse = await axios.get(sitemapLoc, {
+                            timeout: 10000,
+                            headers: { 'User-Agent': 'Voicory-Crawler/1.0' }
+                        });
+                        const subPages = await parseSitemap(subResponse.data, baseUrl);
+                        pages.push(...subPages);
+                    } catch (subError) {
+                        console.log('Error fetching sub-sitemap:', sitemapLoc);
+                    }
+                }
+            }
+        }
+
+        // Handle regular sitemap (contains URLs)
+        if (result.urlset?.url) {
+            const urls = Array.isArray(result.urlset.url) 
+                ? result.urlset.url 
+                : [result.urlset.url];
+
+            for (const urlEntry of urls) {
+                const url = urlEntry.loc;
+                if (url) {
+                    pages.push({
+                        url: url,
+                        lastmod: urlEntry.lastmod || null,
+                        priority: urlEntry.priority || null,
+                        changefreq: urlEntry.changefreq || null
+                    });
+                }
+            }
+        }
+    } catch (parseError) {
+        console.error('XML parse error:', parseError.message);
+    }
+
+    return pages;
+}
+
+/**
+ * Crawl a page and extract internal links
+ */
+async function crawlPageForLinks(pageUrl, baseUrl) {
+    const links = [];
+
+    try {
+        const response = await axios.get(pageUrl, {
+            timeout: 15000,
+            headers: { 
+                'User-Agent': 'Voicory-Crawler/1.0',
+                'Accept': 'text/html,application/xhtml+xml'
+            },
+            maxRedirects: 5
+        });
+
+        const $ = cheerio.load(response.data);
+
+        // Extract all links
+        $('a[href]').each((i, el) => {
+            const href = $(el).attr('href');
+            const title = $(el).text().trim() || $(el).attr('title');
+
+            if (href) {
+                try {
+                    let absoluteUrl;
+                    if (href.startsWith('http')) {
+                        absoluteUrl = href;
+                    } else if (href.startsWith('/')) {
+                        absoluteUrl = new URL(href, baseUrl).href;
+                    } else if (!href.startsWith('#') && !href.startsWith('mailto:') && !href.startsWith('tel:') && !href.startsWith('javascript:')) {
+                        absoluteUrl = new URL(href, pageUrl).href;
+                    }
+
+                    if (absoluteUrl && absoluteUrl.startsWith(baseUrl)) {
+                        // Remove hash and query params for deduplication
+                        const cleanUrl = absoluteUrl.split('#')[0].split('?')[0];
+                        // Skip common non-content URLs
+                        if (!cleanUrl.match(/\.(jpg|jpeg|png|gif|svg|css|js|pdf|zip|mp4|mp3|ico)$/i)) {
+                            links.push({
+                                url: cleanUrl,
+                                title: title?.substring(0, 100) || null
+                            });
+                        }
+                    }
+                } catch (urlError) {
+                    // Invalid URL, skip
+                }
+            }
+        });
+    } catch (crawlError) {
+        console.error('Error crawling page for links:', crawlError.message);
+    }
+
+    // Dedupe by URL
+    const seen = new Set();
+    return links.filter(link => {
+        if (seen.has(link.url)) return false;
+        seen.add(link.url);
+        return true;
+    });
+}
+
+/**
+ * Crawl selected pages and extract content
+ * POST /api/crawler/crawl
+ * Body: { pages: [{ url }], knowledgeBaseId, documentName, userId }
+ * Returns: { success, document, crawledPages }
+ */
+app.post('/api/crawler/crawl', async (req, res) => {
+    try {
+        const { pages, knowledgeBaseId, documentName, userId, autoAddFuture } = req.body;
+
+        if (!pages || !Array.isArray(pages) || pages.length === 0) {
+            return res.status(400).json({ error: 'At least one page URL is required' });
+        }
+
+        if (!knowledgeBaseId || !userId) {
+            return res.status(400).json({ error: 'knowledgeBaseId and userId are required' });
+        }
+
+        console.log(`Starting crawl of ${pages.length} pages for KB: ${knowledgeBaseId}`);
+
+        // Get domain from first URL
+        const firstUrl = new URL(pages[0].url || pages[0]);
+        const domain = firstUrl.host;
+        const baseUrl = `${firstUrl.protocol}//${firstUrl.host}`;
+
+        // Create URL document first (status: processing)
+        const { data: urlDocument, error: docError } = await supabase
+            .from('knowledge_base_documents')
+            .insert({
+                knowledge_base_id: knowledgeBaseId,
+                type: 'url',
+                name: documentName || domain,
+                source_url: baseUrl,
+                crawl_depth: 0,
+                processing_status: 'processing',
+                user_id: userId,
+                metadata: {
+                    autoAddFuture: autoAddFuture || false,
+                    totalPages: pages.length,
+                    crawledAt: new Date().toISOString()
+                }
+            })
+            .select()
+            .single();
+
+        if (docError) {
+            console.error('Error creating URL document:', docError);
+            return res.status(500).json({ error: 'Failed to create document record' });
+        }
+
+        console.log('Created URL document:', urlDocument.id);
+
+        // Crawl each page
+        const crawledPages = [];
+        let totalCharacters = 0;
+        let successCount = 0;
+        let failCount = 0;
+
+        for (const pageInfo of pages) {
+            const pageUrl = typeof pageInfo === 'string' ? pageInfo : pageInfo.url;
+            
+            try {
+                console.log('Crawling:', pageUrl);
+                const pageContent = await crawlPageContent(pageUrl);
+
+                if (pageContent.content) {
+                    // Insert crawled page record
+                    const { data: crawledPage, error: pageError } = await supabase
+                        .from('knowledge_base_crawled_pages')
+                        .insert({
+                            document_id: urlDocument.id,
+                            page_url: pageUrl,
+                            page_title: pageContent.title,
+                            content: pageContent.content,
+                            character_count: pageContent.content.length,
+                            crawl_status: 'completed',
+                            http_status_code: 200,
+                            metadata: {
+                                description: pageContent.description,
+                                wordCount: pageContent.wordCount,
+                                headings: pageContent.headings?.slice(0, 10)
+                            },
+                            crawled_at: new Date().toISOString(),
+                            user_id: userId
+                        })
+                        .select()
+                        .single();
+
+                    if (!pageError && crawledPage) {
+                        crawledPages.push(crawledPage);
+                        totalCharacters += pageContent.content.length;
+                        successCount++;
+                    }
+                } else {
+                    // Record failed crawl
+                    await supabase
+                        .from('knowledge_base_crawled_pages')
+                        .insert({
+                            document_id: urlDocument.id,
+                            page_url: pageUrl,
+                            crawl_status: 'failed',
+                            crawl_error: 'No content extracted',
+                            crawled_at: new Date().toISOString(),
+                            user_id: userId
+                        });
+                    failCount++;
+                }
+
+                // Add small delay between requests to be respectful
+                await new Promise(resolve => setTimeout(resolve, 200));
+
+            } catch (crawlError) {
+                console.error(`Error crawling ${pageUrl}:`, crawlError.message);
+                // Record failed crawl
+                await supabase
+                    .from('knowledge_base_crawled_pages')
+                    .insert({
+                        document_id: urlDocument.id,
+                        page_url: pageUrl,
+                        crawl_status: 'failed',
+                        crawl_error: crawlError.message,
+                        http_status_code: crawlError.response?.status || null,
+                        crawled_at: new Date().toISOString(),
+                        user_id: userId
+                    });
+                failCount++;
+            }
+        }
+
+        // Update document with final status and stats
+        const { data: updatedDoc, error: updateError } = await supabase
+            .from('knowledge_base_documents')
+            .update({
+                processing_status: failCount === pages.length ? 'failed' : 'completed',
+                character_count: totalCharacters,
+                last_crawled_at: new Date().toISOString(),
+                metadata: {
+                    ...urlDocument.metadata,
+                    successCount,
+                    failCount,
+                    totalCharacters,
+                    crawledPagesCount: successCount
+                }
+            })
+            .eq('id', urlDocument.id)
+            .select()
+            .single();
+
+        console.log(`Crawl complete: ${successCount} success, ${failCount} failed`);
+
+        res.json({
+            success: true,
+            document: updatedDoc || urlDocument,
+            stats: {
+                totalPages: pages.length,
+                successCount,
+                failCount,
+                totalCharacters
+            },
+            crawledPages: crawledPages.map(p => ({
+                id: p.id,
+                url: p.page_url,
+                title: p.page_title,
+                characterCount: p.character_count
+            }))
+        });
+
+    } catch (error) {
+        console.error('Crawl error:', error);
+        res.status(500).json({ error: error.message || 'Failed to crawl pages' });
+    }
+});
+
+/**
+ * Crawl a single page and extract content
+ */
+async function crawlPageContent(url) {
+    const response = await axios.get(url, {
+        timeout: 30000,
+        headers: {
+            'User-Agent': 'Voicory-Crawler/1.0 (+https://voicory.com)',
+            'Accept': 'text/html,application/xhtml+xml',
+            'Accept-Language': 'en-US,en;q=0.9'
+        },
+        maxRedirects: 5
+    });
+
+    const $ = cheerio.load(response.data);
+
+    // Remove unwanted elements
+    $('script, style, noscript, iframe, nav, footer, header, aside, .sidebar, .nav, .menu, .footer, .header, .advertisement, .ads, .social-share, .cookie-notice, .popup, #cookie-banner, .comments, form').remove();
+
+    // Extract title
+    const title = $('title').first().text().trim() ||
+                  $('h1').first().text().trim() ||
+                  $('meta[property="og:title"]').attr('content') ||
+                  '';
+
+    // Extract description
+    const description = $('meta[name="description"]').attr('content') ||
+                       $('meta[property="og:description"]').attr('content') ||
+                       '';
+
+    // Extract headings for structure
+    const headings = [];
+    $('h1, h2, h3').each((i, el) => {
+        const text = $(el).text().trim();
+        if (text && text.length < 200) {
+            headings.push({
+                level: el.tagName.toLowerCase(),
+                text: text
+            });
+        }
+    });
+
+    // Extract main content
+    // Try common content selectors first
+    let mainContent = '';
+    const contentSelectors = [
+        'main',
+        'article',
+        '[role="main"]',
+        '.content',
+        '.post-content',
+        '.entry-content',
+        '.article-content',
+        '.page-content',
+        '#content',
+        '.main-content'
+    ];
+
+    for (const selector of contentSelectors) {
+        const el = $(selector);
+        if (el.length) {
+            mainContent = el.text().trim();
+            if (mainContent.length > 100) break;
+        }
+    }
+
+    // Fallback to body
+    if (!mainContent || mainContent.length < 100) {
+        mainContent = $('body').text().trim();
+    }
+
+    // Clean up content
+    mainContent = mainContent
+        .replace(/\s+/g, ' ')           // Normalize whitespace
+        .replace(/\n\s*\n/g, '\n\n')    // Normalize line breaks
+        .trim();
+
+    // Count words
+    const wordCount = mainContent.split(/\s+/).filter(w => w.length > 0).length;
+
+    return {
+        title: title.substring(0, 500),
+        description: description.substring(0, 500),
+        content: mainContent,
+        headings,
+        wordCount,
+        characterCount: mainContent.length
+    };
+}
+
+/**
+ * Get crawled pages for a document
+ * GET /api/crawler/pages/:documentId
+ */
+app.get('/api/crawler/pages/:documentId', async (req, res) => {
+    try {
+        const { documentId } = req.params;
+
+        const { data: pages, error } = await supabase
+            .from('knowledge_base_crawled_pages')
+            .select('*')
+            .eq('document_id', documentId)
+            .order('crawled_at', { ascending: false });
+
+        if (error) throw error;
+
+        res.json({
+            pages: pages || [],
+            totalCount: pages?.length || 0
+        });
+
+    } catch (error) {
+        console.error('Error fetching crawled pages:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+/**
+ * Re-crawl a document (refresh content)
+ * POST /api/crawler/recrawl/:documentId
+ */
+app.post('/api/crawler/recrawl/:documentId', async (req, res) => {
+    try {
+        const { documentId } = req.params;
+
+        // Get the document and its pages
+        const { data: document, error: docError } = await supabase
+            .from('knowledge_base_documents')
+            .select('*, knowledge_base_crawled_pages(*)')
+            .eq('id', documentId)
+            .single();
+
+        if (docError || !document) {
+            return res.status(404).json({ error: 'Document not found' });
+        }
+
+        // Get existing page URLs
+        const existingPages = document.knowledge_base_crawled_pages || [];
+        const pageUrls = existingPages.map(p => ({ url: p.page_url }));
+
+        if (pageUrls.length === 0) {
+            return res.status(400).json({ error: 'No pages to re-crawl' });
+        }
+
+        // Delete old crawled pages
+        await supabase
+            .from('knowledge_base_crawled_pages')
+            .delete()
+            .eq('document_id', documentId);
+
+        // Update document status
+        await supabase
+            .from('knowledge_base_documents')
+            .update({ processing_status: 'processing' })
+            .eq('id', documentId);
+
+        // Trigger new crawl (using same logic as /api/crawler/crawl)
+        // For simplicity, redirect to the crawl endpoint logic
+        req.body = {
+            pages: pageUrls,
+            knowledgeBaseId: document.knowledge_base_id,
+            documentName: document.name,
+            userId: document.user_id
+        };
+
+        // Re-use crawl endpoint handler
+        // This is a simplified version - in production, you might want to use a job queue
+        const crawlResult = await performCrawl(pageUrls, document.knowledge_base_id, document.name, document.user_id, documentId);
+        
+        res.json(crawlResult);
+
+    } catch (error) {
+        console.error('Re-crawl error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Helper function for re-crawl
+async function performCrawl(pages, knowledgeBaseId, documentName, userId, existingDocId = null) {
+    const firstUrl = new URL(pages[0].url || pages[0]);
+    const baseUrl = `${firstUrl.protocol}//${firstUrl.host}`;
+
+    let urlDocument;
+    
+    if (existingDocId) {
+        // Update existing document
+        const { data } = await supabase
+            .from('knowledge_base_documents')
+            .select()
+            .eq('id', existingDocId)
+            .single();
+        urlDocument = data;
+    }
+
+    const crawledPages = [];
+    let totalCharacters = 0;
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const pageInfo of pages) {
+        const pageUrl = typeof pageInfo === 'string' ? pageInfo : pageInfo.url;
+        
+        try {
+            const pageContent = await crawlPageContent(pageUrl);
+
+            if (pageContent.content) {
+                const { data: crawledPage } = await supabase
+                    .from('knowledge_base_crawled_pages')
+                    .insert({
+                        document_id: existingDocId || urlDocument.id,
+                        page_url: pageUrl,
+                        page_title: pageContent.title,
+                        content: pageContent.content,
+                        character_count: pageContent.content.length,
+                        crawl_status: 'completed',
+                        http_status_code: 200,
+                        metadata: {
+                            description: pageContent.description,
+                            wordCount: pageContent.wordCount
+                        },
+                        crawled_at: new Date().toISOString(),
+                        user_id: userId
+                    })
+                    .select()
+                    .single();
+
+                if (crawledPage) {
+                    crawledPages.push(crawledPage);
+                    totalCharacters += pageContent.content.length;
+                    successCount++;
+                }
+            } else {
+                failCount++;
+            }
+
+            await new Promise(resolve => setTimeout(resolve, 200));
+
+        } catch (crawlError) {
+            failCount++;
+        }
+    }
+
+    // Update document
+    await supabase
+        .from('knowledge_base_documents')
+        .update({
+            processing_status: failCount === pages.length ? 'failed' : 'completed',
+            character_count: totalCharacters,
+            last_crawled_at: new Date().toISOString()
+        })
+        .eq('id', existingDocId || urlDocument.id);
+
+    return {
+        success: true,
+        stats: { totalPages: pages.length, successCount, failCount, totalCharacters },
+        crawledPages
+    };
+}
+
+// ============================================
+// TWILIO PHONE NUMBER IMPORT
+// ============================================
+
+/**
+ * Fetch all phone numbers from a Twilio account
+ * POST /api/twilio/list-numbers
+ * Body: { accountSid, authToken }
+ */
+app.post('/api/twilio/list-numbers', async (req, res) => {
+    try {
+        const { accountSid, authToken } = req.body;
+
+        if (!accountSid || !authToken) {
+            return res.status(400).json({ 
+                error: 'Account SID and Auth Token are required' 
+            });
+        }
+
+        // Validate Twilio credentials format
+        if (!accountSid.startsWith('AC') || accountSid.length !== 34) {
+            return res.status(400).json({ 
+                error: 'Invalid Account SID format. It should start with "AC" and be 34 characters long.' 
+            });
+        }
+
+        console.log('Fetching Twilio numbers for account:', accountSid.substring(0, 10) + '...');
+
+        // Call Twilio API to list phone numbers
+        const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/IncomingPhoneNumbers.json`;
+        
+        const response = await axios.get(twilioUrl, {
+            auth: {
+                username: accountSid,
+                password: authToken
+            },
+            params: {
+                PageSize: 100 // Get up to 100 numbers
+            }
+        });
+
+        const phoneNumbers = response.data.incoming_phone_numbers || [];
+        
+        // Map to our format
+        const numbers = phoneNumbers.map(num => ({
+            sid: num.sid,
+            phoneNumber: num.phone_number,
+            friendlyName: num.friendly_name,
+            capabilities: {
+                voice: num.capabilities?.voice || false,
+                sms: num.capabilities?.sms || false,
+                mms: num.capabilities?.mms || false
+            },
+            status: num.status,
+            dateCreated: num.date_created,
+            // Check if voice URL is already configured (might be in use)
+            hasVoiceConfig: !!num.voice_url || !!num.voice_application_sid,
+            voiceUrl: num.voice_url || null
+        }));
+
+        console.log(`Found ${numbers.length} phone numbers in Twilio account`);
+
+        res.json({
+            success: true,
+            numbers,
+            totalCount: numbers.length
+        });
+
+    } catch (error) {
+        console.error('Twilio list numbers error:', error.response?.data || error.message);
+        
+        // Handle specific Twilio errors
+        if (error.response?.status === 401) {
+            return res.status(401).json({ 
+                error: 'Invalid Twilio credentials. Please check your Account SID and Auth Token.' 
+            });
+        }
+        
+        res.status(500).json({ 
+            error: error.response?.data?.message || error.message || 'Failed to fetch Twilio numbers' 
+        });
+    }
+});
+
+/**
+ * Import a Twilio phone number and configure webhook
+ * POST /api/twilio/import-number
+ * Body: { accountSid, authToken, phoneNumberSid, phoneNumber, label, userId }
+ */
+app.post('/api/twilio/import-number', async (req, res) => {
+    try {
+        const { accountSid, authToken, phoneNumberSid, phoneNumber, label, userId, smsEnabled } = req.body;
+
+        if (!accountSid || !authToken || !phoneNumberSid || !phoneNumber || !userId) {
+            return res.status(400).json({ 
+                error: 'Account SID, Auth Token, Phone Number SID, Phone Number, and User ID are required' 
+            });
+        }
+
+        console.log('Importing Twilio number:', phoneNumber, 'for user:', userId);
+
+        // Configure Twilio webhook URL to point to our backend
+        // This URL will handle inbound calls
+        const webhookUrl = `https://callyy-production.up.railway.app/api/webhooks/twilio/voice`;
+        const statusCallbackUrl = `https://callyy-production.up.railway.app/api/webhooks/twilio/status`;
+
+        // Update the phone number in Twilio to use our webhook
+        const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/IncomingPhoneNumbers/${phoneNumberSid}.json`;
+        
+        const updateData = new URLSearchParams();
+        updateData.append('VoiceUrl', webhookUrl);
+        updateData.append('VoiceMethod', 'POST');
+        updateData.append('StatusCallback', statusCallbackUrl);
+        updateData.append('StatusCallbackMethod', 'POST');
+
+        const twilioResponse = await axios.post(twilioUrl, updateData.toString(), {
+            auth: {
+                username: accountSid,
+                password: authToken
+            },
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            }
+        });
+
+        console.log('Twilio number configured with webhook:', webhookUrl);
+
+        // Save to our database
+        const { data: phoneNumberData, error: dbError } = await supabase
+            .from('phone_numbers')
+            .insert({
+                number: phoneNumber,
+                provider: 'Twilio',
+                label: label || 'Twilio Number',
+                twilio_phone_number: phoneNumber,
+                twilio_account_sid: accountSid,
+                twilio_auth_token: authToken, // In production, encrypt this
+                twilio_phone_sid: phoneNumberSid,
+                sms_enabled: smsEnabled || false,
+                inbound_enabled: true,
+                outbound_enabled: true,
+                is_active: true,
+                user_id: userId
+            })
+            .select()
+            .single();
+
+        if (dbError) {
+            console.error('Database error saving phone number:', dbError);
+            return res.status(500).json({ 
+                error: 'Phone number configured in Twilio but failed to save to database: ' + dbError.message 
+            });
+        }
+
+        console.log('Phone number saved to database:', phoneNumberData.id);
+
+        res.json({
+            success: true,
+            phoneNumber: {
+                id: phoneNumberData.id,
+                number: phoneNumberData.number,
+                provider: phoneNumberData.provider,
+                label: phoneNumberData.label,
+                twilioPhoneNumber: phoneNumberData.twilio_phone_number,
+                twilioAccountSid: phoneNumberData.twilio_account_sid,
+                smsEnabled: phoneNumberData.sms_enabled,
+                inboundEnabled: phoneNumberData.inbound_enabled,
+                outboundEnabled: phoneNumberData.outbound_enabled,
+                isActive: phoneNumberData.is_active
+            },
+            webhookConfigured: true,
+            webhookUrl
+        });
+
+    } catch (error) {
+        console.error('Twilio import error:', error.response?.data || error.message);
+        
+        if (error.response?.status === 401) {
+            return res.status(401).json({ 
+                error: 'Invalid Twilio credentials' 
+            });
+        }
+        
+        if (error.response?.status === 404) {
+            return res.status(404).json({ 
+                error: 'Phone number not found in your Twilio account' 
+            });
+        }
+        
+        res.status(500).json({ 
+            error: error.response?.data?.message || error.message || 'Failed to import Twilio number' 
+        });
+    }
+});
+
+/**
+ * Twilio Voice Webhook - Handles inbound calls
+ * POST /api/webhooks/twilio/voice
+ */
+app.post('/api/webhooks/twilio/voice', async (req, res) => {
+    try {
+        const callData = req.body;
+        console.log('Twilio voice webhook received:', {
+            callSid: callData.CallSid,
+            from: callData.From,
+            to: callData.To,
+            status: callData.CallStatus
+        });
+
+        // Find the phone number configuration
+        const { data: phoneConfig } = await supabase
+            .from('phone_numbers')
+            .select('*, assistants(*)')
+            .eq('twilio_phone_number', callData.To)
+            .single();
+
+        if (!phoneConfig) {
+            console.log('No configuration found for number:', callData.To);
+            // Return basic TwiML to reject the call gracefully
+            res.type('text/xml');
+            return res.send(`
+                <Response>
+                    <Say>Sorry, this number is not configured. Goodbye.</Say>
+                    <Hangup/>
+                </Response>
+            `);
+        }
+
+        // If no assistant configured, provide a basic response
+        if (!phoneConfig.assistant_id) {
+            res.type('text/xml');
+            return res.send(`
+                <Response>
+                    <Say>Thank you for calling. No assistant has been configured for this number yet. Please try again later.</Say>
+                    <Hangup/>
+                </Response>
+            `);
+        }
+
+        // TODO: Integrate with your AI voice calling system
+        // For now, return a placeholder response
+        res.type('text/xml');
+        res.send(`
+            <Response>
+                <Say voice="Polly.Joanna">Hello! Thank you for calling. This line is powered by Voicory AI. An assistant will be with you shortly.</Say>
+                <Pause length="2"/>
+                <Say voice="Polly.Joanna">Goodbye!</Say>
+                <Hangup/>
+            </Response>
+        `);
+
+    } catch (error) {
+        console.error('Twilio voice webhook error:', error);
+        res.type('text/xml');
+        res.send(`
+            <Response>
+                <Say>We are experiencing technical difficulties. Please try again later.</Say>
+                <Hangup/>
+            </Response>
+        `);
+    }
+});
+
+/**
+ * Twilio Status Callback - Handles call status updates
+ * POST /api/webhooks/twilio/status
+ */
+app.post('/api/webhooks/twilio/status', async (req, res) => {
+    try {
+        const statusData = req.body;
+        console.log('Twilio status callback:', {
+            callSid: statusData.CallSid,
+            status: statusData.CallStatus,
+            duration: statusData.CallDuration
+        });
+
+        // Log call to database if needed
+        // For now, just acknowledge
+        res.sendStatus(200);
+
+    } catch (error) {
+        console.error('Twilio status callback error:', error);
+        res.sendStatus(500);
+    }
+});
+
+// ============================================
 // SYSTEM PROMPT GENERATOR - AI-powered prompt creation
 // Generates professional system prompts based on user description
 // ============================================
@@ -448,9 +1423,15 @@ Generate a natural, warm first message that:
 - Sounds natural when spoken aloud
 - Invites the customer to share their need
 
+=== CRITICAL OUTPUT RULES ===
+1. The "systemPrompt" field must contain ONLY the system prompt text - no JSON, no metadata
+2. The "firstMessage" field must contain a short greeting (e.g., "Hi! Thanks for calling SparkleClean. I'm Maya, how can I help?")
+3. Do NOT leave any field empty or null
+4. Do NOT include the JSON structure inside the systemPrompt text
+
 Return your response in this exact JSON format:
 {
-    "systemPrompt": "The complete system prompt with all sections...",
+    "systemPrompt": "You are {{assistant_name}}... [THE COMPLETE SYSTEM PROMPT TEXT ONLY - NO JSON INSIDE]",
     "firstMessage": "Hi! Thanks for calling [Business]. I'm {{assistant_name}}, how can I help you today?",
     "suggestedVariables": [
         {"name": "variable_name", "description": "Clear description of what this variable stores", "example": "Example value"}
@@ -497,6 +1478,19 @@ Generate a production-ready system prompt that makes this AI assistant highly ef
         } catch (parseError) {
             console.error('Failed to parse AI response:', responseText);
             return res.status(500).json({ error: 'Failed to parse AI response' });
+        }
+
+        // Validate and clean up the response
+        if (!result.systemPrompt || typeof result.systemPrompt !== 'string') {
+            console.error('Invalid systemPrompt in response:', result);
+            return res.status(500).json({ error: 'Invalid response: missing systemPrompt' });
+        }
+
+        // Ensure firstMessage is not empty - provide a fallback if needed
+        if (!result.firstMessage || result.firstMessage.trim() === '') {
+            const businessNameStr = businessName || 'our company';
+            const agentNameStr = result.suggestedAgentName || agentName || 'your assistant';
+            result.firstMessage = `Hi! Thanks for calling ${businessNameStr}. I'm ${agentNameStr}, how can I help you today?`;
         }
 
         // Log usage
