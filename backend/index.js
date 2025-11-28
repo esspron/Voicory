@@ -358,6 +358,197 @@ app.get('/health', (req, res) => {
     res.json({ status: 'healthy' });
 });
 
+// ============================================
+// TEST CHAT ENDPOINT - For testing agents in the dashboard
+// Uses the SAME logic as WhatsApp processWithAI
+// ============================================
+app.post('/api/test-chat', async (req, res) => {
+    try {
+        if (!openai) {
+            return res.status(503).json({ error: 'AI service not available' });
+        }
+
+        const { 
+            message, 
+            conversationHistory = [], 
+            assistantId,  // If saved, use this to fetch from DB
+            assistantConfig  // Fallback for unsaved assistants
+        } = req.body;
+
+        if (!message) {
+            return res.status(400).json({ error: 'Message is required' });
+        }
+
+        if (!assistantId && !assistantConfig) {
+            return res.status(400).json({ error: 'Either assistantId or assistantConfig is required' });
+        }
+
+        let assistant;
+
+        // If assistantId provided, fetch from database (same as WhatsApp)
+        if (assistantId) {
+            const { data, error } = await supabase
+                .from('assistants')
+                .select('*')
+                .eq('id', assistantId)
+                .single();
+
+            if (error || !data) {
+                console.error('Failed to fetch assistant:', error);
+                return res.status(404).json({ error: 'Assistant not found' });
+            }
+            assistant = data;
+            console.log('Test chat - Using saved assistant:', assistant.name);
+        } else {
+            // Use passed config for unsaved assistants (convert to DB format)
+            assistant = {
+                name: assistantConfig.name,
+                system_prompt: assistantConfig.systemPrompt,
+                first_message: assistantConfig.firstMessage,
+                language_settings: assistantConfig.languageSettings,
+                style_settings: assistantConfig.styleSettings,
+                llm_model: assistantConfig.llmModel,
+                temperature: assistantConfig.temperature,
+                max_tokens: assistantConfig.maxTokens,
+                dynamic_variables: assistantConfig.dynamicVariables,
+                timezone: assistantConfig.timezone || 'Asia/Kolkata'
+            };
+            console.log('Test chat - Using unsaved config:', assistant.name);
+        }
+
+        // ===== SAME LOGIC AS processWithAI =====
+        
+        // Language and Style Settings
+        const langSettings = assistant.language_settings || { default: 'en', autoDetect: false };
+        const styleSettings = assistant.style_settings || { mode: 'friendly' };
+        
+        console.log('Test chat - Language:', langSettings.default, 'AutoDetect:', langSettings.autoDetect, 'Style:', styleSettings.mode);
+
+        // Build system prompt
+        let systemPrompt = assistant.system_prompt || 
+            'You are a helpful, friendly AI assistant. Be conversational and helpful.';
+        
+        // Prepend the assistant's identity if a name is set
+        if (assistant.name) {
+            systemPrompt = `Your name is ${assistant.name}. When asked about your name, always say you are ${assistant.name}.\n\n${systemPrompt}`;
+        }
+
+        // Language settings - SAME as WhatsApp
+        const langNames = {
+            'en': 'English', 'en-GB': 'British English', 'en-AU': 'Australian English',
+            'hi': 'Hindi', 'hi-Latn': 'Hinglish (Hindi written in English letters)',
+            'ta': 'Tamil', 'te': 'Telugu', 'mr': 'Marathi', 'bn': 'Bengali',
+            'gu': 'Gujarati', 'kn': 'Kannada', 'ml': 'Malayalam', 'pa': 'Punjabi',
+            'es': 'Spanish', 'es-MX': 'Mexican Spanish', 'fr': 'French', 'de': 'German',
+            'it': 'Italian', 'pt': 'Portuguese', 'pt-BR': 'Brazilian Portuguese',
+            'nl': 'Dutch', 'pl': 'Polish', 'ru': 'Russian', 'ja': 'Japanese',
+            'ko': 'Korean', 'zh': 'Chinese (Mandarin)', 'ar': 'Arabic', 'tr': 'Turkish'
+        };
+        const defaultLang = langSettings.default || 'en';
+        const langName = langNames[defaultLang] || defaultLang;
+
+        if (langSettings.autoDetect) {
+            systemPrompt += `\n\nLANGUAGE: Detect the customer's language and respond in the same language they use. If they write in Hindi, respond in Hindi. If they write in Hinglish (Hindi in English letters), respond in Hinglish. Match their language preference.`;
+        } else {
+            // Strict language enforcement - SAME as WhatsApp
+            const languagePrefix = `[MANDATORY LANGUAGE: ${langName.toUpperCase()}] - All your responses in this conversation MUST be in ${langName}. This overrides any previous conversation patterns.\n\n`;
+            systemPrompt = languagePrefix + systemPrompt;
+            systemPrompt += `\n\n⚠️ CRITICAL LANGUAGE RULE ⚠️: You MUST respond ONLY in ${langName}. This is a strict requirement that overrides everything else. 
+- Even if the customer writes in Hindi, Hinglish, or any other language, YOUR response MUST be in ${langName}.
+- Even if your previous responses in this conversation were in another language, you MUST now respond in ${langName}.
+- Do NOT translate the customer's message - just respond in ${langName}.
+- This rule is NON-NEGOTIABLE.`;
+        }
+
+        // Style settings - SAME as WhatsApp
+        const styleMode = styleSettings.mode || 'friendly';
+        switch (styleMode) {
+            case 'professional':
+                systemPrompt += `\n\nCOMMUNICATION STYLE: Be professional and formal. Use polished language, proper grammar, and structured responses. Avoid slang, contractions, or casual expressions.`;
+                break;
+            case 'friendly':
+                systemPrompt += `\n\nCOMMUNICATION STYLE: Be warm, friendly, and conversational. Use a relaxed tone, feel free to use casual language, and be personable.`;
+                break;
+            case 'concise':
+                systemPrompt += `\n\nCOMMUNICATION STYLE: Be brief and direct. Give short, to-the-point answers. Avoid unnecessary words or explanations unless specifically asked.`;
+                break;
+            case 'adaptive':
+                const adaptiveConfig = styleSettings.adaptiveConfig || {};
+                let adaptiveInstruction = `\n\nCOMMUNICATION STYLE: Adapt your style to match the customer's communication pattern.`;
+                if (adaptiveConfig.mirrorFormality) {
+                    adaptiveInstruction += ` If they're formal, be formal. If they're casual, be casual.`;
+                }
+                if (adaptiveConfig.mirrorLength) {
+                    adaptiveInstruction += ` Match their message length - brief replies to brief messages, detailed responses to detailed questions.`;
+                }
+                if (adaptiveConfig.mirrorVocabulary) {
+                    adaptiveInstruction += ` Use similar vocabulary complexity as they do.`;
+                }
+                systemPrompt += adaptiveInstruction;
+                break;
+        }
+
+        // Resolve dynamic variables if available
+        const dynamicVariables = assistant.dynamic_variables || { enableSystemVariables: true, variables: [] };
+        const templateContext = {
+            enableSystemVariables: dynamicVariables.enableSystemVariables,
+            timezone: assistant.timezone || 'Asia/Kolkata',
+            assistantName: assistant.name,
+            customer: null, // No customer in test mode
+            customVariables: dynamicVariables.variables || []
+        };
+        
+        // Use the same resolveTemplateVariables function
+        const resolvedSystemPrompt = resolveTemplateVariables(systemPrompt, templateContext);
+
+        // Build messages array
+        const messages = [{ role: 'system', content: resolvedSystemPrompt }];
+
+        // Add first message as assistant's opening if this is the start of conversation
+        if (conversationHistory.length === 0 && assistant.first_message) {
+            messages.push({ role: 'assistant', content: assistant.first_message });
+        }
+
+        // Add conversation history
+        for (const msg of conversationHistory) {
+            messages.push({
+                role: msg.role,
+                content: msg.content
+            });
+        }
+
+        // Add the current user message
+        messages.push({ role: 'user', content: message });
+
+        const model = assistant.llm_model || 'gpt-4o';
+        console.log('Test chat - Model:', model, 'Messages:', messages.length);
+
+        // Call OpenAI - SAME as WhatsApp
+        const completion = await openai.chat.completions.create({
+            model: model,
+            messages: messages,
+            temperature: parseFloat(assistant.temperature) || 0.7,
+            max_tokens: assistant.max_tokens || 1024,
+        });
+
+        const response = completion.choices[0]?.message?.content;
+        
+        if (!response) {
+            return res.status(500).json({ error: 'No response from AI' });
+        }
+
+        res.json({ 
+            response,
+            model: model,
+            assistantName: assistant.name
+        });
+
+    } catch (error) {
+        console.error('Test chat error:', error);
+        res.status(500).json({ error: error.message || 'Failed to process message' });
+    }
+});
+
 // WhatsApp OAuth Callback
 app.post('/api/whatsapp/oauth/callback', async (req, res) => {
   try {
