@@ -810,11 +810,13 @@ async function processWithAI(config, message, contact) {
         }
 
         // Log assistant settings including language and style
-        const langSettings = assistant.language_settings || { default: 'en' };
+        // IMPORTANT: Default autoDetect to false so language enforcement works by default
+        const langSettings = assistant.language_settings || { default: 'en', autoDetect: false };
         const styleSettings = assistant.style_settings || { mode: 'friendly' };
         console.log('Using assistant:', assistant.name, 
             'Model:', assistant.llm_model, 
             'Language:', langSettings.default, 
+            'AutoDetect:', langSettings.autoDetect,
             'Style:', styleSettings.mode,
             'Memory:', assistant.memory_enabled);
 
