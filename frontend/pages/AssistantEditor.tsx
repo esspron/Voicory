@@ -2273,11 +2273,15 @@ const KnowledgeBaseTab: React.FC<KnowledgeBaseTabProps> = ({ formData, setFormDa
                                         <p className="text-xs text-textMuted">{kb.total_documents} documents</p>
                                     </div>
                                     <button
-                                        onClick={() => handleUnlinkKB(kb.id)}
-                                        className="p-1.5 opacity-0 group-hover:opacity-100 text-textMuted hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            handleUnlinkKB(kb.id);
+                                        }}
+                                        className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/20 rounded-lg transition-all"
                                         title="Unlink knowledge base"
                                     >
-                                        <X size={14} weight="bold" />
+                                        <X size={16} weight="bold" />
                                     </button>
                                 </div>
                             ))}
