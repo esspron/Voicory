@@ -436,17 +436,38 @@ frontend/
     └── SidebarContext.tsx # Sidebar collapse state
 
 backend/
-├── index.js             # Main Express server with Redis caching
+├── index.js             # Clean entry point (134 lines)
 ├── package.json         # Dependencies including @upstash/redis
-├── services/
+├── config/
+│   └── index.js         # Shared dependencies & clients
+├── lib/                 # Security middleware
+│   ├── auth.js          # Authentication middleware
+│   ├── crypto.js        # Encryption/decryption
+│   ├── security.js      # Security headers, rate limiting
+│   └── validators.js    # Input validation
+├── routes/              # Express route handlers
+│   ├── health.js        # Health check endpoints
+│   ├── crawler.js       # Web crawler (/api/crawler/*)
+│   ├── knowledgeBase.js # KB embeddings (/api/knowledge-base/*)
+│   ├── twilio.js        # Phone import & webhooks (/api/twilio/*)
+│   ├── ai.js            # Prompt generation (/api/generate-prompt)
+│   ├── testChat.js      # Dashboard agent testing (/api/test-chat)
+│   ├── whatsappOAuth.js # WhatsApp OAuth (/api/whatsapp/oauth/*)
+│   ├── whatsappWebhook.js # WhatsApp messages (/api/webhooks/whatsapp)
+│   ├── payments.js      # Stripe & Razorpay (/api/payments/*)
+│   ├── coupons.js       # Coupon management (/api/coupons/*)
+│   └── admin.js         # Admin endpoints (/api/admin/*)
+├── services/            # Reusable business logic
+│   ├── cache.js         # Redis caching (cacheGet, cacheSet)
+│   ├── assistant.js     # Cached DB lookups (getCachedAssistant)
+│   ├── embedding.js     # OpenAI embeddings (generateEmbedding)
+│   ├── rag.js           # Knowledge base search (searchKnowledgeBase)
+│   ├── template.js      # Dynamic variables (resolveTemplateVariables)
+│   ├── memory.js        # Customer memory (formatMemoryForPrompt)
 │   ├── callbot/         # Ultra-low latency voice service (scaling)
-│   │   ├── index.js
-│   │   ├── package.json
-│   │   └── railway.json
 │   └── chatbot/         # WhatsApp/chat service (scaling)
-│       ├── index.js
-│       ├── package.json
-│       └── railway.json
+├── utils/
+│   └── shutdown.js      # Graceful shutdown handlers
 └── supabase/
     └── migrations/      # Database migrations
 
@@ -461,4 +482,56 @@ admin/                   # Local-only admin panel
 
 docs/
 └── SCALING_ARCHITECTURE.md  # Full scaling guide
+```
+
+## 15. Backend Architecture (Modular)
+
+### Route Mounting
+```javascript
+// index.js
+app.use('/', healthRoutes);
+app.use('/api/crawler', crawlerRoutes);
+app.use('/api/knowledge-base', knowledgeBaseRoutes);
+app.use('/api/twilio', twilioRoutes);
+app.use('/api', aiRoutes);
+app.use('/api', testChatRoutes);
+app.use('/api/whatsapp', whatsappOAuthRoutes);
+app.use('/api/webhooks/whatsapp', whatsappWebhookRoutes);
+app.use('/api/payments', paymentRoutes);
+app.use('/api/coupons', couponRoutes);
+app.use('/api/admin', adminRoutes);
+```
+
+### Service Layer Usage
+```javascript
+// Example: routes/testChat.js
+const { getCachedAssistant } = require('../services/assistant');
+const { searchKnowledgeBase } = require('../services/rag');
+const { resolveTemplateVariables } = require('../services/template');
+```
+
+### Creating New Routes
+```javascript
+// routes/myFeature.js
+const express = require('express');
+const router = express.Router();
+const { supabase } = require('../config');
+
+router.post('/endpoint', async (req, res) => {
+    // Implementation
+});
+
+module.exports = router;
+```
+
+### Creating New Services
+```javascript
+// services/myService.js
+const { supabase, openai } = require('../config');
+
+async function myFunction(params) {
+    // Implementation
+}
+
+module.exports = { myFunction };
 ```
