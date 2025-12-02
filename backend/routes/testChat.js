@@ -182,8 +182,9 @@ router.post('/test-chat', async (req, res) => {
         
         if (assistant.rag_enabled && assistant.knowledge_base_ids && assistant.knowledge_base_ids.length > 0) {
             console.log('Test chat - RAG enabled, searching knowledge base for:', message?.slice(0, 50));
-            const ragThreshold = parseFloat(assistant.rag_similarity_threshold) || 0.5;
-            const ragMaxResults = parseInt(assistant.rag_max_results) || 5;
+            const ragThreshold = parseFloat(assistant.rag_similarity_threshold) || 0.2;
+            const ragMaxResults = parseInt(assistant.rag_max_results) || 10;
+            const ragInstructions = assistant.rag_instructions || '';
             
             console.log('Test chat - RAG params:', { ragThreshold, ragMaxResults, kbIds: assistant.knowledge_base_ids });
             
@@ -196,12 +197,14 @@ router.post('/test-chat', async (req, res) => {
             
             console.log('Test chat - RAG search results:', ragDocuments?.length || 0, 'documents');
             
+            // Always add RAG context (even if empty - this adds strict "no info" instructions)
+            const ragContext = formatRAGContext(ragDocuments, ragInstructions);
+            systemPrompt += ragContext;
+            
             if (ragDocuments && ragDocuments.length > 0) {
-                const ragContext = formatRAGContext(ragDocuments);
-                systemPrompt += ragContext;
                 console.log(`Test chat - Injected RAG context from ${ragDocuments.length} documents`);
             } else {
-                console.log('Test chat - No relevant RAG documents found');
+                console.log('Test chat - No relevant documents found, added strict no-info instructions');
             }
         } else {
             console.log('Test chat - RAG not enabled or no KBs linked');

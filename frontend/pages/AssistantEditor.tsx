@@ -1,11 +1,27 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { createPortal } from 'react-dom';
-import { useParams, useNavigate } from 'react-router-dom';
 import {
     FloppyDisk, Play, Robot, GitBranch, BookOpen, ChartBar, Wrench,
     Gear, Globe, X, Check, ChatCircle, Phone, CircleNotch,
     Brain, Trash, Translate, SquaresFour, TestTube, Lightning, PhoneCall, ChatTeardrop
 } from '@phosphor-icons/react';
+import React, { useEffect, useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
+import { useParams, useNavigate } from 'react-router-dom';
+
+import AnalysisTab from '../components/assistant-editor/AnalysisTab';
+import CallsTab from '../components/assistant-editor/CallsTab';
+import TestsTab from '../components/assistant-editor/TestsTab';
+import ChatSidebar from '../components/assistant-editor/ChatSidebar';
+import KnowledgeBaseTab from '../components/assistant-editor/KnowledgeBaseTab';
+import LLMSelectorModal from '../components/assistant-editor/LLMSelectorModal';
+import MemoryTab from '../components/assistant-editor/MemoryTab';
+import MessagesTab from '../components/assistant-editor/MessagesTab';
+import PlaceholderTab from '../components/assistant-editor/PlaceholderTab';
+import PromptGeneratorModal from '../components/assistant-editor/PromptGeneratorModal';
+import ToolsTab from '../components/assistant-editor/ToolsTab';
+import VoiceSelectorModal from '../components/assistant-editor/VoiceSelectorModal';
+import { FadeIn } from '../components/ui/FadeIn';
+import Select from '../components/ui/Select';
+import { useAuth } from '../contexts/AuthContext';
 import { getAssistant, getVoices, createAssistant, updateAssistant, deleteAssistant } from '../services/voicoryService';
 import {
     Assistant, Voice, AssistantInput, MemoryConfig,
@@ -15,21 +31,6 @@ import {
     DEFAULT_LANGUAGE_SETTINGS, DEFAULT_STYLE_SETTINGS,
     DEFAULT_DYNAMIC_VARIABLES_CONFIG
 } from '../types';
-import VoiceSelectorModal from '../components/assistant-editor/VoiceSelectorModal';
-import LLMSelectorModal from '../components/assistant-editor/LLMSelectorModal';
-import PromptGeneratorModal from '../components/assistant-editor/PromptGeneratorModal';
-import CallsTab from '../components/assistant-editor/CallsTab';
-import MessagesTab from '../components/assistant-editor/MessagesTab';
-import MemoryTab from '../components/assistant-editor/MemoryTab';
-import ToolsTab from '../components/assistant-editor/ToolsTab';
-import KnowledgeBaseTab from '../components/assistant-editor/KnowledgeBaseTab';
-import AnalysisTab from '../components/assistant-editor/AnalysisTab';
-import TestsTab from '../components/assistant-editor/TestsTab';
-import ChatSidebar from '../components/assistant-editor/ChatSidebar';
-import PlaceholderTab from '../components/assistant-editor/PlaceholderTab';
-import Select from '../components/ui/Select';
-import { FadeIn } from '../components/ui/FadeIn';
-import { useAuth } from '../contexts/AuthContext';
 
 // Tab definitions - Calls and Messages replace Agent
 const TABS = [
@@ -172,9 +173,9 @@ Guidelines for messaging:
     useDefaultPersonality: true,
     timezone: 'Asia/Kolkata',
     ragEnabled: false,
-    ragSimilarityThreshold: 0.7,
-    ragMaxResults: 5,
-    ragInstructions: '',
+    ragSimilarityThreshold: 0.2,
+    ragMaxResults: 10,
+    ragInstructions: 'STRICT MODE: Only answer using the knowledge base content. If the information is not in the knowledge base, say "I don\'t have information about that in my knowledge base."',
     knowledgeBaseIds: [],
     memoryEnabled: false,
     memoryConfig: DEFAULT_MEMORY_CONFIG,
