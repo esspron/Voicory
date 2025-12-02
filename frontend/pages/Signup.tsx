@@ -194,13 +194,13 @@ const Signup: React.FC = () => {
         </div>
 
         {error && (
-          <div className="mb-4 p-3 bg-red-500/10 border border-red-500/50 rounded-lg text-red-400 text-sm">
+          <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm">
             {error}
           </div>
         )}
 
         {success && (
-          <div className="mb-4 p-3 bg-green-500/10 border border-green-500/50 rounded-lg text-green-400 text-sm">
+          <div className="mb-4 p-3 bg-green-500/10 border border-green-500/20 rounded-xl text-green-400 text-sm">
             Account created successfully! Redirecting to dashboard...
           </div>
         )}
@@ -214,7 +214,7 @@ const Signup: React.FC = () => {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full bg-background border border-border rounded-lg px-4 py-2.5 text-textMain placeholder-textMuted focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
+              className="w-full bg-background border border-white/10 rounded-xl px-4 py-2.5 text-textMain placeholder-textMuted outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all duration-200"
             />
           </div>
           <div>
@@ -226,14 +226,14 @@ const Signup: React.FC = () => {
               onChange={(e) => setPassword(e.target.value)}
               required
               minLength={6}
-              className="w-full bg-background border border-border rounded-lg px-4 py-2.5 text-textMain placeholder-textMuted focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
+              className="w-full bg-background border border-white/10 rounded-xl px-4 py-2.5 text-textMain placeholder-textMuted outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all duration-200"
             />
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-primary hover:bg-primaryHover text-black font-semibold py-2.5 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full bg-gradient-to-r from-primary to-primary/80 hover:shadow-lg hover:shadow-primary/25 text-black font-semibold py-2.5 rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:-translate-y-0.5"
           >
             {loading ? 'Creating account...' : 'Sign Up'}
           </button>

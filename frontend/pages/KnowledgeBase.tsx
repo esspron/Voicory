@@ -1,6 +1,29 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Plus, Book, FileText, Link as LinkIcon, UploadSimple, X, CaretDown, Sparkle, MagnifyingGlass, FolderOpen, Globe, TextAa, ArrowsClockwise, Trash } from '@phosphor-icons/react';
+import { 
+    Plus, 
+    Books, 
+    FileText, 
+    Link as LinkIcon, 
+    UploadSimple, 
+    X, 
+    CaretDown, 
+    Sparkle, 
+    MagnifyingGlass, 
+    FolderOpen, 
+    Globe, 
+    TextAa, 
+    CircleNotch, 
+    Trash, 
+    Warning,
+    Lightning,
+    Database,
+    Brain,
+    Article,
+    FilePlus,
+    DownloadSimple,
+    Copy
+} from '@phosphor-icons/react';
 
 import { FadeIn } from '../components/ui/FadeIn';
 import AddWebPagesModal from '../components/AddWebPagesModal';
@@ -16,9 +39,22 @@ import {
     KnowledgeBaseDocument,
 } from '../services/knowledgeBaseService';
 
-// Skeleton loader component
+// Skeleton loader component with shimmer effect
 const Skeleton = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-    <div className={`animate-pulse bg-gradient-to-r from-white/5 via-white/10 to-white/5 rounded ${className}`} {...props} />
+    <div className={`animate-pulse bg-gradient-to-r from-white/5 via-white/10 to-white/5 bg-[length:200%_100%] animate-shimmer rounded ${className}`} {...props} />
+);
+
+// Document card skeleton
+const DocumentSkeleton = () => (
+    <div className="bg-surface/30 border border-white/5 rounded-xl p-4">
+        <div className="flex items-start gap-3">
+            <Skeleton className="w-10 h-10 rounded-xl flex-shrink-0" />
+            <div className="flex-1 space-y-2">
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-3 w-1/2" />
+            </div>
+        </div>
+    </div>
 );
 
 const KnowledgeBase: React.FC = () => {
@@ -271,11 +307,14 @@ const KnowledgeBase: React.FC = () => {
     return (
         <FadeIn className="flex h-full bg-background">
             {/* Sub-sidebar */}
-            <div className="w-72 border-r border-white/5 bg-surface/50 backdrop-blur-xl flex flex-col">
+            <div className="w-72 border-r border-white/5 bg-surface/30 backdrop-blur-xl flex flex-col">
                 {/* Header */}
                 <div className="p-4 border-b border-white/5">
                     <div className="flex justify-between items-center mb-4">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2.5">
+                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/20 to-violet-500/10 flex items-center justify-center">
+                                <Brain size={20} weight="duotone" className="text-primary" />
+                            </div>
                             <h2 className="font-semibold text-textMain">Knowledge Base</h2>
                             <span className="px-2 py-0.5 text-xs font-medium bg-primary/10 text-primary rounded-full">
                                 {knowledgeBases.length}
@@ -283,7 +322,8 @@ const KnowledgeBase: React.FC = () => {
                         </div>
                         <button
                             onClick={() => setIsModalOpen(true)}
-                            className="group p-2 bg-gradient-to-br from-primary to-primary/80 text-white rounded-xl hover:shadow-lg hover:shadow-primary/25 transition-all duration-200 hover:-translate-y-0.5"
+                            className="group p-2 bg-gradient-to-br from-primary to-primary/80 text-black rounded-xl hover:shadow-lg hover:shadow-primary/25 transition-all duration-200 hover:-translate-y-0.5"
+                            title="Create knowledge base"
                         >
                             <Plus size={18} weight="bold" />
                         </button>
@@ -316,8 +356,8 @@ const KnowledgeBase: React.FC = () => {
                         </div>
                     ) : knowledgeBases.length === 0 ? (
                         <div className="text-center py-12 px-4">
-                            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-white/5 to-transparent flex items-center justify-center mx-auto mb-4">
-                                <Book size={28} weight="duotone" className="text-textMuted/30" />
+                            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary/10 to-violet-500/5 flex items-center justify-center mx-auto mb-4 border border-white/5">
+                                <Books size={28} weight="duotone" className="text-primary/40" />
                             </div>
                             <p className="text-sm font-medium text-textMain mb-1">No knowledge bases</p>
                             <p className="text-xs text-textMuted/60">Create your first one to get started</p>
@@ -337,13 +377,16 @@ const KnowledgeBase: React.FC = () => {
                                         ? 'bg-gradient-to-br from-primary/20 to-primary/10'
                                         : 'bg-gradient-to-br from-white/10 to-white/5 group-hover:from-primary/15 group-hover:to-primary/5'
                                         }`}>
-                                        <Book size={18} weight={selectedKb?.id === kb.id ? "fill" : "duotone"} className={selectedKb?.id === kb.id ? 'text-primary' : 'text-textMuted group-hover:text-primary transition-colors'} />
+                                        <Database size={18} weight={selectedKb?.id === kb.id ? "fill" : "duotone"} className={selectedKb?.id === kb.id ? 'text-primary' : 'text-textMuted group-hover:text-primary transition-colors'} />
                                     </div>
                                     <div className="flex-1 text-left min-w-0">
                                         <p className={`text-sm font-medium truncate ${selectedKb?.id === kb.id ? 'text-textMain' : 'text-textMain/80 group-hover:text-textMain'}`}>
                                             {kb.name}
                                         </p>
-                                        <p className="text-xs text-textMuted/60">{kb.total_documents} documents</p>
+                                        <div className="flex items-center gap-1.5">
+                                            <Article size={10} weight="bold" className="text-textMuted/40" />
+                                            <p className="text-xs text-textMuted/60">{kb.total_documents} documents</p>
+                                        </div>
                                     </div>
                                 </button>
                             ))}
@@ -372,12 +415,12 @@ const KnowledgeBase: React.FC = () => {
                             {/* Floating sparkles */}
                             <Sparkle size={16} weight="fill" className="absolute -top-8 -left-6 text-primary/40 animate-pulse" />
                             <Sparkle size={12} weight="fill" className="absolute -top-4 right-0 text-violet-400/40 animate-pulse" style={{ animationDelay: '0.5s' }} />
-                            <Sparkle size={14} weight="fill" className="absolute bottom-0 -left-8 text-cyan-400/40 animate-pulse" style={{ animationDelay: '1s' }} />
+                            <Lightning size={14} weight="fill" className="absolute bottom-0 -left-8 text-cyan-400/40 animate-pulse" style={{ animationDelay: '1s' }} />
 
                             <div className="relative w-20 h-20 mb-6">
                                 <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-violet-500/20 rounded-2xl blur-xl animate-pulse" />
                                 <div className="relative w-full h-full rounded-2xl bg-gradient-to-br from-surface to-surface/80 border border-white/10 flex items-center justify-center backdrop-blur-sm">
-                                    <Book size={40} weight="duotone" className="text-primary" />
+                                    <Brain size={40} weight="duotone" className="text-primary" />
                                 </div>
                             </div>
                         </div>
@@ -398,92 +441,50 @@ const KnowledgeBase: React.FC = () => {
                 ) : selectedKb ? (
                     <div className="p-8 w-full h-full overflow-y-auto">
                         <div className="max-w-4xl mx-auto">
-                            {/* Header */}
-                            <div className="flex items-start justify-between mb-8">
+                            {/* Header - Clean Style */}
+                            <div className="flex items-start justify-between mb-6 pb-4 border-b border-white/5">
                                 <div>
-                                    <div className="flex items-center gap-3 mb-2">
-                                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center">
-                                            <Book size={24} weight="fill" className="text-primary" />
-                                        </div>
-                                        <div>
-                                            <h2 className="text-2xl font-bold text-textMain">{selectedKb.name}</h2>
-                                            <p className="text-sm text-textMuted">{selectedKbDocuments.length} documents</p>
-                                        </div>
+                                    <h2 className="text-xl font-bold text-textMain mb-1">{selectedKb.name}</h2>
+                                    <div className="flex items-center gap-3 text-sm">
+                                        <span className="text-textMuted/60">ID: know...{selectedKb.id.slice(-3)}</span>
+                                        <button 
+                                            onClick={() => navigator.clipboard.writeText(selectedKb.id)}
+                                            className="text-textMuted/40 hover:text-textMuted transition-colors"
+                                            title="Copy ID"
+                                        >
+                                            <Copy size={14} weight="bold" />
+                                        </button>
+                                        <span className="text-textMuted/40">•</span>
+                                        {selectedKbDocuments.some(d => d.processing_status === 'processing') ? (
+                                            <span className="flex items-center gap-1.5 text-blue-400">
+                                                <CircleNotch size={14} weight="bold" className="animate-spin" />
+                                                In progress
+                                            </span>
+                                        ) : selectedKbDocuments.length > 0 && selectedKbDocuments.every(d => d.has_embedding) ? (
+                                            <span className="flex items-center gap-1.5 text-emerald-400">
+                                                <Lightning size={14} weight="fill" />
+                                                RAG Ready
+                                            </span>
+                                        ) : (
+                                            <span className="text-textMuted/60">{selectedKbDocuments.length} documents</span>
+                                        )}
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <div className="relative" ref={dropdownRef}>
-                                        <button
-                                            onClick={() => setShowAddDropdown(!showAddDropdown)}
-                                            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-primary to-primary/80 text-white font-medium rounded-xl hover:shadow-lg hover:shadow-primary/25 transition-all"
-                                        >
-                                            <Plus size={16} weight="bold" />
-                                            Add Document
-                                            <CaretDown size={14} weight="bold" className={`transition-transform ${showAddDropdown ? 'rotate-180' : ''}`} />
-                                        </button>
-
-                                        {showAddDropdown && (
-                                            <div className="absolute top-full right-0 mt-2 w-72 bg-surface/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl z-10 overflow-hidden">
-                                                <button
-                                                    onClick={() => {
-                                                        setShowAddDropdown(false);
-                                                        setIsWebPagesModalOpen(true);
-                                                    }}
-                                                    className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-white/5 text-left transition-all"
-                                                >
-                                                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500/20 to-blue-500/5 flex items-center justify-center">
-                                                        <Globe size={18} weight="duotone" className="text-blue-400" />
-                                                    </div>
-                                                    <div>
-                                                        <p className="text-sm font-medium text-textMain">Add Web Pages</p>
-                                                        <p className="text-xs text-textMuted/60">Crawl and sync your website</p>
-                                                    </div>
-                                                </button>
-
-                                                <button
-                                                    onClick={() => {
-                                                        setShowAddDropdown(false);
-                                                        fileInputRef.current?.click();
-                                                    }}
-                                                    className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-white/5 text-left transition-all"
-                                                >
-                                                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500/20 to-violet-500/5 flex items-center justify-center">
-                                                        <UploadSimple size={18} weight="duotone" className="text-violet-400" />
-                                                    </div>
-                                                    <div>
-                                                        <p className="text-sm font-medium text-textMain">Upload Files</p>
-                                                        <p className="text-xs text-textMuted/60">PDF, TXT, DOCX up to 100MB</p>
-                                                    </div>
-                                                </button>
-                                                <input
-                                                    type="file"
-                                                    ref={fileInputRef}
-                                                    className="hidden"
-                                                    accept=".txt,.json,.md"
-                                                    onChange={handleFileUpload}
-                                                />
-
-                                                <button
-                                                    onClick={() => {
-                                                        setActiveModal('text');
-                                                        setShowAddDropdown(false);
-                                                    }}
-                                                    className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-white/5 text-left transition-all"
-                                                >
-                                                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500/20 to-emerald-500/5 flex items-center justify-center">
-                                                        <TextAa size={18} weight="duotone" className="text-emerald-400" />
-                                                    </div>
-                                                    <div>
-                                                        <p className="text-sm font-medium text-textMain">Add Text</p>
-                                                        <p className="text-xs text-textMuted/60">Add articles manually</p>
-                                                    </div>
-                                                </button>
-                                            </div>
-                                        )}
-                                    </div>
+                                    {/* Edit Button */}
+                                    <button
+                                        className="flex items-center gap-2 px-4 py-2 bg-surface border border-white/10 text-textMain font-medium rounded-xl hover:bg-white/5 transition-all"
+                                    >
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                            <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+                                            <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                                        </svg>
+                                        Edit
+                                    </button>
+                                    {/* Delete Button */}
                                     <button
                                         onClick={() => handleDeleteKb(selectedKb.id)}
-                                        className="p-2 text-textMuted hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-all"
+                                        className="p-2 text-textMuted border border-white/10 hover:text-red-400 hover:border-red-500/30 hover:bg-red-500/10 rounded-xl transition-all"
                                         title="Delete Knowledge Base"
                                     >
                                         <Trash size={18} weight="bold" />
@@ -491,66 +492,179 @@ const KnowledgeBase: React.FC = () => {
                                 </div>
                             </div>
 
-                            {/* Documents Grid */}
+                            {/* Add Document Button */}
+                            <div className="mb-6">
+                                <div className="relative" ref={dropdownRef}>
+                                    <button
+                                        onClick={() => setShowAddDropdown(!showAddDropdown)}
+                                        className="flex items-center gap-2 px-4 py-2 bg-primary/10 text-primary font-medium rounded-xl hover:bg-primary/20 transition-all border border-primary/20"
+                                    >
+                                        <Plus size={16} weight="bold" />
+                                        Add Document
+                                        <CaretDown size={14} weight="bold" className={`transition-transform ${showAddDropdown ? 'rotate-180' : ''}`} />
+                                    </button>
+
+                                    {showAddDropdown && (
+                                        <div className="absolute top-full left-0 mt-2 w-72 bg-surface/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl shadow-black/20 z-10 overflow-hidden">
+                                            <button
+                                                onClick={() => {
+                                                    setShowAddDropdown(false);
+                                                    setIsWebPagesModalOpen(true);
+                                                }}
+                                                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/5 text-left transition-all group"
+                                            >
+                                                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500/15 to-blue-500/5 border border-blue-500/20 flex items-center justify-center group-hover:border-blue-500/40 transition-colors">
+                                                    <Globe size={18} weight="duotone" className="text-blue-400" />
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm font-medium text-textMain">Add Web Pages</p>
+                                                    <p className="text-xs text-textMuted/60">Crawl and sync your website</p>
+                                                </div>
+                                            </button>
+
+                                            <button
+                                                onClick={() => {
+                                                    setShowAddDropdown(false);
+                                                    fileInputRef.current?.click();
+                                                }}
+                                                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/5 text-left transition-all group"
+                                            >
+                                                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500/15 to-violet-500/5 border border-violet-500/20 flex items-center justify-center group-hover:border-violet-500/40 transition-colors">
+                                                    <UploadSimple size={18} weight="duotone" className="text-violet-400" />
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm font-medium text-textMain">Upload Files</p>
+                                                    <p className="text-xs text-textMuted/60">TXT, JSON, MD up to 100MB</p>
+                                                </div>
+                                            </button>
+                                            <input
+                                                type="file"
+                                                ref={fileInputRef}
+                                                className="hidden"
+                                                accept=".txt,.json,.md"
+                                                onChange={handleFileUpload}
+                                            />
+
+                                            <button
+                                                onClick={() => {
+                                                    setActiveModal('text');
+                                                    setShowAddDropdown(false);
+                                                }}
+                                                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/5 text-left transition-all group"
+                                            >
+                                                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500/15 to-emerald-500/5 border border-emerald-500/20 flex items-center justify-center group-hover:border-emerald-500/40 transition-colors">
+                                                    <TextAa size={18} weight="duotone" className="text-emerald-400" />
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm font-medium text-textMain">Add Text</p>
+                                                    <p className="text-xs text-textMuted/60">Add articles manually</p>
+                                                </div>
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Documents List */}
                             {isLoadingDocs ? (
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                <div className="border border-white/5 rounded-xl overflow-hidden bg-surface/20">
                                     {[1, 2, 3].map(i => (
-                                        <Skeleton key={i} className="h-24 rounded-xl" />
+                                        <div key={i} className={`flex items-center gap-4 px-4 py-3 ${i !== 3 ? 'border-b border-white/5' : ''}`}>
+                                            <Skeleton className="w-10 h-10 rounded-lg" />
+                                            <div className="flex-1">
+                                                <Skeleton className="h-4 w-32 mb-1.5" />
+                                                <Skeleton className="h-3 w-16" />
+                                            </div>
+                                        </div>
                                     ))}
                                 </div>
                             ) : selectedKbDocuments.length === 0 ? (
-                                <div className="border border-dashed border-white/10 rounded-2xl p-12 text-center">
-                                    <div className="w-16 h-16 rounded-2xl bg-surface border border-white/10 flex items-center justify-center mx-auto mb-4">
-                                        <FileText size={28} weight="duotone" className="text-textMuted" />
+                                <div className="border border-dashed border-white/10 rounded-2xl p-12 text-center bg-white/[0.01]">
+                                    <div className="relative w-16 h-16 mx-auto mb-4">
+                                        <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-violet-500/10 rounded-2xl blur-xl" />
+                                        <div className="relative w-full h-full rounded-2xl bg-surface border border-white/10 flex items-center justify-center">
+                                            <FilePlus size={28} weight="duotone" className="text-primary/60" />
+                                        </div>
                                     </div>
                                     <h3 className="text-lg font-medium text-textMain mb-2">No documents yet</h3>
-                                    <p className="text-sm text-textMuted mb-4">Add documents to this knowledge base</p>
-                                    <button
-                                        onClick={() => setIsWebPagesModalOpen(true)}
-                                        className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 text-primary font-medium rounded-xl hover:bg-primary/20 transition-all"
-                                    >
-                                        <Globe size={16} weight="bold" />
-                                        Add Web Pages
-                                    </button>
+                                    <p className="text-sm text-textMuted/60 mb-5">Add documents to power your AI with knowledge</p>
+                                    <div className="flex items-center justify-center gap-3">
+                                        <button
+                                            onClick={() => setIsWebPagesModalOpen(true)}
+                                            className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-500/10 to-blue-500/5 text-blue-400 font-medium rounded-xl border border-blue-500/20 hover:bg-blue-500/20 transition-all"
+                                        >
+                                            <Globe size={16} weight="bold" />
+                                            Add Web Pages
+                                        </button>
+                                        <button
+                                            onClick={() => setActiveModal('text')}
+                                            className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-500/10 to-emerald-500/5 text-emerald-400 font-medium rounded-xl border border-emerald-500/20 hover:bg-emerald-500/20 transition-all"
+                                        >
+                                            <TextAa size={16} weight="bold" />
+                                            Add Text
+                                        </button>
+                                    </div>
                                 </div>
                             ) : (
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                    {selectedKbDocuments.map((doc) => (
-                                        <div key={doc.id} className="group bg-surface/50 border border-white/10 rounded-xl p-4 hover:border-primary/30 hover:bg-white/[0.03] transition-all">
-                                            <div className="flex items-start gap-3">
-                                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${doc.type === 'url' ? 'bg-blue-500/10' :
-                                                    doc.type === 'file' ? 'bg-violet-500/10' :
-                                                        'bg-emerald-500/10'
-                                                    }`}>
-                                                    {doc.type === 'url' && <Globe size={20} weight="duotone" className="text-blue-400" />}
-                                                    {doc.type === 'file' && <FileText size={20} weight="duotone" className="text-violet-400" />}
-                                                    {doc.type === 'text' && <TextAa size={20} weight="duotone" className="text-emerald-400" />}
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <p className="text-sm font-medium text-textMain truncate">{doc.name}</p>
-                                                    <p className="text-xs text-textMuted capitalize">{doc.type}</p>
-                                                    {doc.character_count > 0 && (
-                                                        <p className="text-xs text-textMuted/60 mt-1">
-                                                            {doc.character_count.toLocaleString()} chars
-                                                        </p>
-                                                    )}
-                                                    {doc.processing_status === 'processing' && (
-                                                        <p className="text-xs text-yellow-400 mt-1 flex items-center gap-1">
-                                                            <ArrowsClockwise size={12} className="animate-spin" />
-                                                            Processing...
-                                                        </p>
-                                                    )}
-                                                    {doc.processing_status === 'failed' && (
-                                                        <p className="text-xs text-red-400 mt-1">Failed</p>
-                                                    )}
-                                                </div>
-                                                <button
-                                                    onClick={() => handleDeleteDocument(doc.id)}
-                                                    className="p-1.5 text-textMuted opacity-0 group-hover:opacity-100 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
-                                                >
-                                                    <Trash size={14} weight="bold" />
-                                                </button>
+                                <div className="border border-white/5 rounded-xl overflow-hidden bg-surface/20">
+                                    {selectedKbDocuments.map((doc, index) => (
+                                        <div 
+                                            key={doc.id} 
+                                            className={`group flex items-center gap-4 px-4 py-3 hover:bg-white/[0.02] transition-all ${
+                                                index !== selectedKbDocuments.length - 1 ? 'border-b border-white/5' : ''
+                                            }`}
+                                        >
+                                            {/* Document Icon */}
+                                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                                                doc.type === 'url' ? 'bg-blue-500/10' :
+                                                doc.type === 'file' ? 'bg-orange-500/10' :
+                                                    'bg-amber-500/10'
+                                                }`}>
+                                                {doc.type === 'url' && <Globe size={20} weight="fill" className="text-blue-400" />}
+                                                {doc.type === 'file' && (
+                                                    <div className="relative">
+                                                        <FileText size={20} weight="fill" className="text-orange-400" />
+                                                    </div>
+                                                )}
+                                                {doc.type === 'text' && (
+                                                    <div className="relative">
+                                                        <FileText size={20} weight="fill" className="text-amber-400" />
+                                                        <span className="absolute -bottom-0.5 -right-0.5 text-[6px] font-bold bg-red-500 text-white px-0.5 rounded">TXT</span>
+                                                    </div>
+                                                )}
                                             </div>
+                                            
+                                            {/* Document Info */}
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-medium text-textMain truncate">{doc.name}</p>
+                                                <p className="text-xs text-textMuted/60">
+                                                    {doc.character_count > 0 
+                                                        ? `${Math.round(doc.character_count / 1000)} K` 
+                                                        : '0 K'}
+                                                </p>
+                                            </div>
+                                            
+                                            {/* Status */}
+                                            {doc.processing_status === 'processing' && (
+                                                <div className="flex items-center gap-1.5 text-yellow-400">
+                                                    <CircleNotch size={14} weight="bold" className="animate-spin" />
+                                                    <span className="text-xs">Processing...</span>
+                                                </div>
+                                            )}
+                                            {doc.processing_status === 'failed' && (
+                                                <div className="flex items-center gap-1.5 text-red-400">
+                                                    <Warning size={14} weight="fill" />
+                                                    <span className="text-xs">Failed</span>
+                                                </div>
+                                            )}
+                                            
+                                            {/* Actions - Always visible download */}
+                                            <button
+                                                className="p-2 text-textMuted/40 hover:text-textMuted transition-colors"
+                                                title="Download document"
+                                            >
+                                                <DownloadSimple size={18} weight="bold" />
+                                            </button>
                                         </div>
                                     ))}
                                 </div>
@@ -559,11 +673,18 @@ const KnowledgeBase: React.FC = () => {
                     </div>
                 ) : (
                     <div className="text-center">
-                        <div className="w-16 h-16 rounded-2xl bg-surface border border-white/10 flex items-center justify-center mx-auto mb-4">
-                            <FolderOpen size={32} weight="duotone" className="text-textMuted" />
+                        {/* Ambient background for empty state */}
+                        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                            <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-64 h-64 bg-primary/5 rounded-full blur-3xl" />
                         </div>
-                        <p className="text-lg font-medium text-textMain mb-1">Select a knowledge base</p>
-                        <p className="text-sm text-textMuted/60">Choose one from the sidebar to view details</p>
+                        
+                        <div className="relative">
+                            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-surface to-surface/80 border border-white/10 flex items-center justify-center mx-auto mb-4">
+                                <FolderOpen size={32} weight="duotone" className="text-primary/40" />
+                            </div>
+                            <p className="text-lg font-medium text-textMain mb-1">Select a knowledge base</p>
+                            <p className="text-sm text-textMuted/60">Choose one from the sidebar to view details</p>
+                        </div>
                     </div>
                 )}
             </div>
@@ -718,10 +839,10 @@ const KnowledgeBase: React.FC = () => {
                                 disabled={!newKbName.trim() || isSaving}
                                 className={`px-6 py-2.5 rounded-xl font-medium transition-all flex items-center gap-2 ${!newKbName.trim() || isSaving
                                         ? 'bg-white/10 text-textMuted cursor-not-allowed'
-                                        : 'bg-primary text-white hover:bg-primary/90'
+                                        : 'bg-gradient-to-r from-primary to-primary/80 text-black hover:shadow-lg hover:shadow-primary/25'
                                     }`}
                             >
-                                {isSaving && <ArrowsClockwise size={16} className="animate-spin" />}
+                                {isSaving && <CircleNotch size={16} weight="bold" className="animate-spin" />}
                                 Save
                             </button>
                         </div>
@@ -797,7 +918,7 @@ const KnowledgeBase: React.FC = () => {
                                     : 'bg-gradient-to-r from-emerald-500 to-emerald-600 text-white hover:shadow-lg hover:shadow-emerald-500/25'
                                     }`}
                             >
-                                {isSaving && <ArrowsClockwise size={16} className="animate-spin" />}
+                                {isSaving && <CircleNotch size={16} weight="bold" className="animate-spin" />}
                                 Add Text
                             </button>
                         </div>

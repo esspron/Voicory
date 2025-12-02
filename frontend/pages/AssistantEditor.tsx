@@ -2186,12 +2186,16 @@ const KnowledgeBaseTab: React.FC<KnowledgeBaseTabProps> = ({ formData, setFormDa
 
     // Unlink a knowledge base
     const handleUnlinkKB = (kbId: string) => {
+        console.log('[KnowledgeBaseTab] handleUnlinkKB called with:', kbId);
+        console.log('[KnowledgeBaseTab] Current formData.knowledgeBaseIds:', formData.knowledgeBaseIds);
         const newIds = (formData.knowledgeBaseIds || []).filter(id => id !== kbId);
+        console.log('[KnowledgeBaseTab] New IDs after filter:', newIds);
         setFormData({ 
             ...formData, 
             knowledgeBaseIds: newIds,
             ragEnabled: newIds.length > 0 
         });
+        console.log('[KnowledgeBaseTab] setFormData called');
     };
 
     // Filter documents based on search
@@ -2273,15 +2277,18 @@ const KnowledgeBaseTab: React.FC<KnowledgeBaseTabProps> = ({ formData, setFormDa
                                         <p className="text-xs text-textMuted">{kb.total_documents} documents</p>
                                     </div>
                                     <button
+                                        type="button"
                                         onClick={(e) => {
                                             e.preventDefault();
                                             e.stopPropagation();
+                                            console.log('[UnlinkButton] Clicked! KB:', kb.id);
                                             handleUnlinkKB(kb.id);
                                         }}
-                                        className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/20 rounded-lg transition-all"
+                                        onPointerDown={(e) => e.stopPropagation()}
+                                        className="relative z-20 w-9 h-9 flex items-center justify-center text-red-400 hover:text-red-300 hover:bg-red-500/20 rounded-lg transition-all cursor-pointer active:scale-95"
                                         title="Unlink knowledge base"
                                     >
-                                        <X size={16} weight="bold" />
+                                        <X size={20} weight="bold" />
                                     </button>
                                 </div>
                             ))}

@@ -141,8 +141,8 @@ const OrgSettings: React.FC = () => {
             {/* Header */}
             <div className="mb-8">
                 <div className="flex items-center gap-3 mb-2">
-                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary/20 to-violet-500/10 flex items-center justify-center border border-white/10">
-                        <Buildings size={24} weight="duotone" className="text-primary" />
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/20 to-violet-500/10 flex items-center justify-center border border-white/10">
+                        <Buildings size={20} weight="duotone" className="text-primary" />
                     </div>
                     <div>
                         <h1 className="text-2xl font-bold text-textMain">Organization Settings</h1>
@@ -378,7 +378,7 @@ const OrgSettings: React.FC = () => {
                         <button
                             onClick={handleSave}
                             disabled={saving}
-                            className="flex items-center gap-2 bg-gradient-to-r from-primary to-primary/80 hover:shadow-lg hover:shadow-primary/25 text-white px-6 py-3 rounded-xl font-medium transition-all disabled:opacity-50 hover:-translate-y-0.5"
+                            className="flex items-center gap-2 bg-gradient-to-r from-primary to-primary/80 hover:shadow-lg hover:shadow-primary/25 text-black px-6 py-3 rounded-xl font-medium transition-all disabled:opacity-50 hover:-translate-y-0.5"
                         >
                             {saving ? (
                                 <>

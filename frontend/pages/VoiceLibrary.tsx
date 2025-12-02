@@ -139,8 +139,8 @@ const VoiceLibrary: React.FC = () => {
                 {/* Header */}
                 <div className="mb-8">
                     <div className="flex items-center gap-3 mb-3">
-                        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary/20 to-violet-500/10 flex items-center justify-center border border-white/10">
-                            <Microphone size={24} weight="duotone" className="text-primary" />
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/20 to-violet-500/10 flex items-center justify-center border border-white/10">
+                            <Microphone size={20} weight="duotone" className="text-primary" />
                         </div>
                         <div>
                             <h1 className="text-2xl font-bold text-textMain">Voice Library</h1>
@@ -256,7 +256,7 @@ const VoiceLibrary: React.FC = () => {
                         <p className="text-red-400 mb-4">{error}</p>
                         <button
                             onClick={loadVoices}
-                            className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-primary to-primary/80 text-white font-medium rounded-xl hover:shadow-lg hover:shadow-primary/25 transition-all hover:-translate-y-0.5"
+                            className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-primary to-primary/80 text-black font-medium rounded-xl hover:shadow-lg hover:shadow-primary/25 transition-all hover:-translate-y-0.5"
                         >
                             <CircleNotch size={18} weight="bold" />
                             Try Again

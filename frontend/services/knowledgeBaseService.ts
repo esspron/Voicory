@@ -51,6 +51,7 @@ export interface KnowledgeBaseDocument {
     created_at: string;
     updated_at: string;
     user_id: string;
+    has_embedding?: boolean; // Whether embedding has been generated for RAG
 }
 
 export interface CrawledPage {
@@ -258,17 +259,27 @@ export const deleteKnowledgeBase = async (id: string): Promise<boolean> => {
 // ============================================
 
 /**
- * Get all documents for a knowledge base
+ * Get all documents for a knowledge base (with embedding status)
  */
 export const getDocuments = async (knowledgeBaseId: string): Promise<KnowledgeBaseDocument[]> => {
     try {
+        // Use RPC function to get documents with embedding status
         const { data, error } = await supabase
-            .from('knowledge_base_documents')
-            .select('*')
-            .eq('knowledge_base_id', knowledgeBaseId)
-            .order('created_at', { ascending: false });
+            .rpc('get_documents_with_embedding_status', { kb_id: knowledgeBaseId });
 
-        if (error) throw error;
+        if (error) {
+            console.error('RPC error, falling back to direct query:', error);
+            // Fallback to direct query if RPC fails
+            const { data: fallbackData, error: fallbackError } = await supabase
+                .from('knowledge_base_documents')
+                .select('*')
+                .eq('knowledge_base_id', knowledgeBaseId)
+                .order('created_at', { ascending: false });
+            
+            if (fallbackError) throw fallbackError;
+            return fallbackData || [];
+        }
+        
         return data || [];
     } catch (error) {
         console.error('Error fetching documents:', error);
