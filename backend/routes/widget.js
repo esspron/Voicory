@@ -44,15 +44,15 @@ const validateApiKey = async (req, res, next) => {
   }
   
   try {
-    // Look up API key
+    // Look up API key (simplified query without join)
     const { data: keyData, error: keyError } = await supabase
       .from('api_keys')
-      .select('*, user_profiles!inner(*)')
+      .select('*')
       .eq('key', apiKey)
-      .eq('type', 'public')
       .single();
     
     if (keyError || !keyData) {
+      console.error('API key lookup failed:', keyError, 'Key prefix:', apiKey.substring(0, 10));
       return res.status(401).json({
         error: 'Invalid API key',
         code: 'INVALID_API_KEY',
