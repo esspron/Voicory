@@ -84,7 +84,6 @@ const Topbar: React.FC = () => {
                     </Button>
                     <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-gradient-to-br from-red-400 to-red-600 rounded-full border-2 border-background animate-pulse" />
                 </div>
-                </div>
 
                 <div className="h-8 w-px bg-white/10 mx-1" />
 
