@@ -3,6 +3,7 @@ import { CreditCard, Check, Warning, DownloadSimple, Plus, Info, PencilSimple, L
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import BuyCreditsModal from '../components/billing/BuyCreditsModal';
 import ApplyCouponModal from '../components/billing/ApplyCouponModal';
+import { Button } from '../components/ui/Button';
 import { 
     getUsageSummary, 
     getCreditTransactions, 
@@ -312,10 +313,10 @@ const Billing: React.FC = () => {
                             </div>
                         </div>
 
-                        <button className="w-full bg-gradient-to-r from-primary to-primary/80 text-black font-semibold py-2.5 rounded-xl text-sm hover:shadow-lg hover:shadow-primary/25 transition-all duration-200 hover:-translate-y-0.5 flex items-center justify-center gap-2">
+                        <Button className="w-full gap-2">
                             Contact Sales
                             <CaretRight size={16} weight="bold" />
-                        </button>
+                        </Button>
                     </div>
                 </div>
             </div>
@@ -448,15 +449,15 @@ const Billing: React.FC = () => {
                                     <div className="text-xs text-textMuted">International Cards</div>
                                 </div>
                             </div>
-                            <button className="text-xs text-primary hover:text-primaryHover transition-colors">
+                            <Button variant="link" size="sm">
                                 Set as default
-                            </button>
+                            </Button>
                         </div>
 
-                        <button className="w-full bg-surface border border-dashed border-white/10 rounded-xl p-4 text-sm text-textMuted hover:text-textMain hover:border-white/20 transition-colors flex items-center justify-center gap-2">
+                        <Button variant="outline" className="w-full gap-2 border-dashed">
                             <Plus size={16} weight="bold" />
                             Add Payment Method
-                        </button>
+                        </Button>
                     </div>
                 </div>
 
@@ -515,10 +516,10 @@ const Billing: React.FC = () => {
                             <Receipt size={20} weight="bold" className="text-textMuted" />
                             <h3 className="text-lg font-semibold text-textMain">Credit Purchase History</h3>
                         </div>
-                        <button className="flex items-center gap-2 text-xs font-medium text-textMain border border-white/10 hover:bg-surfaceHover px-3 py-1.5 rounded-lg transition-colors">
+                        <Button variant="secondary" size="sm" className="gap-2">
                             <DownloadSimple size={14} weight="bold" />
                             Download Statement
-                        </button>
+                        </Button>
                     </div>
                     <div className="p-6">
                         {paymentHistory.length > 0 ? (

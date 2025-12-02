@@ -79,7 +79,7 @@ const Assistants: React.FC = () => {
                         <button
                             type="button"
                             onClick={handleCreateNew}
-                            className="group p-2.5 bg-gradient-to-br from-primary to-primary/80 text-white rounded-xl hover:shadow-lg hover:shadow-primary/25 transition-all duration-200 hover:-translate-y-0.5 relative z-20 cursor-pointer"
+                            className="group p-2.5 bg-gradient-to-br from-primary to-primary/80 text-black rounded-xl hover:shadow-lg hover:shadow-primary/25 transition-all duration-200 hover:-translate-y-0.5 relative z-20 cursor-pointer"
                             title="Create new assistant"
                         >
                             <Plus size={18} weight="bold" className="pointer-events-none" />
@@ -108,7 +108,7 @@ const Assistants: React.FC = () => {
                             <button
                                 type="button"
                                 onClick={handleCreateNew}
-                                className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-primary to-primary/80 text-white font-medium rounded-xl hover:shadow-lg hover:shadow-primary/25 transition-all duration-200 hover:-translate-y-0.5 relative z-20 cursor-pointer"
+                                className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-primary to-primary/80 text-black font-medium rounded-xl hover:shadow-lg hover:shadow-primary/25 transition-all duration-200 hover:-translate-y-0.5 relative z-20 cursor-pointer"
                             >
                                 <Plus size={18} weight="bold" className="pointer-events-none" />
                                 Create Assistant

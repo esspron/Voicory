@@ -27,10 +27,14 @@
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
+    "express-rate-limit": "^7.5.0",
+    "helmet": "^8.1.0",
+    "hpp": "^0.2.3",
     "ioredis": "^5.8.2",
     "openai": "^4.73.0",
     "razorpay": "^2.9.4",
     "stripe": "^17.5.0",
-    "xml2js": "^0.6.2"
+    "xml2js": "^0.6.2",
+    "zod": "^3.25.76"
   }
 }

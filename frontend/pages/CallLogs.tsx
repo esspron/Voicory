@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { DownloadSimple, Funnel, Play, DotsThree, PhoneCall, CheckCircle, XCircle, Clock, Waveform, ArrowsClockwise, Sparkle } from '@phosphor-icons/react';
 import { getCallLogs } from '../services/voicoryService';
 import type { CallLog } from '../types';
-
+import { Button } from '../components/ui/Button';
 import { FadeIn } from '../components/ui/FadeIn';
 
 const CallLogs: React.FC = () => {
@@ -91,20 +91,21 @@ const CallLogs: React.FC = () => {
                     <p className="text-textMuted text-sm mt-1 ml-[52px]">Detailed history of all inbound and outbound calls.</p>
                 </div>
                 <div className="flex gap-3">
-                    <button className="group flex items-center gap-2 px-4 py-2.5 bg-surface/80 backdrop-blur-xl border border-border rounded-xl text-sm text-textMain hover:bg-surfaceHover hover:border-primary/30 transition-all duration-200">
+                    <Button variant="glass" className="gap-2">
                         <Funnel size={16} weight="duotone" />
                         Filters
-                    </button>
-                    <button className="group flex items-center gap-2 px-4 py-2.5 bg-surface/80 backdrop-blur-xl border border-border rounded-xl text-sm text-textMain hover:bg-surfaceHover hover:border-primary/30 transition-all duration-200">
+                    </Button>
+                    <Button variant="glass" className="gap-2">
                         <DownloadSimple size={16} weight="duotone" />
                         Export CSV
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                        variant="glass"
+                        size="icon"
                         onClick={() => window.location.reload()}
-                        className="p-2.5 bg-surface/80 backdrop-blur-xl border border-border rounded-xl text-textMuted hover:text-primary hover:border-primary/30 transition-all duration-200"
                     >
                         <ArrowsClockwise size={16} weight="bold" />
-                    </button>
+                    </Button>
                 </div>
             </div>
 
@@ -175,15 +176,16 @@ const CallLogs: React.FC = () => {
                                     <span className="text-textMain font-medium">₹{log.cost.toFixed(2)}</span>
                                 </div>
                                 <div className="col-span-2 flex items-center justify-end gap-1">
-                                    <button
-                                        className="p-2 hover:bg-primary/10 rounded-lg text-textMuted hover:text-primary transition-all duration-200"
+                                    <Button
+                                        variant="ghost"
+                                        size="icon-sm"
                                         title="Play Recording"
                                     >
                                         <Play size={16} weight="fill" />
-                                    </button>
-                                    <button className="p-2 hover:bg-background rounded-lg text-textMuted hover:text-textMain transition-all duration-200">
+                                    </Button>
+                                    <Button variant="ghost" size="icon-sm">
                                         <DotsThree size={18} weight="bold" />
-                                    </button>
+                                    </Button>
                                 </div>
                             </div>
                         ))

@@ -19,6 +19,7 @@ import {
     CurrencyInr
 } from '@phosphor-icons/react';
 import { useAuth } from '../../contexts/AuthContext';
+import { Badge } from '../../components/ui/Badge';
 import {
     getOrCreateReferralCode,
     getReferralStats,
@@ -124,13 +125,13 @@ const ReferralProgram: React.FC = () => {
     const getStatusBadge = (status: ReferralHistoryItem['status']) => {
         switch (status) {
             case 'completed':
-                return <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-medium">Completed</span>;
+                return <Badge variant="success" size="pill">Completed</Badge>;
             case 'pending':
-                return <span className="px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-400 text-xs font-medium">Pending</span>;
+                return <Badge variant="warning" size="pill">Pending</Badge>;
             case 'expired':
-                return <span className="px-2 py-0.5 rounded-full bg-gray-500/20 text-gray-400 text-xs font-medium">Expired</span>;
+                return <Badge variant="default" size="pill">Expired</Badge>;
             case 'cancelled':
-                return <span className="px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 text-xs font-medium">Cancelled</span>;
+                return <Badge variant="error" size="pill">Cancelled</Badge>;
             default:
                 return null;
         }

@@ -58,46 +58,50 @@ const EditorLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => 
 };
 
 import ProtectedRoute from './components/ProtectedRoute';
+import { CommandPalette } from './components/CommandPalette';
 
 const AppRoutes: React.FC = () => {
     const location = useLocation();
     const isEditor = location.pathname.startsWith('/assistants/');
 
     return (
-        <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route path="/signup" element={<Signup />} />
-            <Route path="/check-email" element={<CheckEmail />} />
+        <>
+            <CommandPalette />
+            <Routes>
+                <Route path="/login" element={<Login />} />
+                <Route path="/signup" element={<Signup />} />
+                <Route path="/check-email" element={<CheckEmail />} />
 
-            {/* Protected Routes */}
-            <Route element={<ProtectedRoute />}>
-                <Route path="/" element={<Layout><Overview /></Layout>} />
-                <Route path="/voice-library" element={<Layout><VoiceLibrary /></Layout>} />
-                <Route path="/assistants" element={<EditorLayout><Assistants /></EditorLayout>} />
-                <Route path="/assistants/:id" element={<EditorLayout><Assistants /></EditorLayout>} />
-                <Route path="/knowledge-base" element={<Layout><KnowledgeBase /></Layout>} />
-                <Route path="/phone-numbers" element={<Layout><PhoneNumbers /></Layout>} />
-                <Route path="/customers" element={<Layout><Customers /></Layout>} />
-                <Route path="/api-keys" element={<Layout><ApiKeys /></Layout>} />
-                <Route path="/logs" element={<Layout><CallLogs /></Layout>} />
-                <Route path="/metrics" element={<Layout><Metrics /></Layout>} />
+                {/* Protected Routes */}
+                <Route element={<ProtectedRoute />}>
+                    <Route path="/" element={<Layout><Overview /></Layout>} />
+                    <Route path="/voice-library" element={<Layout><VoiceLibrary /></Layout>} />
+                    <Route path="/assistants" element={<EditorLayout><Assistants /></EditorLayout>} />
+                    <Route path="/assistants/:id" element={<EditorLayout><Assistants /></EditorLayout>} />
+                    <Route path="/knowledge-base" element={<Layout><KnowledgeBase /></Layout>} />
+                    <Route path="/phone-numbers" element={<Layout><PhoneNumbers /></Layout>} />
+                    <Route path="/customers" element={<Layout><Customers /></Layout>} />
+                    <Route path="/api-keys" element={<Layout><ApiKeys /></Layout>} />
+                    <Route path="/logs" element={<Layout><CallLogs /></Layout>} />
+                    <Route path="/metrics" element={<Layout><Metrics /></Layout>} />
 
-                {/* Messenger Routes */}
-                <Route path="/messenger/whatsapp" element={<Layout><WhatsAppMessenger /></Layout>} />
+                    {/* Messenger Routes */}
+                    <Route path="/messenger/whatsapp" element={<Layout><WhatsAppMessenger /></Layout>} />
 
-                <Route path="/settings" element={<Layout><SettingsLayout /></Layout>}>
-                    <Route index element={<Navigate to="org" replace />} />
-                    <Route path="org" element={<OrgSettings />} />
-                    <Route path="billing" element={<BillingAndAddons />} />
-                    <Route path="members" element={<Members />} />
-                    <Route path="integrations" element={<Integrations />} />
-                    <Route path="referral" element={<ReferralProgram />} />
+                    <Route path="/settings" element={<Layout><SettingsLayout /></Layout>}>
+                        <Route index element={<Navigate to="org" replace />} />
+                        <Route path="org" element={<OrgSettings />} />
+                        <Route path="billing" element={<BillingAndAddons />} />
+                        <Route path="members" element={<Members />} />
+                        <Route path="integrations" element={<Integrations />} />
+                        <Route path="referral" element={<ReferralProgram />} />
+                    </Route>
+                    <Route path="/billing" element={<Navigate to="/settings/billing" replace />} />
                 </Route>
-                <Route path="/billing" element={<Navigate to="/settings/billing" replace />} />
-            </Route>
 
-            <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+                <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+        </>
     );
 }
 

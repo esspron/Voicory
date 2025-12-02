@@ -671,7 +671,7 @@ const ConnectWhatsAppModal: React.FC<ConnectModalProps> = ({ onClose, onSuccess 
                         <div className="space-y-6">
                             {oauthStatus === 'idle' && (
                                 <>
-                                    <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
+                                    <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4">
                                         <div className="flex items-start gap-3">
                                             <Info className="text-blue-400 shrink-0 mt-0.5" size={18} />
                                             <div className="text-sm">
@@ -737,7 +737,7 @@ const ConnectWhatsAppModal: React.FC<ConnectModalProps> = ({ onClose, onSuccess 
                             )}
 
                             {oauthStatus === 'error' && error && (
-                                <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4">
+                                <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4">
                                     <div className="flex items-start gap-3">
                                         <Warning className="text-red-400 shrink-0 mt-0.5" size={18} weight="fill" />
                                         <div className="text-sm">
@@ -755,7 +755,7 @@ const ConnectWhatsAppModal: React.FC<ConnectModalProps> = ({ onClose, onSuccess 
                         <>
                             {step === 1 && (
                                 <div className="space-y-4">
-                                    <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
+                                    <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4">
                                         <div className="flex items-start gap-3">
                                             <Info className="text-blue-400 shrink-0 mt-0.5" size={18} />
                                             <div className="text-sm">
@@ -784,7 +784,7 @@ const ConnectWhatsAppModal: React.FC<ConnectModalProps> = ({ onClose, onSuccess 
                                             value={formData.wabaId}
                                             onChange={(e) => setFormData({ ...formData, wabaId: e.target.value })}
                                             placeholder="e.g., 123456789012345"
-                                            className="w-full px-4 py-2.5 bg-background border border-border rounded-lg text-textMain placeholder-textMuted focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                            className="w-full px-4 py-2.5 bg-background border border-white/10 rounded-xl text-textMain placeholder-textMuted outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all duration-200"
                                         />
                                     </div>
 
@@ -797,7 +797,7 @@ const ConnectWhatsAppModal: React.FC<ConnectModalProps> = ({ onClose, onSuccess 
                                             value={formData.phoneNumberId}
                                             onChange={(e) => setFormData({ ...formData, phoneNumberId: e.target.value })}
                                             placeholder="e.g., 123456789012345"
-                                            className="w-full px-4 py-2.5 bg-background border border-border rounded-lg text-textMain placeholder-textMuted focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                            className="w-full px-4 py-2.5 bg-background border border-white/10 rounded-xl text-textMain placeholder-textMuted outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all duration-200"
                                         />
                                     </div>
 
@@ -810,7 +810,7 @@ const ConnectWhatsAppModal: React.FC<ConnectModalProps> = ({ onClose, onSuccess 
                                             value={formData.displayPhoneNumber}
                                             onChange={(e) => setFormData({ ...formData, displayPhoneNumber: e.target.value })}
                                             placeholder="e.g., +1 555-123-4567"
-                                            className="w-full px-4 py-2.5 bg-background border border-border rounded-lg text-textMain placeholder-textMuted focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                            className="w-full px-4 py-2.5 bg-background border border-white/10 rounded-xl text-textMain placeholder-textMuted outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all duration-200"
                                         />
                                     </div>
 
@@ -823,7 +823,7 @@ const ConnectWhatsAppModal: React.FC<ConnectModalProps> = ({ onClose, onSuccess 
                                             value={formData.displayName}
                                             onChange={(e) => setFormData({ ...formData, displayName: e.target.value })}
                                             placeholder="e.g., My Business"
-                                            className="w-full px-4 py-2.5 bg-background border border-border rounded-lg text-textMain placeholder-textMuted focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                            className="w-full px-4 py-2.5 bg-background border border-white/10 rounded-xl text-textMain placeholder-textMuted outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all duration-200"
                                         />
                                     </div>
 
@@ -836,7 +836,7 @@ const ConnectWhatsAppModal: React.FC<ConnectModalProps> = ({ onClose, onSuccess 
                                             onChange={(e) => setFormData({ ...formData, accessToken: e.target.value })}
                                             placeholder="Paste your permanent (System User) access token here"
                                             rows={3}
-                                            className="w-full px-4 py-2.5 bg-background border border-border rounded-lg text-textMain placeholder-textMuted focus:outline-none focus:ring-2 focus:ring-primary/50 font-mono text-sm"
+                                            className="w-full px-4 py-2.5 bg-background border border-white/10 rounded-xl text-textMain placeholder-textMuted outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all duration-200 font-mono text-sm"
                                         />
                                         <p className="text-xs text-textMuted mt-1">
                                             Create a System User in Business Settings → System Users → Generate Token with <code className="bg-surface px-1 rounded">whatsapp_business_messaging</code> permission.
@@ -864,7 +864,7 @@ const ConnectWhatsAppModal: React.FC<ConnectModalProps> = ({ onClose, onSuccess 
                                             value={formData.appId}
                                             onChange={(e) => setFormData({ ...formData, appId: e.target.value })}
                                             placeholder="e.g., 123456789012345"
-                                            className="w-full px-4 py-2.5 bg-background border border-border rounded-lg text-textMain placeholder-textMuted focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                            className="w-full px-4 py-2.5 bg-background border border-white/10 rounded-xl text-textMain placeholder-textMuted outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all duration-200"
                                         />
                                         <p className="text-xs text-textMuted mt-1">
                                             Found in Meta for Developers → Your App → App Dashboard
@@ -880,7 +880,7 @@ const ConnectWhatsAppModal: React.FC<ConnectModalProps> = ({ onClose, onSuccess 
                                             value={formData.appSecret || ''}
                                             onChange={(e) => setFormData({ ...formData, appSecret: e.target.value })}
                                             placeholder="Your app secret for webhook verification"
-                                            className="w-full px-4 py-2.5 bg-background border border-border rounded-lg text-textMain placeholder-textMuted focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                            className="w-full px-4 py-2.5 bg-background border border-white/10 rounded-xl text-textMain placeholder-textMuted outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all duration-200"
                                         />
                                         <p className="text-xs text-textMuted mt-1">
                                             Required for webhook signature verification. Found in App Settings → Basic.
@@ -888,7 +888,7 @@ const ConnectWhatsAppModal: React.FC<ConnectModalProps> = ({ onClose, onSuccess 
                                     </div>
 
                                     {error && (
-                                        <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4">
+                                        <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4">
                                             <p className="text-red-400 text-sm">{error}</p>
                                         </div>
                                     )}
@@ -918,7 +918,7 @@ const ConnectWhatsAppModal: React.FC<ConnectModalProps> = ({ onClose, onSuccess 
                             {oauthStatus === 'error' && (
                                 <button
                                     onClick={() => setOauthStatus('idle')}
-                                    className="px-4 py-2 bg-primary text-black font-semibold rounded-lg hover:bg-primaryHover transition-colors"
+                                    className="px-4 py-2 bg-gradient-to-r from-primary to-primary/80 text-black font-semibold rounded-xl hover:shadow-lg hover:shadow-primary/25 transition-colors"
                                 >
                                     Try Again
                                 </button>
@@ -946,7 +946,7 @@ const ConnectWhatsAppModal: React.FC<ConnectModalProps> = ({ onClose, onSuccess 
                                 <button
                                     onClick={() => setStep(step + 1)}
                                     disabled={!formData.wabaId || !formData.phoneNumberId || !formData.displayPhoneNumber || !formData.displayName}
-                                    className="flex items-center gap-2 px-4 py-2 bg-primary text-black font-semibold rounded-lg hover:bg-primaryHover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-primary to-primary/80 text-black font-semibold rounded-xl hover:shadow-lg hover:shadow-primary/25 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                 >
                                     Continue
                                     <CaretRight size={16} weight="bold" />
@@ -955,7 +955,7 @@ const ConnectWhatsAppModal: React.FC<ConnectModalProps> = ({ onClose, onSuccess 
                                 <button
                                     onClick={handleManualSubmit}
                                     disabled={loading || !formData.accessToken}
-                                    className="flex items-center gap-2 px-4 py-2 bg-primary text-black font-semibold rounded-lg hover:bg-primaryHover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-primary to-primary/80 text-black font-semibold rounded-xl hover:shadow-lg hover:shadow-primary/25 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                 >
                                     {loading ? (
                                         <>
@@ -1036,7 +1036,7 @@ const WhatsAppSettingsModal: React.FC<SettingsModalProps> = ({ config, assistant
                 {/* Header */}
                 <div className="flex items-center justify-between p-6 border-b border-border">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-green-500/10 rounded-lg flex items-center justify-center">
+                        <div className="w-10 h-10 bg-green-500/10 rounded-xl flex items-center justify-center">
                             <Gear className="text-green-500" size={20} weight="fill" />
                         </div>
                         <div>
@@ -1317,7 +1317,7 @@ const WhatsAppSettingsModal: React.FC<SettingsModalProps> = ({ config, assistant
                     <button
                         onClick={handleSave}
                         disabled={loading}
-                        className="flex items-center gap-2 px-4 py-2 bg-primary text-black font-semibold rounded-lg hover:bg-primaryHover disabled:opacity-50 transition-colors"
+                        className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-primary to-primary/80 text-black font-semibold rounded-xl hover:shadow-lg hover:shadow-primary/25 disabled:opacity-50 transition-colors"
                     >
                         {loading ? (
                             <>

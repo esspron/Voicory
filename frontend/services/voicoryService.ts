@@ -1,9 +1,11 @@
 
 import { Voice, VoiceSample, VoiceWithSamples, Assistant, AssistantInput, AssistantTool, PhoneNumber, ApiKey, CallLog, Customer, SipTrunkCredential, UserProfile, CustomerConversation, CustomerMemory, CustomerInsight, CustomerContext, MemoryConfig, ActionItem, TranscriptMessage } from '../types';
 import { supabase } from './supabase';
+import { AssistantSchema, VoiceSchema, CallLogSchema } from '../types/schemas';
+import { z } from 'zod';
 
 // Backend URL for API calls
-const BACKEND_URL = import.meta.env.PROD 
+const BACKEND_URL = import.meta.env.PROD
     ? 'https://callyy-production.up.railway.app'
     : 'http://localhost:3001';
 
@@ -58,7 +60,7 @@ export const importTwilioNumberDirect = async (params: {
         });
 
         const data = await response.json();
-        
+
         if (!response.ok) {
             return {
                 success: false,
@@ -132,7 +134,8 @@ export const getVoices = async (): Promise<Voice[]> => {
 
         if (error) throw error;
 
-        return (data || []).map(mapVoiceFromDB);
+        const voices = (data || []).map(mapVoiceFromDB);
+        return voices.map(v => validateData(VoiceSchema, v, `getVoices:${v.id}`));
     } catch (error) {
         console.error('Error fetching voices from Supabase:', error);
         throw error;
@@ -350,6 +353,18 @@ const mapAssistantFromDB = (a: any): Assistant => ({
     }
 });
 
+const validateData = <T>(schema: z.ZodType<T>, data: any, context: string): T => {
+    const result = schema.safeParse(data);
+    if (!result.success) {
+        console.error(`Data Validation Error (${context}):`, result.error.format());
+        // In development, we might want to throw to catch these issues early
+        if (import.meta.env.DEV) {
+            console.warn('Returning invalid data in DEV mode for debugging.');
+        }
+    }
+    return data as T;
+};
+
 /**
  * Get a single assistant by ID from Supabase
  */
@@ -363,7 +378,10 @@ export const getAssistant = async (id: string): Promise<Assistant | undefined> =
 
         if (error) throw error;
 
-        return data ? mapAssistantFromDB(data) : undefined;
+        if (!data) return undefined;
+
+        const assistant = mapAssistantFromDB(data);
+        return validateData(AssistantSchema, assistant, `getAssistant:${id}`);
     } catch (error) {
         console.error('Error fetching assistant from Supabase:', error);
         throw error;
@@ -382,7 +400,8 @@ export const getAssistants = async (): Promise<Assistant[]> => {
 
         if (error) throw error;
 
-        return (data || []).map(mapAssistantFromDB);
+        const assistants = (data || []).map(mapAssistantFromDB);
+        return assistants.map(a => validateData(AssistantSchema, a, `getAssistants:${a.id}`));
     } catch (error) {
         console.error('Error fetching assistants from Supabase:', error);
         throw error;
@@ -710,7 +729,7 @@ export const getCallLogs = async (): Promise<CallLog[]> => {
 
         if (error) throw error;
 
-        return (data || []).map(c => ({
+        const logs = (data || []).map(c => ({
             id: c.id,
             assistantName: c.assistant_name,
             phoneNumber: c.phone_number,
@@ -719,6 +738,7 @@ export const getCallLogs = async (): Promise<CallLog[]> => {
             status: c.status as CallLog['status'],
             date: new Date(c.created_at).toLocaleString()
         }));
+        return logs.map(l => validateData(CallLogSchema, l, `getCallLogs:${l.id}`));
     } catch (error) {
         console.error('Error fetching call logs from Supabase:', error);
         throw error;
@@ -943,7 +963,7 @@ export const createPhoneNumber = async (phoneNumber: Omit<PhoneNumber, 'id'>): P
 export const updatePhoneNumber = async (id: string, updates: Partial<Omit<PhoneNumber, 'id'>>): Promise<boolean> => {
     try {
         const updateData: any = {};
-        
+
         if (updates.number) updateData.number = updates.number;
         if (updates.provider) updateData.provider = updates.provider;
         if (updates.assistantId !== undefined) updateData.assistant_id = updates.assistantId;
@@ -951,7 +971,7 @@ export const updatePhoneNumber = async (id: string, updates: Partial<Omit<PhoneN
         if (updates.inboundEnabled !== undefined) updateData.inbound_enabled = updates.inboundEnabled;
         if (updates.outboundEnabled !== undefined) updateData.outbound_enabled = updates.outboundEnabled;
         if (updates.isActive !== undefined) updateData.is_active = updates.isActive;
-        
+
         // Provider-specific fields
         if (updates.areaCode !== undefined) updateData.area_code = updates.areaCode;
         if (updates.sipIdentifier !== undefined) updateData.sip_identifier = updates.sipIdentifier;
@@ -1492,7 +1512,7 @@ export const updateConversationAnalysis = async (conversationId: string, analysi
 }): Promise<boolean> => {
     try {
         const updateData: any = {};
-        
+
         if (analysis.transcript) updateData.transcript = analysis.transcript;
         if (analysis.endedAt) updateData.ended_at = analysis.endedAt;
         if (analysis.durationSeconds !== undefined) updateData.duration_seconds = analysis.durationSeconds;
@@ -1586,7 +1606,7 @@ export const updateCustomerMemory = async (customerId: string, updates: Partial<
         if (!user) throw new Error('User not authenticated');
 
         const updateData: any = {};
-        
+
         if (updates.personalityTraits) updateData.personality_traits = updates.personalityTraits;
         if (updates.communicationPreferences) updateData.communication_preferences = updates.communicationPreferences;
         if (updates.interests) updateData.interests = updates.interests;
@@ -1695,10 +1715,10 @@ export const getCustomersWithMemory = async (): Promise<(Customer & { memory?: C
  */
 export const formatMemoryForPrompt = (context: CustomerContext): string => {
     if (!context) return '';
-    
+
     let memoryText = `\n--- CUSTOMER MEMORY ---\n`;
     memoryText += `Customer: ${context.customer.name}\n`;
-    
+
     if (context.memory) {
         memoryText += `\nRelationship:\n`;
         memoryText += `- Total conversations: ${context.memory.totalConversations}\n`;
@@ -1706,35 +1726,35 @@ export const formatMemoryForPrompt = (context: CustomerContext): string => {
             memoryText += `- Last contact: ${new Date(context.memory.lastContact).toLocaleDateString()}\n`;
         }
         if (context.memory.averageSentiment !== undefined) {
-            const sentimentLabel = context.memory.averageSentiment > 0.3 ? 'Positive' : 
-                                   context.memory.averageSentiment < -0.3 ? 'Negative' : 'Neutral';
+            const sentimentLabel = context.memory.averageSentiment > 0.3 ? 'Positive' :
+                context.memory.averageSentiment < -0.3 ? 'Negative' : 'Neutral';
             memoryText += `- Overall sentiment: ${sentimentLabel}\n`;
         }
         if (context.memory.engagementScore) {
             memoryText += `- Engagement score: ${context.memory.engagementScore}/100\n`;
         }
-        
+
         if (context.memory.personalityTraits?.length) {
             memoryText += `\nPersonality: ${context.memory.personalityTraits.join(', ')}\n`;
         }
-        
+
         if (context.memory.interests?.length) {
             memoryText += `\nInterests: ${context.memory.interests.join(', ')}\n`;
         }
-        
+
         if (context.memory.painPoints?.length) {
             memoryText += `\nPain points: ${context.memory.painPoints.join(', ')}\n`;
         }
-        
+
         if (context.memory.executiveSummary) {
             memoryText += `\nSummary: ${context.memory.executiveSummary}\n`;
         }
-        
+
         if (context.memory.conversationContext) {
             memoryText += `\nContext for this call: ${context.memory.conversationContext}\n`;
         }
     }
-    
+
     // Recent conversations
     if (context.recentConversations?.length) {
         memoryText += `\n--- RECENT CONVERSATIONS ---\n`;
@@ -1749,7 +1769,7 @@ export const formatMemoryForPrompt = (context: CustomerContext): string => {
             }
         });
     }
-    
+
     // Key insights
     if (context.keyInsights?.length) {
         memoryText += `\n--- KEY INSIGHTS ---\n`;
@@ -1758,8 +1778,8 @@ export const formatMemoryForPrompt = (context: CustomerContext): string => {
             memoryText += `[${insight.insightType.toUpperCase()}] ${insight.content}\n`;
         });
     }
-    
+
     memoryText += `\n--- END MEMORY ---\n`;
-    
+
     return memoryText;
 };

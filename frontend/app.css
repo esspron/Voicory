@@ -40,6 +40,7 @@
    ============================================ */
 
 @layer base {
+
   /* Ahsing Font for Logo */
   @font-face {
     font-family: 'Ahsing';
@@ -73,12 +74,15 @@
 
   /* Hide all scrollbars globally while keeping scroll functionality */
   * {
-    scrollbar-width: none; /* Firefox */
-    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none;
+    /* Firefox */
+    -ms-overflow-style: none;
+    /* IE and Edge */
   }
 
   *::-webkit-scrollbar {
-    display: none; /* Chrome, Safari, Opera */
+    display: none;
+    /* Chrome, Safari, Opera */
   }
 
   /* Utility class to show scrollbar if needed */
@@ -108,6 +112,7 @@
    ============================================ */
 
 @layer components {
+
   /* ============================================
      GLOBAL BUTTON CLICK EFFECT
      All buttons get satisfying press feedback
@@ -132,7 +137,7 @@
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     border: 1px solid oklch(1 0 0 / 0.05);
-    box-shadow: 
+    box-shadow:
       0 0 0 1px oklch(1 0 0 / 0.02) inset,
       0 20px 40px oklch(0 0 0 / 0.3);
   }
@@ -163,7 +168,7 @@
   }
 
   .btn-primary:hover {
-    box-shadow: 
+    box-shadow:
       0 0 20px oklch(0.72 0.15 180 / 0.4),
       0 0 40px oklch(0.72 0.15 180 / 0.2);
     transform: translateY(-1px);
@@ -218,7 +223,7 @@
      TAB/PILL BUTTON STYLES
      Premium navigation tabs with gradient active state
      ============================================ */
-  
+
   /* Tab container */
   .tab-container {
     display: flex;
@@ -257,7 +262,7 @@
     background: linear-gradient(135deg, oklch(0.72 0.15 180 / 0.15), oklch(0.72 0.15 180 / 0.05));
     color: var(--color-textMain);
     border-color: oklch(0.72 0.15 180 / 0.2);
-    box-shadow: 
+    box-shadow:
       0 4px 12px oklch(0.72 0.15 180 / 0.05),
       0 0 0 1px oklch(0.72 0.15 180 / 0.1) inset;
   }
@@ -320,12 +325,10 @@
     content: '';
     position: absolute;
     inset: -1px;
-    background: linear-gradient(
-      135deg,
-      var(--color-primary),
-      oklch(0.65 0.14 280),
-      var(--color-primary)
-    );
+    background: linear-gradient(135deg,
+        var(--color-primary),
+        oklch(0.65 0.14 280),
+        var(--color-primary));
     border-radius: inherit;
     z-index: -1;
     opacity: 0;
@@ -338,9 +341,12 @@
 
   /* Pulse animation for live indicators */
   @keyframes pulse-glow {
-    0%, 100% {
+
+    0%,
+    100% {
       box-shadow: 0 0 0 0 oklch(0.72 0.15 180 / 0.4);
     }
+
     50% {
       box-shadow: 0 0 0 6px oklch(0.72 0.15 180 / 0);
     }
@@ -355,18 +361,17 @@
     0% {
       background-position: -200% 0;
     }
+
     100% {
       background-position: 200% 0;
     }
   }
 
   .shimmer {
-    background: linear-gradient(
-      90deg,
-      oklch(1 0 0 / 0.05) 25%,
-      oklch(1 0 0 / 0.1) 50%,
-      oklch(1 0 0 / 0.05) 75%
-    );
+    background: linear-gradient(90deg,
+        oklch(1 0 0 / 0.05) 25%,
+        oklch(1 0 0 / 0.1) 50%,
+        oklch(1 0 0 / 0.05) 75%);
     background-size: 200% 100%;
     animation: shimmer 1.5s ease-in-out infinite;
   }

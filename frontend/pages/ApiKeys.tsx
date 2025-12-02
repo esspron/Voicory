@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Eye, EyeSlash, Copy, Plus, Trash, Key, ShieldCheck, Globe, CircleNotch, Sparkle } from '@phosphor-icons/react';
 import { getApiKeys } from '../services/voicoryService';
+import { Button } from '../components/ui/Button';
 import type { ApiKey } from '../types';
 
 const ApiKeys: React.FC = () => {
@@ -66,11 +67,10 @@ const ApiKeys: React.FC = () => {
                     </div>
                     <p className="text-textMuted text-sm mt-1 ml-[52px]">Manage your public and private keys for API access.</p>
                 </div>
-                <button className="group flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-primary to-primary/80 text-black font-semibold rounded-xl text-sm hover:shadow-lg hover:shadow-primary/25 hover:scale-[1.02] transition-all duration-300">
+                <Button className="gap-2">
                     <Plus size={18} weight="bold" />
                     Create New Key
-                    <Sparkle size={14} weight="fill" className="opacity-0 group-hover:opacity-100 transition-opacity" />
-                </button>
+                </Button>
             </div>
 
             {/* Private Keys Section */}
@@ -109,21 +109,23 @@ const ApiKeys: React.FC = () => {
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-1">
-                                        <button 
+                                        <Button 
+                                            variant="ghost"
+                                            size="icon-sm"
                                             onClick={() => toggleVisibility(key.id)}
-                                            className="p-2.5 hover:bg-background rounded-lg text-textMuted hover:text-textMain transition-all duration-200"
                                         >
                                             {visibleKeys[key.id] ? <EyeSlash size={18} /> : <Eye size={18} />}
-                                        </button>
-                                        <button 
+                                        </Button>
+                                        <Button 
+                                            variant="ghost"
+                                            size="icon-sm"
                                             onClick={() => copyToClipboard(key.key)}
-                                            className="p-2.5 hover:bg-background rounded-lg text-textMuted hover:text-primary transition-all duration-200"
                                         >
                                             <Copy size={18} />
-                                        </button>
-                                        <button className="p-2.5 hover:bg-red-500/10 rounded-lg text-textMuted hover:text-red-500 transition-all duration-200">
+                                        </Button>
+                                        <Button variant="ghost-destructive" size="icon-sm">
                                             <Trash size={18} />
-                                        </button>
+                                        </Button>
                                     </div>
                                 </div>
                             ))}
@@ -169,15 +171,16 @@ const ApiKeys: React.FC = () => {
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-1">
-                                        <button 
+                                        <Button 
+                                            variant="ghost"
+                                            size="icon-sm"
                                             onClick={() => copyToClipboard(key.key)}
-                                            className="p-2.5 hover:bg-background rounded-lg text-textMuted hover:text-primary transition-all duration-200"
                                         >
                                             <Copy size={18} />
-                                        </button>
-                                        <button className="p-2.5 hover:bg-red-500/10 rounded-lg text-textMuted hover:text-red-500 transition-all duration-200">
+                                        </Button>
+                                        <Button variant="ghost-destructive" size="icon-sm">
                                             <Trash size={18} />
-                                        </button>
+                                        </Button>
                                     </div>
                                 </div>
                             ))}

@@ -78,8 +78,8 @@ const PromptGeneratorModal: React.FC<PromptGeneratorModalProps> = ({
     const [previewTab, setPreviewTab] = useState<'calls' | 'messaging'>('calls');
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-    // Always use Railway backend
-    const BACKEND_URL = 'https://callyy-production.up.railway.app';
+    // Backend URL from environment (falls back to production if not set)
+    const BACKEND_URL = import.meta.env['VITE_BACKEND_URL'] || 'https://callyy-production.up.railway.app';
 
     useEffect(() => {
         textareaRef.current?.focus();

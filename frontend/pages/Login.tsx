@@ -3,6 +3,9 @@ import { Link, useNavigate } from 'react-router-dom';
 import AuthLayout from '../components/AuthLayout';
 import { GithubLogo, CircleNotch, Sparkle } from '@phosphor-icons/react';
 import { useAuth } from '../contexts/AuthContext';
+import { Button } from '../components/ui/Button';
+import { Input } from '../components/ui/Input';
+import { Label } from '../components/ui/Label';
 
 const GoogleIcon = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -62,18 +65,18 @@ const Login: React.FC = () => {
         </p>
 
         <div className="grid grid-cols-3 gap-3 mb-6">
-          <button className="group flex items-center justify-center p-2.5 bg-surface border border-border rounded-xl hover:bg-surfaceHover hover:border-primary/30 transition-all duration-200">
+          <Button variant="glass" className="gap-2">
             <GoogleIcon />
-            <span className="ml-2 text-sm font-medium text-textMain">Google</span>
-          </button>
-          <button className="group flex items-center justify-center p-2.5 bg-surface border border-border rounded-xl hover:bg-surfaceHover hover:border-primary/30 transition-all duration-200">
-            <GithubLogo size={20} weight="fill" className="text-textMain" />
-            <span className="ml-2 text-sm font-medium text-textMain">GitHub</span>
-          </button>
-          <button className="group flex items-center justify-center p-2.5 bg-surface border border-border rounded-xl hover:bg-surfaceHover hover:border-primary/30 transition-all duration-200">
+            <span className="text-sm font-medium">Google</span>
+          </Button>
+          <Button variant="glass" className="gap-2">
+            <GithubLogo size={20} weight="fill" />
+            <span className="text-sm font-medium">GitHub</span>
+          </Button>
+          <Button variant="glass" className="gap-2">
             <DiscordIcon />
-            <span className="ml-2 text-sm font-medium text-textMain">Discord</span>
-          </button>
+            <span className="text-sm font-medium">Discord</span>
+          </Button>
         </div>
 
         <div className="relative mb-6">
@@ -93,41 +96,39 @@ const Login: React.FC = () => {
 
         <form className="space-y-4" onSubmit={handleSubmit}>
           <div>
-            <label className="block text-sm font-medium text-textMuted mb-1">Email</label>
-            <input
+            <Label>Email</Label>
+            <Input
               type="email"
               placeholder="Your email address"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full bg-background border border-white/10 rounded-xl px-4 py-2.5 text-textMain placeholder-textMuted outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all duration-200"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-textMuted mb-1">Password</label>
-            <input
+            <Label>Password</Label>
+            <Input
               type="password"
               placeholder="Your password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="w-full bg-background border border-white/10 rounded-xl px-4 py-2.5 text-textMain placeholder-textMuted outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all duration-200"
             />
           </div>
 
-          <button
+          <Button
             type="submit"
-            disabled={loading}
-            className="w-full bg-gradient-to-r from-primary to-primary/80 hover:shadow-lg hover:shadow-primary/25 text-black font-semibold py-2.5 rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:-translate-y-0.5"
+            loading={loading}
+            className="w-full"
           >
-            {loading ? 'Signing in...' : 'Sign in'}
-          </button>
+            Sign in
+          </Button>
         </form>
 
         <div className="mt-6 text-center space-y-4">
-          <button className="text-sm text-textMuted hover:text-textMain transition-colors">
+          <Button variant="ghost" size="sm">
             Sign in with SSO
-          </button>
+          </Button>
 
           <div className="text-sm text-textMuted">
             Don't have an account? <Link to="/signup" className="text-textMain hover:underline">Sign up</Link>

@@ -1,35 +1,67 @@
 {
   "compilerOptions": {
+    // Language & Environment
     "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
     "experimentalDecorators": true,
     "useDefineForClassFields": false,
+
+    // Module Resolution
     "module": "ESNext",
-    "lib": [
-      "ES2022",
-      "DOM",
-      "DOM.Iterable"
-    ],
-    "skipLibCheck": true,
-    "types": [
-      "node",
-      "vite/client"
-    ],
     "moduleResolution": "bundler",
-    "isolatedModules": true,
     "moduleDetection": "force",
-    "allowJs": true,
-    "jsx": "react-jsx",
-    "paths": {
-      "@/*": [
-        "./*"
-      ]
-    },
+    "isolatedModules": true,
     "allowImportingTsExtensions": true,
-    "noEmit": true
+    "resolveJsonModule": true,
+
+    // Strict Type-Checking (Professional Standards)
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "strictBindCallApply": true,
+    "strictPropertyInitialization": true,
+    "noImplicitThis": true,
+    "useUnknownInCatchVariables": true,
+    "alwaysStrict": true,
+
+    // Code Quality
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "allowUnusedLabels": false,
+    "allowUnreachableCode": false,
+
+    // Interop & Emit
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "allowJs": true,
+    "noEmit": true,
+
+    // Type Acquisition
+    "types": ["node", "vite/client"],
+
+    // Path Mapping
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./*"],
+      "@/components/*": ["./components/*"],
+      "@/pages/*": ["./pages/*"],
+      "@/services/*": ["./services/*"],
+      "@/hooks/*": ["./hooks/*"],
+      "@/contexts/*": ["./contexts/*"],
+      "@/types/*": ["./types/*"],
+      "@/utils/*": ["./utils/*"],
+      "@/lib/*": ["./lib/*"]
+    }
   },
-  "include": [
-    "./**/*.ts",
-    "./**/*.tsx",
-    "vite-env.d.ts"
-  ]
+  "include": ["./**/*.ts", "./**/*.tsx", "vite-env.d.ts"],
+  "exclude": ["node_modules", "dist", ".vite"]
 }

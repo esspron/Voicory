@@ -1,5 +1,6 @@
 import React from 'react';
 import { Users, Plus, Sparkle, UserPlus, Crown, EnvelopeSimple } from '@phosphor-icons/react';
+import { Button } from '../../components/ui/Button';
 
 const Members: React.FC = () => {
     return (
@@ -15,10 +16,10 @@ const Members: React.FC = () => {
                         <p className="text-sm text-textMuted">Manage members of your organization</p>
                     </div>
                 </div>
-                <button className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-primary to-primary/80 text-white font-medium rounded-xl hover:shadow-lg hover:shadow-primary/25 transition-all hover:-translate-y-0.5">
+                <Button className="gap-2">
                     <UserPlus size={18} weight="bold" />
                     Invite Member
-                </button>
+                </Button>
             </div>
 
             {/* Owner Card */}

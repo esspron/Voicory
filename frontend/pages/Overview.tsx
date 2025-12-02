@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import Select, { type SelectOption } from '../components/ui/Select';
 import { FadeIn } from '../components/ui/FadeIn';
+import { Button } from '../components/ui/Button';
 import WelcomeBonusBanner from '../components/WelcomeBonusBanner';
 import {
     TrendUp,
@@ -502,10 +503,10 @@ const Overview: React.FC = () => {
                         </div>
 
                         {!loading && callLogs.length > 0 && (
-                            <button className="w-full mt-5 flex items-center justify-center gap-2 text-sm text-primary hover:text-white font-medium py-2.5 rounded-xl bg-primary/5 hover:bg-primary transition-all duration-200 group active:scale-95">
+                            <Button variant="outline" className="w-full mt-5 gap-2 group">
                                 View All Logs
                                 <ArrowRight size={16} weight="bold" className="group-hover:translate-x-0.5 transition-transform" />
-                            </button>
+                            </Button>
                         )}
                     </div>
                 </div>
