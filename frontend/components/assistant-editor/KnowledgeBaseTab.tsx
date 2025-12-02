@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom';
 import {
     MagnifyingGlass, Plus, BookOpen, FileText, Globe, X, Gear, Check,
     CircleNotch, ArrowsClockwise, TextAa, Trash
 } from '@phosphor-icons/react';
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
+
 import {
     getKnowledgeBases,
     getDocuments,
@@ -95,8 +96,16 @@ const KnowledgeBaseTab: React.FC<KnowledgeBaseTabProps> = ({ formData, setFormDa
         try {
             const newIds = [...(formData.knowledgeBaseIds || []), kbId];
             
-            // Update local state
-            setFormData({ ...formData, knowledgeBaseIds: newIds, ragEnabled: true });
+            // Update local state with strict RAG settings
+            setFormData({ 
+                ...formData, 
+                knowledgeBaseIds: newIds, 
+                ragEnabled: true,
+                // Set strict defaults if not already configured
+                ragSimilarityThreshold: formData.ragSimilarityThreshold || 0.2,
+                ragMaxResults: formData.ragMaxResults || 10,
+                ragInstructions: formData.ragInstructions || 'STRICT MODE: Only answer using the knowledge base content. If the information is not in the knowledge base, say "I don\'t have information about that in my knowledge base."'
+            });
             setShowKBSelector(false);
             
             // Auto-save after linking - pass the new IDs directly

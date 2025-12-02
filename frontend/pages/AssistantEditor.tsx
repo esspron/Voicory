@@ -482,12 +482,16 @@ const AssistantEditor: React.FC = () => {
         }
     };
 
-    // Handle saving with updated knowledge base IDs (for unlink operation)
+    // Handle saving with updated knowledge base IDs (for link/unlink operation)
     const handleSaveWithKnowledgeBaseIds = async (updatedKnowledgeBaseIds: string[]) => {
         if (saving || !assistantId) return;
 
         setSaving(true);
         try {
+            // When linking (adding KBs), apply strict RAG settings
+            const isLinking = updatedKnowledgeBaseIds.length > (formData.knowledgeBaseIds?.length || 0);
+            const strictRagInstructions = 'STRICT MODE: Only answer using the knowledge base content. If the information is not in the knowledge base, say "I don\'t have information about that in my knowledge base."';
+            
             const inputData: AssistantInput = {
                 name: formData.name,
                 systemPrompt: formData.systemPrompt,
@@ -510,9 +514,10 @@ const AssistantEditor: React.FC = () => {
                 timezone: formData.timezone,
                 // Use the updated knowledge base IDs passed in
                 ragEnabled: updatedKnowledgeBaseIds.length > 0,
-                ragSimilarityThreshold: formData.ragSimilarityThreshold,
-                ragMaxResults: formData.ragMaxResults,
-                ragInstructions: formData.ragInstructions,
+                // Apply strict settings when linking, keep existing when unlinking
+                ragSimilarityThreshold: isLinking ? (formData.ragSimilarityThreshold || 0.2) : formData.ragSimilarityThreshold,
+                ragMaxResults: isLinking ? (formData.ragMaxResults || 10) : formData.ragMaxResults,
+                ragInstructions: isLinking ? (formData.ragInstructions || strictRagInstructions) : formData.ragInstructions,
                 knowledgeBaseIds: updatedKnowledgeBaseIds,
                 memoryEnabled: formData.memoryEnabled,
                 memoryConfig: formData.memoryConfig,
@@ -526,6 +531,10 @@ const AssistantEditor: React.FC = () => {
                     ...formData, 
                     knowledgeBaseIds: updatedKnowledgeBaseIds,
                     ragEnabled: updatedKnowledgeBaseIds.length > 0,
+                    // Also update RAG settings in local state
+                    ragSimilarityThreshold: inputData.ragSimilarityThreshold,
+                    ragMaxResults: inputData.ragMaxResults,
+                    ragInstructions: inputData.ragInstructions,
                     status: savedAssistant.status 
                 };
                 setFormData(updatedFormData);
