@@ -16,6 +16,12 @@ interface AssistantFormData {
     llmModel: string;
     temperature: number;
     maxTokens: number;
+    // RAG settings
+    ragEnabled: boolean;
+    ragSimilarityThreshold: number;
+    ragMaxResults: number;
+    ragInstructions: string;
+    knowledgeBaseIds: string[];
 }
 
 type TabId = 'calls' | 'messages' | 'memory' | 'workflow' | 'knowledge-base' | 'analysis' | 'tools' | 'tests' | 'widget';
@@ -101,6 +107,12 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ assistantId, formData, select
                     llmModel: formData.llmModel,
                     temperature: formData.temperature,
                     maxTokens: formData.maxTokens,
+                    // RAG settings
+                    ragEnabled: formData.ragEnabled,
+                    ragSimilarityThreshold: formData.ragSimilarityThreshold,
+                    ragMaxResults: formData.ragMaxResults,
+                    ragInstructions: formData.ragInstructions,
+                    knowledgeBaseIds: formData.knowledgeBaseIds,
                 }
             }),
         });

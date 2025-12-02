@@ -75,9 +75,15 @@ router.post('/test-chat', async (req, res) => {
                 temperature: assistantConfig.temperature,
                 max_tokens: assistantConfig.maxTokens,
                 dynamic_variables: assistantConfig.dynamicVariables,
-                timezone: assistantConfig.timezone || 'Asia/Kolkata'
+                timezone: assistantConfig.timezone || 'Asia/Kolkata',
+                // RAG settings from config
+                rag_enabled: assistantConfig.ragEnabled,
+                rag_similarity_threshold: assistantConfig.ragSimilarityThreshold,
+                rag_max_results: assistantConfig.ragMaxResults,
+                rag_instructions: assistantConfig.ragInstructions,
+                knowledge_base_ids: assistantConfig.knowledgeBaseIds,
             };
-            console.log('Test chat - Using unsaved config:', assistant.name, 'Billing user:', billingUserId);
+            console.log('Test chat - Using unsaved config:', assistant.name, 'RAG enabled:', assistant.rag_enabled, 'KBs:', assistant.knowledge_base_ids?.length || 0, 'Billing user:', billingUserId);
         }
 
         // Require userId for billing
