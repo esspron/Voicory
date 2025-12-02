@@ -40,8 +40,43 @@ router.post('/test-chat', async (req, res) => {
         let assistant;
         let billingUserId = userId; // User ID for billing purposes
 
-        // If assistantId provided, fetch from database (same as WhatsApp)
-        if (assistantId) {
+        // PRIORITY: Always use assistantConfig if provided (for live preview with unsaved changes)
+        // This allows testing changes before saving
+        if (assistantConfig) {
+            // Use passed config (convert to DB format)
+            // The frontend already sends the correct systemPrompt based on channel
+            assistant = {
+                name: assistantConfig.name,
+                system_prompt: assistantConfig.systemPrompt,
+                first_message: assistantConfig.firstMessage,
+                language_settings: assistantConfig.languageSettings,
+                style_settings: assistantConfig.styleSettings,
+                llm_model: assistantConfig.llmModel,
+                temperature: assistantConfig.temperature,
+                max_tokens: assistantConfig.maxTokens,
+                dynamic_variables: assistantConfig.dynamicVariables,
+                timezone: assistantConfig.timezone || 'Asia/Kolkata',
+                // RAG settings from config - these are the LIVE values from the form
+                rag_enabled: assistantConfig.ragEnabled,
+                rag_similarity_threshold: assistantConfig.ragSimilarityThreshold,
+                rag_max_results: assistantConfig.ragMaxResults,
+                rag_instructions: assistantConfig.ragInstructions,
+                knowledge_base_ids: assistantConfig.knowledgeBaseIds,
+            };
+            console.log('Test chat - Using LIVE config:', assistant.name, 
+                'RAG enabled:', assistant.rag_enabled, 
+                'KBs:', assistant.knowledge_base_ids?.length || 0,
+                'Threshold:', assistant.rag_similarity_threshold);
+            
+            // If we have assistantId, fetch just for billing user_id
+            if (assistantId && !billingUserId) {
+                const savedAssistant = await getCachedAssistant(assistantId);
+                if (savedAssistant) {
+                    billingUserId = savedAssistant.user_id;
+                }
+            }
+        } else if (assistantId) {
+            // Fallback: If no config provided, fetch from database
             // 🚀 CACHED: Use Redis cache for assistant lookup
             assistant = await getCachedAssistant(assistantId);
 
@@ -61,29 +96,9 @@ router.post('/test-chat', async (req, res) => {
                 assistant.first_message = assistant.messaging_first_message || assistant.first_message;
             }
             
-            console.log('Test chat - Using saved assistant:', assistant.name, 'Channel:', channel, 'Billing user:', billingUserId);
+            console.log('Test chat - Using SAVED assistant:', assistant.name, 'Channel:', channel, 'Billing user:', billingUserId);
         } else {
-            // Use passed config for unsaved assistants (convert to DB format)
-            // The frontend already sends the correct systemPrompt based on channel
-            assistant = {
-                name: assistantConfig.name,
-                system_prompt: assistantConfig.systemPrompt,
-                first_message: assistantConfig.firstMessage,
-                language_settings: assistantConfig.languageSettings,
-                style_settings: assistantConfig.styleSettings,
-                llm_model: assistantConfig.llmModel,
-                temperature: assistantConfig.temperature,
-                max_tokens: assistantConfig.maxTokens,
-                dynamic_variables: assistantConfig.dynamicVariables,
-                timezone: assistantConfig.timezone || 'Asia/Kolkata',
-                // RAG settings from config
-                rag_enabled: assistantConfig.ragEnabled,
-                rag_similarity_threshold: assistantConfig.ragSimilarityThreshold,
-                rag_max_results: assistantConfig.ragMaxResults,
-                rag_instructions: assistantConfig.ragInstructions,
-                knowledge_base_ids: assistantConfig.knowledgeBaseIds,
-            };
-            console.log('Test chat - Using unsaved config:', assistant.name, 'RAG enabled:', assistant.rag_enabled, 'KBs:', assistant.knowledge_base_ids?.length || 0, 'Billing user:', billingUserId);
+            return res.status(400).json({ error: 'Either assistantId or assistantConfig is required' });
         }
 
         // Require userId for billing
