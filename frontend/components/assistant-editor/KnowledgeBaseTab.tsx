@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import {
     MagnifyingGlass, Plus, BookOpen, FileText, Globe, X, Gear, Check,
-    CircleNotch, ArrowsClockwise, TextAa
+    CircleNotch, ArrowsClockwise, TextAa, Trash
 } from '@phosphor-icons/react';
 import {
     getKnowledgeBases,
@@ -22,9 +22,10 @@ interface AssistantFormData {
 interface KnowledgeBaseTabProps {
     formData: AssistantFormData;
     setFormData: React.Dispatch<React.SetStateAction<any>>;
+    onSave?: (updatedKnowledgeBaseIds: string[]) => Promise<void>;
 }
 
-const KnowledgeBaseTab: React.FC<KnowledgeBaseTabProps> = ({ formData, setFormData }) => {
+const KnowledgeBaseTab: React.FC<KnowledgeBaseTabProps> = ({ formData, setFormData, onSave }) => {
     const [searchQuery, setSearchQuery] = useState('');
     const [showRAGConfig, setShowRAGConfig] = useState(false);
     const [showKBSelector, setShowKBSelector] = useState(false);
@@ -32,6 +33,10 @@ const KnowledgeBaseTab: React.FC<KnowledgeBaseTabProps> = ({ formData, setFormDa
     const [linkedDocuments, setLinkedDocuments] = useState<KnowledgeBaseDocument[]>([]);
     const [loading, setLoading] = useState(true);
     const [loadingDocs, setLoadingDocs] = useState(false);
+    const [showUnlinkConfirm, setShowUnlinkConfirm] = useState(false);
+    const [kbToUnlink, setKbToUnlink] = useState<KnowledgeBase | null>(null);
+    const [unlinking, setUnlinking] = useState(false);
+    const [linking, setLinking] = useState(false);
 
     // Load all knowledge bases
     useEffect(() => {
@@ -84,25 +89,59 @@ const KnowledgeBaseTab: React.FC<KnowledgeBaseTabProps> = ({ formData, setFormDa
         !formData.knowledgeBaseIds?.includes(kb.id)
     );
 
-    // Link a knowledge base
-    const handleLinkKB = (kbId: string) => {
-        const newIds = [...(formData.knowledgeBaseIds || []), kbId];
-        setFormData({ ...formData, knowledgeBaseIds: newIds, ragEnabled: true });
-        setShowKBSelector(false);
+    // Link a knowledge base and auto-save
+    const handleLinkKB = async (kbId: string) => {
+        setLinking(true);
+        try {
+            const newIds = [...(formData.knowledgeBaseIds || []), kbId];
+            
+            // Update local state
+            setFormData({ ...formData, knowledgeBaseIds: newIds, ragEnabled: true });
+            setShowKBSelector(false);
+            
+            // Auto-save after linking - pass the new IDs directly
+            if (onSave) {
+                await onSave(newIds);
+            }
+        } catch (error) {
+            console.error('Error linking knowledge base:', error);
+        } finally {
+            setLinking(false);
+        }
     };
 
-    // Unlink a knowledge base
-    const handleUnlinkKB = (kbId: string) => {
-        console.log('[KnowledgeBaseTab] handleUnlinkKB called with:', kbId);
-        console.log('[KnowledgeBaseTab] Current formData.knowledgeBaseIds:', formData.knowledgeBaseIds);
-        const newIds = (formData.knowledgeBaseIds || []).filter(id => id !== kbId);
-        console.log('[KnowledgeBaseTab] New IDs after filter:', newIds);
-        setFormData({ 
-            ...formData, 
-            knowledgeBaseIds: newIds,
-            ragEnabled: newIds.length > 0 
-        });
-        console.log('[KnowledgeBaseTab] setFormData called');
+    // Show unlink confirmation
+    const handleUnlinkClick = (kb: KnowledgeBase) => {
+        setKbToUnlink(kb);
+        setShowUnlinkConfirm(true);
+    };
+
+    // Confirm and unlink a knowledge base
+    const handleConfirmUnlink = async () => {
+        if (!kbToUnlink) return;
+        
+        setUnlinking(true);
+        try {
+            const newIds = (formData.knowledgeBaseIds || []).filter(id => id !== kbToUnlink.id);
+            
+            // Update local state
+            setFormData({ 
+                ...formData, 
+                knowledgeBaseIds: newIds,
+                ragEnabled: newIds.length > 0 
+            });
+            
+            // Auto-save after unlinking - pass the new IDs directly
+            if (onSave) {
+                await onSave(newIds);
+            }
+        } catch (error) {
+            console.error('Error unlinking knowledge base:', error);
+        } finally {
+            setUnlinking(false);
+            setShowUnlinkConfirm(false);
+            setKbToUnlink(null);
+        }
     };
 
     // Filter documents based on search
@@ -188,8 +227,7 @@ const KnowledgeBaseTab: React.FC<KnowledgeBaseTabProps> = ({ formData, setFormDa
                                         onClick={(e) => {
                                             e.preventDefault();
                                             e.stopPropagation();
-                                            console.log('[UnlinkButton] Clicked! KB:', kb.id);
-                                            handleUnlinkKB(kb.id);
+                                            handleUnlinkClick(kb);
                                         }}
                                         onPointerDown={(e) => e.stopPropagation()}
                                         className="relative z-20 w-9 h-9 flex items-center justify-center text-red-400 hover:text-red-300 hover:bg-red-500/20 rounded-lg transition-all cursor-pointer active:scale-95"
@@ -439,7 +477,8 @@ const KnowledgeBaseTab: React.FC<KnowledgeBaseTabProps> = ({ formData, setFormDa
                                         <button
                                             key={kb.id}
                                             onClick={() => handleLinkKB(kb.id)}
-                                            className="w-full flex items-center gap-3 p-4 bg-white/[0.02] border border-white/5 rounded-xl hover:bg-white/[0.05] hover:border-primary/30 transition-all text-left"
+                                            disabled={linking}
+                                            className="w-full flex items-center gap-3 p-4 bg-white/[0.02] border border-white/5 rounded-xl hover:bg-white/[0.05] hover:border-primary/30 transition-all text-left disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
                                             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center">
                                                 <BookOpen size={20} weight="duotone" className="text-primary" />
@@ -450,7 +489,11 @@ const KnowledgeBaseTab: React.FC<KnowledgeBaseTabProps> = ({ formData, setFormDa
                                                     {kb.total_documents} documents · {kb.total_characters.toLocaleString()} characters
                                                 </p>
                                             </div>
-                                            <Plus size={18} className="text-primary" />
+                                            {linking ? (
+                                                <CircleNotch size={18} className="text-primary animate-spin" />
+                                            ) : (
+                                                <Plus size={18} className="text-primary" />
+                                            )}
                                         </button>
                                     ))}
                                 </div>
@@ -463,6 +506,59 @@ const KnowledgeBaseTab: React.FC<KnowledgeBaseTabProps> = ({ formData, setFormDa
                                 className="w-full px-4 py-2.5 bg-surface border border-white/10 rounded-xl text-sm text-textMain hover:bg-white/5 transition-all"
                             >
                                 Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>,
+                document.body
+            )}
+
+            {/* Unlink Confirmation Modal */}
+            {showUnlinkConfirm && kbToUnlink && createPortal(
+                <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-[100]">
+                    <div className="bg-surface/95 backdrop-blur-xl border border-white/10 rounded-2xl p-6 w-full max-w-md mx-4 shadow-2xl">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-red-500/20 to-red-600/10 flex items-center justify-center">
+                                <Trash size={24} weight="duotone" className="text-red-400" />
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-semibold text-textMain">Unlink Knowledge Base</h3>
+                                <p className="text-sm text-textMuted/70">This will remove access to these documents</p>
+                            </div>
+                        </div>
+
+                        <p className="text-sm text-textMuted mb-6">
+                            Are you sure you want to unlink <span className="font-medium text-textMain">"{kbToUnlink.name}"</span>?
+                            The agent will no longer have access to the {kbToUnlink.total_documents} documents in this knowledge base.
+                        </p>
+
+                        <div className="flex items-center justify-end gap-3">
+                            <button
+                                onClick={() => {
+                                    setShowUnlinkConfirm(false);
+                                    setKbToUnlink(null);
+                                }}
+                                disabled={unlinking}
+                                className="px-4 py-2.5 bg-surface/50 border border-white/10 rounded-xl text-sm text-textMain hover:bg-white/5 transition-all disabled:opacity-50"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleConfirmUnlink}
+                                disabled={unlinking}
+                                className="px-5 py-2.5 bg-gradient-to-r from-red-500 to-red-600 text-white font-medium rounded-xl text-sm hover:shadow-lg hover:shadow-red-500/25 transition-all disabled:opacity-50 flex items-center gap-2"
+                            >
+                                {unlinking ? (
+                                    <>
+                                        <CircleNotch size={16} weight="bold" className="animate-spin" />
+                                        Unlinking...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Trash size={16} weight="bold" />
+                                        Unlink & Save
+                                    </>
+                                )}
                             </button>
                         </div>
                     </div>

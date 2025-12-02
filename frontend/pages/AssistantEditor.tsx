@@ -481,6 +481,64 @@ const AssistantEditor: React.FC = () => {
         }
     };
 
+    // Handle saving with updated knowledge base IDs (for unlink operation)
+    const handleSaveWithKnowledgeBaseIds = async (updatedKnowledgeBaseIds: string[]) => {
+        if (saving || !assistantId) return;
+
+        setSaving(true);
+        try {
+            const inputData: AssistantInput = {
+                name: formData.name,
+                systemPrompt: formData.systemPrompt,
+                firstMessage: formData.firstMessage,
+                outboundSystemPrompt: formData.outboundSystemPrompt,
+                outboundFirstMessage: formData.outboundFirstMessage,
+                messagingSystemPrompt: formData.messagingSystemPrompt,
+                messagingFirstMessage: formData.messagingFirstMessage,
+                voiceId: formData.voiceId || undefined,
+                elevenlabsModelId: formData.elevenlabsModelId,
+                languageSettings: formData.languageSettings,
+                styleSettings: formData.styleSettings,
+                dynamicVariables: formData.dynamicVariables,
+                llmProvider: formData.llmProvider,
+                llmModel: formData.llmModel,
+                temperature: formData.temperature,
+                maxTokens: formData.maxTokens,
+                interruptible: formData.interruptible,
+                useDefaultPersonality: formData.useDefaultPersonality,
+                timezone: formData.timezone,
+                // Use the updated knowledge base IDs passed in
+                ragEnabled: updatedKnowledgeBaseIds.length > 0,
+                ragSimilarityThreshold: formData.ragSimilarityThreshold,
+                ragMaxResults: formData.ragMaxResults,
+                ragInstructions: formData.ragInstructions,
+                knowledgeBaseIds: updatedKnowledgeBaseIds,
+                memoryEnabled: formData.memoryEnabled,
+                memoryConfig: formData.memoryConfig,
+                status: formData.status,
+            };
+
+            const savedAssistant = await updateAssistant(assistantId, inputData);
+
+            if (savedAssistant) {
+                const updatedFormData = { 
+                    ...formData, 
+                    knowledgeBaseIds: updatedKnowledgeBaseIds,
+                    ragEnabled: updatedKnowledgeBaseIds.length > 0,
+                    status: savedAssistant.status 
+                };
+                setFormData(updatedFormData);
+                originalFormDataRef.current = getFormDataFingerprint(updatedFormData);
+                setHasChanges(false);
+            }
+        } catch (error) {
+            console.error('Error saving assistant:', error);
+            alert('Failed to save changes. Please try again.');
+        } finally {
+            setSaving(false);
+        }
+    };
+
     // Handle applying generated prompt from AI
     const handleApplyGeneratedPrompt = (data: {
         systemPrompt: string;
@@ -583,7 +641,7 @@ const AssistantEditor: React.FC = () => {
             case 'tools':
                 return <ToolsTab />;
             case 'knowledge-base':
-                return <KnowledgeBaseTab formData={formData} setFormData={setFormData} />;
+                return <KnowledgeBaseTab formData={formData} setFormData={setFormData} onSave={handleSaveWithKnowledgeBaseIds} />;
             case 'analysis':
                 return <AnalysisTab />;
             case 'tests':
