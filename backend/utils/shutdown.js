@@ -7,8 +7,9 @@ function setupGracefulShutdown(app, supabase, port) {
     let isShuttingDown = false;
     const activeConnections = new Set();
 
-    const server = app.listen(port, () => {
-        console.log(`✅ Server running on port ${port}`);
+    // Bind to 0.0.0.0 explicitly for Railway/Docker
+    const server = app.listen(port, '0.0.0.0', () => {
+        console.log(`✅ Server running on 0.0.0.0:${port}`);
         console.log(`   Environment: ${process.env.NODE_ENV || 'development'}`);
         console.log(`   Redis: ${getRedis() ? 'connected' : 'not configured'}`);
     });
