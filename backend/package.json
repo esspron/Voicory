@@ -11,7 +11,11 @@
   "engines": {
     "node": ">=20.0.0"
   },
-  "keywords": ["whatsapp", "webhook", "voicory"],
+  "keywords": [
+    "whatsapp",
+    "webhook",
+    "voicory"
+  ],
   "author": "Voicory",
   "license": "ISC",
   "type": "commonjs",
@@ -23,6 +27,7 @@
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
     "openai": "^4.73.0",
+    "uuid": "^13.0.0",
     "xml2js": "^0.6.2"
   }
 }
