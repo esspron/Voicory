@@ -1,7 +1,114 @@
 // ============================================
 // MEMORY SERVICE - Customer Memory Management
 // ============================================
-const { openai } = require('../config');
+const { openai, supabase } = require('../config');
+
+/**
+ * Fetch complete customer memory context from database
+ * Includes: customer info, memory record, recent conversations, insights
+ */
+async function getCustomerMemory(customerId, userId, memoryConfig = {}) {
+    if (!customerId) return null;
+    
+    try {
+        const maxConversations = memoryConfig.maxContextConversations || 5;
+        
+        // Fetch all memory data in parallel
+        const [customerResult, memoryResult, conversationsResult, insightsResult] = await Promise.all([
+            // Customer basic info
+            supabase
+                .from('customers')
+                .select('id, name, email, phone_number, variables, interaction_count, last_interaction')
+                .eq('id', customerId)
+                .single(),
+            
+            // Customer memory record (personality, engagement, etc.)
+            supabase
+                .from('customer_memories')
+                .select('*')
+                .eq('customer_id', customerId)
+                .single(),
+            
+            // Recent conversation summaries
+            supabase
+                .from('customer_conversations')
+                .select('id, started_at, summary, key_points, sentiment, sentiment_score, outcome, topics_discussed, channel')
+                .eq('customer_id', customerId)
+                .order('started_at', { ascending: false })
+                .limit(maxConversations),
+            
+            // Key insights about this customer
+            supabase
+                .from('customer_insights')
+                .select('id, insight_type, content, importance, confidence, extracted_at')
+                .eq('customer_id', customerId)
+                .eq('is_active', true)
+                .order('importance', { ascending: false })
+                .order('extracted_at', { ascending: false })
+                .limit(15)
+        ]);
+        
+        const customer = customerResult.data;
+        const memory = memoryResult.data;
+        const conversations = conversationsResult.data || [];
+        const insights = insightsResult.data || [];
+        
+        if (!customer) {
+            console.log('[Memory] Customer not found:', customerId);
+            return null;
+        }
+        
+        // Build memory context object
+        const memoryContext = {
+            customer: {
+                name: customer.name,
+                email: customer.email,
+                phone: customer.phone_number,
+                interactionCount: customer.interaction_count,
+                lastInteraction: customer.last_interaction,
+                variables: customer.variables || {}
+            },
+            memory: memory ? {
+                totalConversations: memory.total_conversations,
+                lastContact: memory.last_contact_date,
+                averageSentiment: memory.average_sentiment,
+                engagementScore: memory.engagement_score,
+                personalityTraits: memory.personality_traits || [],
+                interests: memory.interests || [],
+                painPoints: memory.pain_points || [],
+                productInterests: memory.product_interests || [],
+                objectionsRaised: memory.objections_raised || [],
+                executiveSummary: memory.executive_summary,
+                communicationPreferences: memory.communication_preferences || {}
+            } : null,
+            recentConversations: conversations.map(c => ({
+                id: c.id,
+                startedAt: c.started_at,
+                summary: c.summary,
+                keyPoints: c.key_points || [],
+                sentiment: c.sentiment,
+                sentimentScore: c.sentiment_score,
+                outcome: c.outcome,
+                topics: c.topics_discussed || [],
+                channel: c.channel
+            })),
+            keyInsights: insights.map(i => ({
+                insightType: i.insight_type,
+                content: i.content,
+                importance: i.importance,
+                confidence: i.confidence,
+                extractedAt: i.extracted_at
+            }))
+        };
+        
+        console.log(`[Memory] Loaded memory for customer ${customerId}: ${conversations.length} conversations, ${insights.length} insights`);
+        
+        return memoryContext;
+    } catch (error) {
+        console.error('[Memory] Error fetching customer memory:', error.message);
+        return null;
+    }
+}
 
 /**
  * Format customer memory context for injection into system prompt
@@ -141,6 +248,7 @@ Return a JSON object with:
 }
 
 module.exports = {
+    getCustomerMemory,
     formatMemoryForPrompt,
     analyzeConversationWithAI
 };

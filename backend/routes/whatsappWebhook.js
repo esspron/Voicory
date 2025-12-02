@@ -8,6 +8,7 @@ const { supabase, axios, openai } = require('../config');
 const { getCachedWhatsAppConfig, getCachedAssistant } = require('../services/assistant');
 const { isMessageProcessed, markMessageProcessed } = require('../services/cache');
 const { processMessage } = require('../services/assistantProcessor');
+const { getCustomerMemory } = require('../services/memory');
 
 // ============================================
 // WHATSAPP WEBHOOK ENDPOINTS
@@ -356,6 +357,12 @@ async function processWithAI(config, message, contact) {
                 content: msg.content.body
             }));
 
+        // === FETCH CUSTOMER MEMORY (if enabled) ===
+        let memoryContext = null;
+        if (assistant.memory_enabled && customerId) {
+            memoryContext = await getCustomerMemory(customerId, config.user_id, assistant.memory_config);
+        }
+
         // === USE CENTRALIZED PROCESSOR FOR AI LOGIC ===
         // Convert database assistant format to assistantConfig format
         const assistantConfig = {
@@ -384,7 +391,8 @@ async function processWithAI(config, message, contact) {
             message: currentMsgText,
             assistantConfig,
             conversationHistory,
-            customerId,
+            customer: customerData,
+            memory: memoryContext,
             userId: config.user_id,
             channel: 'whatsapp'
         });
