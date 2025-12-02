@@ -8,16 +8,11 @@
 
 const express = require('express');
 const router = express.Router();
-const { createClient } = require('@supabase/supabase-js');
 const { v4: uuidv4 } = require('uuid');
 const OpenAI = require('openai');
-const crypto = require('crypto');
 
-// Initialize clients
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_KEY
-);
+// Use shared config
+const { supabase } = require('../config');
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
