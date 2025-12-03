@@ -80,14 +80,18 @@ const Signup: React.FC = () => {
   };
 
   const handleOAuthSignIn = async (provider: 'google' | 'github' | 'discord') => {
+    console.log('OAuth sign up clicked:', provider);
     setError('');
     setOauthLoading(provider);
     try {
       const { error } = await AuthService.signInWithOAuth(provider);
+      console.log('OAuth result:', error);
       if (error) {
         setError(error.message || `Failed to sign up with ${provider}`);
       }
+      // Note: On success, Supabase redirects to the OAuth provider
     } catch (err) {
+      console.error('OAuth error:', err);
       setError('An unexpected error occurred. Please try again.');
     } finally {
       setOauthLoading(null);
@@ -192,6 +196,7 @@ const Signup: React.FC = () => {
 
         <div className="grid grid-cols-3 gap-3 mb-6">
           <Button 
+            type="button"
             variant="glass" 
             className="gap-2"
             onClick={() => handleOAuthSignIn('google')}
@@ -205,6 +210,7 @@ const Signup: React.FC = () => {
             <span className="text-sm font-medium">Google</span>
           </Button>
           <Button 
+            type="button"
             variant="glass" 
             className="gap-2"
             onClick={() => handleOAuthSignIn('github')}
@@ -218,6 +224,7 @@ const Signup: React.FC = () => {
             <span className="text-sm font-medium">GitHub</span>
           </Button>
           <Button 
+            type="button"
             variant="glass" 
             className="gap-2"
             onClick={() => handleOAuthSignIn('discord')}
