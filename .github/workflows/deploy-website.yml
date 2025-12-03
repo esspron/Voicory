@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - 'website-nextjs/**'
+      - '.github/workflows/deploy-website.yml'
   workflow_dispatch:
 
 jobs:
@@ -13,4 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Trigger Vercel Deploy
-        run: curl -X POST "https://api.vercel.com/v1/integrations/deploy/prj_xK8ZnWM2jxkBRgtxYPeZ0uOjKLSv/DMKtCi3dZR"
+        run: |
+          echo "Triggering Vercel deployment..."
+          curl -X POST "https://api.vercel.com/v1/integrations/deploy/prj_xK8ZnWM2jxkBRgtxYPeZ0uOjKLSv/DMKtCi3dZR"
+          echo "Done!"
