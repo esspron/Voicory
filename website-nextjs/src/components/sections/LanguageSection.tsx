@@ -97,6 +97,102 @@ export function LanguageSection() {
         </span>
       </div>
 
+      {/* Visual Showcase - India Map with Language Bubbles */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        transition={{ duration: 0.5, delay: 0.3 }}
+        className="relative mb-16 mx-auto max-w-4xl"
+      >
+        <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-transparent to-transparent blur-3xl" />
+        <div className="relative bg-surface/50 border border-border rounded-3xl p-8 overflow-hidden">
+          {/* Background Map Silhouette */}
+          <div className="absolute inset-0 opacity-5">
+            <svg viewBox="0 0 400 400" className="w-full h-full">
+              <path fill="currentColor" d="M200 50 L280 80 L320 150 L350 220 L320 300 L250 350 L200 370 L150 350 L80 300 L50 220 L80 150 L120 80 Z" />
+            </svg>
+          </div>
+          
+          <div className="relative flex flex-col items-center gap-6 py-6">
+            <h3 className="text-2xl font-bold text-center">
+              <span className="gradient-text">One Platform</span>, Every Language
+            </h3>
+            
+            {/* Language Conversation Examples */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full max-w-3xl">
+              {/* Hindi Example */}
+              <div className="bg-background/60 border border-border rounded-xl p-4 space-y-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-full bg-orange-500/20 flex items-center justify-center">
+                    <span className="text-sm font-bold text-orange-400">हि</span>
+                  </div>
+                  <span className="text-sm font-medium">Hindi</span>
+                </div>
+                <div className="space-y-2">
+                  <div className="bg-surface rounded-lg px-3 py-2">
+                    <p className="text-xs text-textMuted">"नमस्ते! मैं आपकी कैसे मदद कर सकता हूँ?"</p>
+                  </div>
+                  <div className="bg-primary/10 rounded-lg px-3 py-2 text-right">
+                    <p className="text-xs text-textMuted">"मुझे अपना ऑर्डर ट्रैक करना है"</p>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Tamil Example */}
+              <div className="bg-background/60 border border-border rounded-xl p-4 space-y-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-full bg-red-500/20 flex items-center justify-center">
+                    <span className="text-sm font-bold text-red-400">த</span>
+                  </div>
+                  <span className="text-sm font-medium">Tamil</span>
+                </div>
+                <div className="space-y-2">
+                  <div className="bg-surface rounded-lg px-3 py-2">
+                    <p className="text-xs text-textMuted">"வணக்கம்! உங்களுக்கு எப்படி உதவ முடியும்?"</p>
+                  </div>
+                  <div className="bg-primary/10 rounded-lg px-3 py-2 text-right">
+                    <p className="text-xs text-textMuted">"நான் ஒரு சந்திப்பை முன்பதிவு செய்ய விரும்புகிறேன்"</p>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Bengali Example */}
+              <div className="bg-background/60 border border-border rounded-xl p-4 space-y-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center">
+                    <span className="text-sm font-bold text-green-400">বা</span>
+                  </div>
+                  <span className="text-sm font-medium">Bengali</span>
+                </div>
+                <div className="space-y-2">
+                  <div className="bg-surface rounded-lg px-3 py-2">
+                    <p className="text-xs text-textMuted">"নমস্কার! আমি কিভাবে সাহায্য করতে পারি?"</p>
+                  </div>
+                  <div className="bg-primary/10 rounded-lg px-3 py-2 text-right">
+                    <p className="text-xs text-textMuted">"আমার প্রশ্ন আছে পণ্য সম্পর্কে"</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            {/* Waveform Visualization */}
+            <div className="flex items-center gap-1 py-4">
+              {[12, 20, 16, 28, 14, 24, 10, 22, 18, 30, 15, 26, 12, 20, 25, 14, 28, 16, 22, 18].map((height, i) => (
+                <div 
+                  key={i}
+                  className="w-1 bg-primary/60 rounded-full animate-pulse"
+                  style={{ 
+                    height: `${height}px`,
+                    animationDelay: `${i * 0.1}s`
+                  }}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      </motion.div>
+
       {/* Features Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {features.map((feature, index) => (

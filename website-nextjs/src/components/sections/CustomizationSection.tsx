@@ -105,6 +105,115 @@ export function CustomizationSection() {
         ))}
       </div>
 
+      {/* Visual Assistant Builder Preview */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        transition={{ duration: 0.5, delay: 0.3 }}
+        className="relative mb-12"
+      >
+        <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-transparent to-primary/5 blur-3xl" />
+        <div className="relative bg-surface border border-border rounded-2xl overflow-hidden">
+          {/* Header */}
+          <div className="bg-surface/80 border-b border-border px-6 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center">
+                <Robot size={20} className="text-primary" />
+              </div>
+              <div>
+                <h4 className="font-semibold text-textMain">Create AI Assistant</h4>
+                <p className="text-xs text-textMuted">Configure your custom agent</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="px-3 py-1 rounded-full bg-green-500/10 text-green-400 text-xs font-medium">Draft</span>
+            </div>
+          </div>
+          
+          {/* Builder Content */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-0">
+            {/* Left: Form Fields */}
+            <div className="p-6 space-y-5 border-r border-border">
+              {/* Name */}
+              <div>
+                <label className="block text-sm text-textMuted mb-2">Assistant Name</label>
+                <div className="bg-background border border-border rounded-xl px-4 py-3 text-textMain text-sm">
+                  Customer Support Agent
+                </div>
+              </div>
+              
+              {/* Voice Selection */}
+              <div>
+                <label className="block text-sm text-textMuted mb-2">Voice</label>
+                <div className="flex gap-2">
+                  {['Priya', 'Raj', 'Meera', 'Amit'].map((voice, i) => (
+                    <button
+                      key={voice}
+                      className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                        i === 0 
+                          ? 'bg-primary/20 border border-primary/30 text-primary' 
+                          : 'bg-background border border-border text-textMuted hover:border-primary/30'
+                      }`}
+                    >
+                      {voice}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              
+              {/* Language */}
+              <div>
+                <label className="block text-sm text-textMuted mb-2">Primary Language</label>
+                <div className="bg-background border border-border rounded-xl px-4 py-3 flex items-center justify-between">
+                  <span className="text-sm text-textMain">Hindi + English (Code-switching)</span>
+                  <Sliders size={16} className="text-textMuted" />
+                </div>
+              </div>
+              
+              {/* LLM */}
+              <div>
+                <label className="block text-sm text-textMuted mb-2">AI Model</label>
+                <div className="bg-background border border-border rounded-xl px-4 py-3 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Brain size={16} className="text-primary" />
+                    <span className="text-sm text-textMain">GPT-4o</span>
+                  </div>
+                  <span className="text-xs text-primary bg-primary/10 px-2 py-0.5 rounded-full">Recommended</span>
+                </div>
+              </div>
+            </div>
+            
+            {/* Right: System Prompt */}
+            <div className="p-6 bg-background/30">
+              <label className="block text-sm text-textMuted mb-2 flex items-center gap-2">
+                <Code size={14} />
+                System Prompt
+              </label>
+              <div className="bg-background border border-border rounded-xl p-4 font-mono text-xs leading-relaxed h-[200px] overflow-hidden">
+                <span className="text-primary">You are</span> <span className="text-amber-400">{'{assistant_name}'}</span>, a helpful customer support agent for <span className="text-amber-400">{'{company_name}'}</span>.<br/><br/>
+                <span className="text-textMuted">// Personality</span><br/>
+                - Be friendly and professional<br/>
+                - Speak in Hindi or English based on customer preference<br/>
+                - Use <span className="text-amber-400">{'{customer_name}'}</span> when greeting<br/><br/>
+                <span className="text-textMuted">// Knowledge</span><br/>
+                - Reference <span className="text-amber-400">{'{knowledge_base}'}</span> for product info<br/>
+                - Check <span className="text-amber-400">{'{order_status}'}</span> via API
+              </div>
+              
+              {/* Variable Pills */}
+              <div className="flex flex-wrap gap-2 mt-3">
+                {['{customer_name}', '{order_id}', '{company_name}'].map((v) => (
+                  <span key={v} className="px-2 py-1 bg-amber-500/10 text-amber-400 rounded-lg text-xs font-mono">
+                    {v}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </motion.div>
+
       {/* LLM Providers Bar */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}

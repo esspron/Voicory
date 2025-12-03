@@ -176,8 +176,54 @@ export function DemoSection() {
           </div>
         </div>
 
-        {/* Right: Use Cases */}
+        {/* Right: Use Cases with Image */}
         <div className="space-y-6">
+          {/* Phone Mockup Image */}
+          <div className="relative flex justify-center mb-6">
+            <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-transparent to-transparent blur-2xl" />
+            <div className="relative bg-surface border border-border rounded-[2.5rem] p-2 shadow-2xl shadow-black/40">
+              <div className="bg-background rounded-[2rem] overflow-hidden w-[200px]">
+                {/* Phone Notch */}
+                <div className="bg-background pt-2 pb-1 flex justify-center">
+                  <div className="w-20 h-5 bg-surface rounded-full" />
+                </div>
+                {/* Chat Screen */}
+                <div className="px-3 py-4 space-y-3 h-[300px]">
+                  <div className="flex gap-2 items-start">
+                    <div className="w-6 h-6 rounded-full bg-primary/20 flex-shrink-0 flex items-center justify-center">
+                      <Robot size={12} className="text-primary" />
+                    </div>
+                    <div className="bg-surface rounded-2xl rounded-tl-sm px-3 py-2 max-w-[140px]">
+                      <p className="text-[10px] text-textMain">Namaste! 🙏 How can I help you today?</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 items-start justify-end">
+                    <div className="bg-primary/20 rounded-2xl rounded-tr-sm px-3 py-2 max-w-[140px]">
+                      <p className="text-[10px] text-textMain">I want to check my order status</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 items-start">
+                    <div className="w-6 h-6 rounded-full bg-primary/20 flex-shrink-0 flex items-center justify-center">
+                      <Robot size={12} className="text-primary" />
+                    </div>
+                    <div className="bg-surface rounded-2xl rounded-tl-sm px-3 py-2 max-w-[140px]">
+                      <p className="text-[10px] text-textMain">Sure! Your order #12847 is out for delivery 📦</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 items-start justify-end">
+                    <div className="bg-primary/20 rounded-2xl rounded-tr-sm px-3 py-2 max-w-[140px]">
+                      <p className="text-[10px] text-textMain">धन्यवाद! 🎉</p>
+                    </div>
+                  </div>
+                </div>
+                {/* Phone Home Bar */}
+                <div className="pb-2 flex justify-center">
+                  <div className="w-24 h-1 bg-border rounded-full" />
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div>
             <h3 className="text-2xl font-bold text-textMain mb-2">Built for Real Business Use Cases</h3>
             <p className="text-textMuted">
