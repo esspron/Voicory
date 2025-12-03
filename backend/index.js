@@ -3,16 +3,24 @@
 // Production-Grade Multi-Million Dollar SaaS Architecture
 // ============================================
 
+// Early startup logging for Railway debugging
+console.log('🚀 Starting Voicory Backend...');
+console.log('   NODE_ENV:', process.env.NODE_ENV || 'not set');
+console.log('   Time:', new Date().toISOString());
+
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const hpp = require('hpp');
 const { createClient } = require('@supabase/supabase-js');
 
-// Load env in development
+// Load env in development (Railway sets NODE_ENV=production automatically)
 if (process.env.NODE_ENV !== 'production') {
     require('dotenv').config();
 }
+
+console.log('   SUPABASE_URL:', process.env.SUPABASE_URL ? '✓ set' : '✗ missing');
+console.log('   SUPABASE_KEY:', (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_KEY) ? '✓ set' : '✗ missing');
 
 // ============================================
 // SECURITY STACK
