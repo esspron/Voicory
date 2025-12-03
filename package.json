@@ -1,5 +1,9 @@
 {
   "devDependencies": {
     "opentype.js": "^1.3.4"
+  },
+  "dependencies": {
+    "@phosphor-icons/react": "^2.1.10",
+    "framer-motion": "^12.23.25"
   }
 }

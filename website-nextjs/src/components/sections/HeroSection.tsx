@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import Link from 'next/link'
 
 const SOUNDWAVE_COLORS = [
@@ -14,14 +14,16 @@ const SOUNDWAVE_COLORS = [
 ]
 
 function SoundwaveVisualization() {
-  const bars = Array.from({ length: 33 }, (_, i) => ({
-    id: i,
-    color: SOUNDWAVE_COLORS[Math.floor(Math.random() * SOUNDWAVE_COLORS.length)],
-    delay: Math.random() * 2,
-  }))
+  const bars = useMemo(() => 
+    Array.from({ length: 33 }, (_, i) => ({
+      id: i,
+      color: SOUNDWAVE_COLORS[Math.floor(Math.random() * SOUNDWAVE_COLORS.length)],
+      delay: Math.random() * 2,
+    })), 
+  [])
 
   return (
-    <div className="pointer-events-none h-[230px] w-full sm:h-[396px] flex items-center justify-center gap-3 overflow-hidden">
+    <div className="pointer-events-none h-[140px] w-full sm:h-[200px] flex items-center justify-center gap-2 sm:gap-3 overflow-hidden">
       {bars.map((bar) => (
         <div
           key={bar.id}
@@ -40,7 +42,7 @@ export function HeroSection() {
   const [isHovered, setIsHovered] = useState(false)
 
   return (
-    <section className="relative flex w-full flex-col gap-12 pt-24 md:pt-32 xl:pt-36 text-center">
+    <section className="relative flex w-full flex-col gap-5 pt-24 md:pt-28 text-center">
       {/* Dotted Background */}
       <div className="absolute inset-0 z-[-1] opacity-30">
         <div 
@@ -53,81 +55,54 @@ export function HeroSection() {
       </div>
 
       {/* Ambient Glow */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[600px] bg-primary/5 blur-[120px] rounded-full pointer-events-none" />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[500px] bg-primary/5 blur-[120px] rounded-full pointer-events-none" />
 
       {/* Main Heading */}
-      <h1 className="px-6 text-balance text-4xl leading-tight tracking-tight md:text-7xl md:leading-tight md:tracking-tighter xl:text-8xl xl:leading-tight font-bold">
-        <span>Voice AI agents</span>
+      <h1 className="px-6 text-balance text-3xl leading-tight tracking-tight md:text-5xl md:leading-tight md:tracking-tighter xl:text-6xl xl:leading-tight font-bold">
+        <span>AI Voice & Chat Agents</span>
         <br />
-        <span className="gradient-text">for India</span>
+        <span className="gradient-text">Built for India</span>
       </h1>
 
       {/* Subtitle */}
-      <p className="text-textMuted text-lg md:text-xl max-w-2xl mx-auto px-6">
-        Build intelligent voice assistants that speak Hindi, English, and 10+ Indian languages. 
-        Perfect for customer service, sales, and support automation.
+      <p className="text-textMuted text-base md:text-lg max-w-2xl mx-auto px-6">
+        Create intelligent AI assistants for phone calls and WhatsApp in Hindi, English & 10+ Indian languages. 
+        Pay-as-you-go pricing starting at ₹0.80/min.
       </p>
 
       {/* CTA Buttons */}
-      <div className="mx-auto flex w-full max-w-md flex-col items-center gap-3 px-6 pb-2 md:flex-row md:pb-14 xl:pb-2">
+      <div className="flex flex-col sm:flex-row items-center justify-center gap-3 px-6">
         <Link
           href="https://app.voicory.com/signup"
-          className="group flex w-full md:flex-1 text-center justify-center items-center font-medium rounded-full transition-all duration-300 font-mono uppercase active:scale-95 bg-primary hover:bg-primaryHover text-background h-14 px-5 py-2 gap-4 tracking-wider text-xs leading-5"
+          className="bg-primary hover:bg-primaryHover text-background px-6 py-3 rounded-full text-sm font-semibold transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-primary/25"
         >
-          <span>Get Started Free</span>
-          <span className="relative overflow-hidden">
-            <svg height="16" viewBox="0 0 8 16" width="8" xmlns="http://www.w3.org/2000/svg" fill="none" className="origin-center transition-transform duration-300 group-hover:translate-x-4">
-              <g clipPath="url(#clip0_hero)">
-                <circle cx="1" cy="2" fill="currentColor" r="1" />
-                <circle cx="4" cy="5" fill="currentColor" r="1" />
-                <circle cx="7" cy="8" fill="currentColor" r="1" />
-                <circle cx="4" cy="11" fill="currentColor" r="1" />
-                <circle cx="1" cy="14" fill="currentColor" r="1" />
-              </g>
-              <defs>
-                <clipPath id="clip0_hero">
-                  <rect fill="white" height="15" transform="translate(0 0.5)" width="8" />
-                </clipPath>
-              </defs>
-            </svg>
-          </span>
+          Start Free — ₹100 Credits
         </Link>
-
         <Link
           href="#demo"
-          className="group flex w-full md:flex-1 text-center justify-center items-center font-medium rounded-full transition-all duration-300 font-mono uppercase active:scale-95 bg-surface border border-border text-textMuted hover:text-textMain hover:border-textMuted h-14 px-5 py-2 gap-4 tracking-wider text-xs leading-5"
+          className="text-textMuted hover:text-textMain border border-border hover:border-textMuted px-6 py-3 rounded-full text-sm font-medium transition-all duration-200"
         >
-          <span>See Demo</span>
-          <svg height="16" viewBox="0 0 16 16" width="16" xmlns="http://www.w3.org/2000/svg" fill="none" className="origin-center transition-transform duration-300 group-hover:rotate-45">
-            <circle cx="6" cy="2" fill="currentColor" r="1" />
-            <circle cx="10" cy="2" fill="currentColor" r="1" />
-            <circle cx="2" cy="6" fill="currentColor" r="1" />
-            <circle cx="14" cy="6" fill="currentColor" r="1" />
-            <circle cx="2" cy="10" fill="currentColor" r="1" />
-            <circle cx="14" cy="10" fill="currentColor" r="1" />
-            <circle cx="6" cy="14" fill="currentColor" r="1" />
-            <circle cx="10" cy="14" fill="currentColor" r="1" />
-          </svg>
+          Watch Demo
         </Link>
       </div>
 
       {/* Soundwave Visualization */}
-      <div className="-mt-5 md:-mt-10 relative">
-        <div className="relative mx-auto min-h-[230px] w-full max-w-7xl sm:min-h-[396px]">
+      <div className="relative mt-2">
+        <div className="relative mx-auto min-h-[140px] w-full max-w-5xl sm:min-h-[200px]">
           <div className="absolute inset-0 grid place-items-center">
             {/* "Talk to Voicory" Button */}
             <div className="flex flex-col gap-4 relative z-10">
               <button
                 onMouseEnter={() => setIsHovered(true)}
                 onMouseLeave={() => setIsHovered(false)}
-                className="group flex text-center justify-center items-center rounded-full transition-all duration-300 uppercase active:scale-95 bg-textMain border border-border text-background hover:bg-background hover:border-textMain hover:text-textMain px-5 py-2 tracking-wider font-mono font-medium h-14 w-[13.5rem] gap-3 sm:h-24 sm:w-[23.3125rem] sm:gap-4 sm:text-xl relative after:absolute after:rounded-full after:border after:border-white/50 after:-inset-2 sm:after:-inset-3"
+                className="group flex text-center justify-center items-center rounded-full transition-all duration-300 uppercase active:scale-95 bg-textMain border border-border text-background hover:bg-background hover:border-textMain hover:text-textMain px-5 py-2 tracking-wider font-mono font-medium h-12 w-[11rem] gap-3 sm:h-16 sm:w-[16rem] sm:gap-4 sm:text-base relative after:absolute after:rounded-full after:border after:border-white/50 after:-inset-2 sm:after:-inset-3"
               >
-                <span className="relative grid text-nowrap">
+                <span className="relative grid text-nowrap text-xs sm:text-sm">
                   <span className={`col-start-1 row-start-1 block transition-opacity duration-250 ${isHovered ? 'opacity-0' : 'opacity-100'}`}>
                     Talk to Voicory
                   </span>
                   <span className={`col-start-1 row-start-1 transition-opacity duration-250 ${isHovered ? 'opacity-100' : 'opacity-0'}`}>
-                    Give it a Try
+                    Try Live Demo
                   </span>
                 </span>
               </button>
@@ -140,8 +115,25 @@ export function HeroSection() {
       </div>
 
       {/* Trust Badges */}
-      <div className="flex flex-wrap justify-center items-center gap-8 px-6 pb-12 opacity-50">
-        <span className="text-textMuted text-sm">Trusted by 500+ businesses in India</span>
+      <div className="flex flex-wrap justify-center items-center gap-4 sm:gap-6 px-6 pb-4">
+        <div className="flex items-center gap-2 text-textMuted text-xs sm:text-sm">
+          <svg className="w-4 h-4 text-primary" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+          </svg>
+          <span>No credit card required</span>
+        </div>
+        <div className="flex items-center gap-2 text-textMuted text-xs sm:text-sm">
+          <svg className="w-4 h-4 text-primary" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+          </svg>
+          <span>Setup in 5 minutes</span>
+        </div>
+        <div className="flex items-center gap-2 text-textMuted text-xs sm:text-sm">
+          <svg className="w-4 h-4 text-primary" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+          </svg>
+          <span>Works with Twilio & WhatsApp</span>
+        </div>
       </div>
     </section>
   )

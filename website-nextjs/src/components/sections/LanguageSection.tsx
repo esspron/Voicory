@@ -45,7 +45,7 @@ const features = [
 
 export function LanguageSection() {
   return (
-    <section id="languages" className="w-full max-w-7xl mx-auto px-6 md:px-8 py-24">
+    <section id="languages" className="w-full max-w-7xl mx-auto px-6 md:px-8 py-12 md:py-16">
       {/* Header */}
       <div className="text-center mb-16">
         <motion.div

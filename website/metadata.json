@@ -1,7 +1,0 @@
-{
-  "name": "Voicory Dashboard",
-  "description": "A Voicory Voice AI dashboard tailored for Indian users with multi-language support.",
-  "requestFramePermissions": [
-    "microphone"
-  ]
-}

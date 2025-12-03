@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useState } from 'react'
 import { List, X, CaretDown, ArrowRight } from '@phosphor-icons/react'
+import { VoicoryLogo } from './VoicoryLogo'
 
 const industries = [
   "Healthcare", "Financial Services", "Insurance", "Logistics", 
@@ -35,10 +36,7 @@ export function Navbar() {
         <div className="flex items-center justify-between">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center">
-              <span className="text-background font-bold text-xl">V</span>
-            </div>
-            <span className="text-xl font-bold text-textMain">Voicory</span>
+            <VoicoryLogo size="md" />
           </Link>
 
           {/* Desktop Nav */}

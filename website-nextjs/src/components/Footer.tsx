@@ -2,88 +2,88 @@
 
 import Link from 'next/link'
 import { 
-  GithubLogo, 
   LinkedinLogo, 
   TwitterLogo, 
   EnvelopeSimple,
-  Phone,
-  MapPin 
+  WhatsappLogo,
+  MapPin,
+  Lightning
 } from '@phosphor-icons/react'
+import { VoicoryLogo } from './VoicoryLogo'
 
 export function Footer() {
   const currentYear = new Date().getFullYear()
 
   const footerLinks = {
     product: [
-      { label: 'Features', href: '#features' },
+      { label: 'Voice Calls', href: '#demo' },
+      { label: 'WhatsApp Chatbot', href: '#demo' },
+      { label: 'Knowledge Base', href: '#customization' },
       { label: 'Pricing', href: '#pricing' },
-      { label: 'Demo', href: '#demo' },
-      { label: 'Voice Library', href: '/voices' },
     ],
-    company: [
-      { label: 'About Us', href: '/about' },
-      { label: 'Careers', href: '/careers' },
-      { label: 'Blog', href: '/blog' },
-      { label: 'Contact', href: '/contact' },
+    features: [
+      { label: 'Customer Memory', href: '#customization' },
+      { label: 'Multi-Language', href: '#languages' },
+      { label: 'Voice Library', href: '#customization' },
+      { label: 'Analytics', href: '#demo' },
+    ],
+    integrations: [
+      { label: 'Twilio', href: '#demo' },
+      { label: 'Vonage', href: '#demo' },
+      { label: 'WhatsApp Business', href: '#demo' },
+      { label: 'Custom SIP', href: '#demo' },
     ],
     legal: [
       { label: 'Privacy Policy', href: '/privacy' },
       { label: 'Terms of Service', href: '/terms' },
       { label: 'Refund Policy', href: '/refund' },
-      { label: 'Cookie Policy', href: '/cookies' },
-    ],
-    resources: [
-      { label: 'Documentation', href: '/docs' },
-      { label: 'API Reference', href: '/docs/api' },
-      { label: 'Status', href: 'https://status.voicory.com' },
-      { label: 'Support', href: '/support' },
     ],
   }
 
   return (
     <footer className="bg-surface border-t border-border">
-      <div className="max-w-7xl mx-auto px-6 py-16">
+      <div className="max-w-7xl mx-auto px-6 py-12">
         {/* Main Footer Content */}
-        <div className="grid grid-cols-2 md:grid-cols-6 gap-8 mb-12">
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-8 mb-10">
           {/* Brand Column */}
           <div className="col-span-2">
             <Link href="/" className="flex items-center gap-2 mb-4">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center">
-                <span className="text-background font-bold text-xl">V</span>
-              </div>
-              <span className="text-xl font-bold text-textMain">Voicory</span>
+              <VoicoryLogo size="md" />
             </Link>
-            <p className="text-textMuted text-sm mb-6 max-w-xs">
-              Build intelligent voice AI agents that speak Hindi, English, and 10+ Indian languages.
+            <p className="text-textMuted text-sm mb-5 max-w-xs">
+              AI voice & chat agents for India. Build intelligent assistants that handle calls and WhatsApp in Hindi, English & 10+ languages.
             </p>
             
             {/* Contact Info */}
             <div className="space-y-2 text-sm text-textMuted">
               <div className="flex items-center gap-2">
                 <EnvelopeSimple size={16} />
-                <a href="mailto:hello@voicory.com" className="hover:text-primary transition-colors">
-                  hello@voicory.com
-                </a>
-              </div>
-              <div className="flex items-center gap-2">
-                <Phone size={16} />
-                <a href="tel:+919876543210" className="hover:text-primary transition-colors">
-                  +91 98765 43210
+                <a href="mailto:support@voicory.com" className="hover:text-primary transition-colors">
+                  support@voicory.com
                 </a>
               </div>
               <div className="flex items-center gap-2">
                 <MapPin size={16} />
-                <span>Mumbai, India</span>
+                <span>India</span>
               </div>
             </div>
+
+            {/* CTA */}
+            <Link 
+              href="https://app.voicory.com/signup"
+              className="inline-flex items-center gap-2 mt-5 bg-primary/10 hover:bg-primary/20 text-primary px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+            >
+              <Lightning size={16} weight="fill" />
+              Start Free — ₹100 Credits
+            </Link>
           </div>
 
           {/* Product Links */}
           <div>
-            <h4 className="text-textMain font-semibold mb-4">Product</h4>
-            <ul className="space-y-3">
+            <h4 className="text-textMain font-semibold mb-4 text-sm">Product</h4>
+            <ul className="space-y-2.5">
               {footerLinks.product.map((link) => (
-                <li key={link.href}>
+                <li key={link.label}>
                   <Link href={link.href} className="text-textMuted hover:text-primary transition-colors text-sm">
                     {link.label}
                   </Link>
@@ -92,12 +92,12 @@ export function Footer() {
             </ul>
           </div>
 
-          {/* Company Links */}
+          {/* Features Links */}
           <div>
-            <h4 className="text-textMain font-semibold mb-4">Company</h4>
-            <ul className="space-y-3">
-              {footerLinks.company.map((link) => (
-                <li key={link.href}>
+            <h4 className="text-textMain font-semibold mb-4 text-sm">Features</h4>
+            <ul className="space-y-2.5">
+              {footerLinks.features.map((link) => (
+                <li key={link.label}>
                   <Link href={link.href} className="text-textMuted hover:text-primary transition-colors text-sm">
                     {link.label}
                   </Link>
@@ -106,12 +106,12 @@ export function Footer() {
             </ul>
           </div>
 
-          {/* Resources Links */}
+          {/* Integrations Links */}
           <div>
-            <h4 className="text-textMain font-semibold mb-4">Resources</h4>
-            <ul className="space-y-3">
-              {footerLinks.resources.map((link) => (
-                <li key={link.href}>
+            <h4 className="text-textMain font-semibold mb-4 text-sm">Integrations</h4>
+            <ul className="space-y-2.5">
+              {footerLinks.integrations.map((link) => (
+                <li key={link.label}>
                   <Link href={link.href} className="text-textMuted hover:text-primary transition-colors text-sm">
                     {link.label}
                   </Link>
@@ -122,10 +122,10 @@ export function Footer() {
 
           {/* Legal Links */}
           <div>
-            <h4 className="text-textMain font-semibold mb-4">Legal</h4>
-            <ul className="space-y-3">
+            <h4 className="text-textMain font-semibold mb-4 text-sm">Legal</h4>
+            <ul className="space-y-2.5">
               {footerLinks.legal.map((link) => (
-                <li key={link.href}>
+                <li key={link.label}>
                   <Link href={link.href} className="text-textMuted hover:text-primary transition-colors text-sm">
                     {link.label}
                   </Link>
@@ -136,18 +136,19 @@ export function Footer() {
         </div>
 
         {/* Bottom Bar */}
-        <div className="border-t border-border pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
+        <div className="border-t border-border pt-6 flex flex-col md:flex-row items-center justify-between gap-4">
           <p className="text-textMuted text-sm">
-            © {currentYear} Voicory. All rights reserved.
+            © {currentYear} Voicory. Made with ❤️ in India.
           </p>
           
           {/* Social Links */}
           <div className="flex items-center gap-4">
             <a
-              href="https://twitter.com/voicory"
+              href="https://twitter.com/voicoryai"
               target="_blank"
               rel="noopener noreferrer"
               className="text-textMuted hover:text-primary transition-colors"
+              aria-label="Twitter"
             >
               <TwitterLogo size={20} weight="fill" />
             </a>
@@ -156,16 +157,18 @@ export function Footer() {
               target="_blank"
               rel="noopener noreferrer"
               className="text-textMuted hover:text-primary transition-colors"
+              aria-label="LinkedIn"
             >
               <LinkedinLogo size={20} weight="fill" />
             </a>
             <a
-              href="https://github.com/voicory"
+              href="https://wa.me/919876543210"
               target="_blank"
               rel="noopener noreferrer"
               className="text-textMuted hover:text-primary transition-colors"
+              aria-label="WhatsApp"
             >
-              <GithubLogo size={20} weight="fill" />
+              <WhatsappLogo size={20} weight="fill" />
             </a>
           </div>
         </div>

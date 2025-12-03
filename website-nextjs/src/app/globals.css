@@ -2,6 +2,15 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Ahsing Font for Logo */
+@font-face {
+  font-family: 'Ahsing';
+  src: url('/fonts/typogama-ahsing.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   --background: #0E0E13;
   --surface: #131319;
@@ -69,7 +78,7 @@ html {
     height: 12px;
   }
   50% {
-    height: 80px;
+    height: 60px;
   }
 }
 
@@ -79,21 +88,22 @@ html {
       height: 12px;
     }
     50% {
-      height: 140px;
+      height: 100px;
     }
   }
 }
 
 .soundwave-bar {
-  width: 20px;
+  width: 16px;
   height: 12px;
   border-radius: 6px;
-  animation: soundwave 1.5s ease-in-out infinite;
+  animation: soundwave 1.2s ease-in-out infinite;
+  will-change: height;
 }
 
 @media (min-width: 640px) {
   .soundwave-bar {
-    width: 32px;
+    width: 24px;
   }
 }
 

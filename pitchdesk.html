@@ -1,0 +1,1101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voicory - Investor Pitch Deck</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --secondary: #8b5cf6;
+            --accent: #ec4899;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --dark: #0f172a;
+            --dark-2: #1e293b;
+            --dark-3: #334155;
+            --light: #f8fafc;
+            --light-2: #e2e8f0;
+        }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--dark);
+            color: var(--light);
+            overflow-x: hidden;
+        }
+        .deck-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+        }
+        .slide {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transform: translateX(100%);
+            transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+            padding: 4rem;
+        }
+        .slide.active {
+            opacity: 1;
+            transform: translateX(0);
+        }
+        .slide.prev {
+            transform: translateX(-100%);
+        }
+        .slide-content {
+            max-width: 1200px;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+        /* Navigation */
+        .nav {
+            position: fixed;
+            bottom: 2rem;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 0.5rem;
+            z-index: 1000;
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(20px);
+            padding: 1rem 1.5rem;
+            border-radius: 2rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .nav-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.3);
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .nav-dot.active {
+            background: var(--primary);
+            width: 30px;
+            border-radius: 5px;
+        }
+        .nav-dot:hover {
+            background: rgba(255, 255, 255, 0.5);
+        }
+        /* Slide 1: Cover */
+        .cover-slide {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            position: relative;
+            overflow: hidden;
+        }
+        .cover-slide::before {
+            content: '';
+            position: absolute;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px);
+            background-size: 50px 50px;
+            animation: moveGrid 20s linear infinite;
+        }
+        @keyframes moveGrid {
+            0% { transform: translate(0, 0); }
+            100% { transform: translate(50px, 50px); }
+        }
+        .cover-content {
+            position: relative;
+            z-index: 1;
+            text-align: center;
+        }
+        .logo {
+            font-size: 4rem;
+            font-weight: 900;
+            background: linear-gradient(to right, #fff, #e0e7ff);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            color: transparent;
+            margin-bottom: 1rem;
+        }
+        .tagline {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            line-height: 1.2;
+        }
+        .subtitle {
+            font-size: 1.5rem;
+            opacity: 0.9;
+            font-weight: 400;
+            margin-bottom: 3rem;
+        }
+        .stat-row {
+            display: flex;
+            gap: 3rem;
+            justify-content: center;
+            margin-top: 4rem;
+        }
+        .stat {
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 3rem;
+            font-weight: 800;
+            color: #fbbf24;
+        }
+        .stat-label {
+            font-size: 1rem;
+            opacity: 0.8;
+            margin-top: 0.5rem;
+        }
+        /* Section Headers */
+        .section-header {
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--primary);
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+        h1 {
+            font-size: 3.5rem;
+            font-weight: 800;
+            margin-bottom: 2rem;
+            line-height: 1.1;
+        }
+        h2 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+        }
+        /* Problem Slide */
+        .problem-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+        .problem-card {
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(220, 38, 38, 0.05));
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            border-radius: 1.5rem;
+            padding: 2rem;
+            position: relative;
+            overflow: hidden;
+        }
+        .problem-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(to right, #ef4444, #dc2626);
+        }
+        .problem-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+        .problem-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 0.75rem;
+        }
+        .problem-desc {
+            opacity: 0.8;
+            line-height: 1.6;
+        }
+        .problem-stat {
+            font-size: 2.5rem;
+            font-weight: 800;
+            color: #fbbf24;
+            margin-top: 1rem;
+        }
+        /* Solution Slide */
+        .solution-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1.5rem;
+            margin-top: 2rem;
+        }
+        .solution-card {
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(79, 70, 229, 0.05));
+            border: 1px solid rgba(99, 102, 241, 0.2);
+            border-radius: 1.5rem;
+            padding: 2rem;
+            text-align: center;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        .solution-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px rgba(99, 102, 241, 0.3);
+        }
+        .solution-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+        .solution-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 0.75rem;
+        }
+        .solution-desc {
+            opacity: 0.8;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+        /* Market Slide */
+        .market-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 3rem;
+            margin-top: 2rem;
+            height: 500px;
+        }
+        .chart-container {
+            position: relative;
+            background: rgba(30, 41, 59, 0.5);
+            border-radius: 1.5rem;
+            padding: 2rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .market-stats {
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+        }
+        .market-stat {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(5, 150, 105, 0.05));
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            border-radius: 1rem;
+            padding: 1.5rem;
+        }
+        .market-stat-value {
+            font-size: 2.5rem;
+            font-weight: 800;
+            color: #10b981;
+            margin-bottom: 0.5rem;
+        }
+        .market-stat-label {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+        /* Traction Slide */
+        .timeline {
+            position: relative;
+            margin-top: 3rem;
+        }
+        .timeline-item {
+            display: flex;
+            gap: 2rem;
+            margin-bottom: 3rem;
+            position: relative;
+        }
+        .timeline-marker {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 1.25rem;
+            flex-shrink: 0;
+        }
+        .timeline-content {
+            flex: 1;
+            background: rgba(30, 41, 59, 0.5);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .timeline-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+        .timeline-metric {
+            font-size: 2rem;
+            font-weight: 800;
+            color: #fbbf24;
+            margin: 0.5rem 0;
+        }
+        /* Team Slide */
+        .team-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+        .team-card {
+            background: rgba(30, 41, 59, 0.5);
+            border-radius: 1.5rem;
+            padding: 2rem;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .team-avatar {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            margin: 0 auto 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 3rem;
+            font-weight: 700;
+        }
+        .team-name {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+        .team-role {
+            color: var(--primary);
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+        .team-bio {
+            opacity: 0.8;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+        /* Financial Slide */
+        .financial-grid {
+            display: grid;
+            grid-template-columns: 1.2fr 1fr;
+            gap: 2rem;
+            margin-top: 2rem;
+            height: 500px;
+        }
+        .projection-table {
+            background: rgba(30, 41, 59, 0.5);
+            border-radius: 1.5rem;
+            padding: 2rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            overflow: auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        th {
+            color: var(--primary);
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 0.85rem;
+            letter-spacing: 1px;
+        }
+        td {
+            font-weight: 600;
+        }
+        .highlight {
+            color: #10b981;
+            font-weight: 800;
+            font-size: 1.1rem;
+        }
+        /* Investment Ask Slide */
+        .ask-container {
+            text-align: center;
+            padding: 3rem;
+        }
+        .ask-amount {
+            font-size: 5rem;
+            font-weight: 900;
+            background: linear-gradient(to right, #fbbf24, #f59e0b);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            color: transparent;
+            margin: 2rem 0;
+        }
+        .valuation {
+            font-size: 2rem;
+            opacity: 0.9;
+            margin-bottom: 3rem;
+        }
+        .use-of-funds {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 2rem;
+            margin-top: 3rem;
+        }
+        .fund-item {
+            background: rgba(30, 41, 59, 0.5);
+            border-radius: 1rem;
+            padding: 2rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .fund-percentage {
+            font-size: 3rem;
+            font-weight: 800;
+            color: var(--primary);
+        }
+        .fund-label {
+            font-size: 1.1rem;
+            margin-top: 0.5rem;
+            opacity: 0.9;
+        }
+        .fund-amount {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #fbbf24;
+            margin-top: 0.5rem;
+        }
+        /* Contact Slide */
+        .contact-content {
+            text-align: center;
+        }
+        .contact-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 2rem;
+            margin-top: 3rem;
+        }
+        .contact-card {
+            background: rgba(30, 41, 59, 0.5);
+            border-radius: 1.5rem;
+            padding: 2.5rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .contact-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+        .contact-info {
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+        /* Controls */
+        .controls {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            display: flex;
+            gap: 1rem;
+            z-index: 1000;
+        }
+        .btn {
+            background: rgba(99, 102, 241, 0.8);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.75rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .btn:hover {
+            background: rgba(99, 102, 241, 1);
+            transform: translateY(-2px);
+        }
+        /* Animations */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .animate-in {
+            animation: fadeInUp 0.6s ease-out forwards;
+        }
+        /* Responsive */
+        @media (max-width: 768px) {
+            .slide {
+                padding: 2rem;
+            }
+            h1 {
+                font-size: 2rem;
+            }
+            .problem-grid,
+            .solution-grid,
+            .market-container,
+            .financial-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        /* Print Styles */
+        @media print {
+            .nav, .controls {
+                display: none;
+            }
+            .slide {
+                position: relative;
+                page-break-after: always;
+                opacity: 1 !important;
+                transform: none !important;
+                height: 100vh;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="deck-container" id="deck">
+    <!-- Slide 1: Cover -->
+    <div class="slide cover-slide active">
+        <div class="cover-content">
+            <div class="logo">Voicory</div>
+            <div class="tagline">AI Voice Agents for Every Business</div>
+            <div class="subtitle">Automate customer calls with human-like AI conversations</div>
+            <div class="stat-row">
+                <div class="stat">
+                    <div class="stat-value">$15B+</div>
+                    <div class="stat-label">Market Opportunity</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">10x</div>
+                    <div class="stat-label">Cost Savings</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">24/7</div>
+                    <div class="stat-label">Availability</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 2: Problem -->
+    <div class="slide">
+        <div class="slide-content">
+            <div class="section-header">The Problem</div>
+            <h1>Businesses Are Losing Customers Every Day</h1>
+            <div class="problem-grid">
+                <div class="problem-card">
+                    <div class="problem-icon">📞</div>
+                    <div class="problem-title">Missed Calls = Lost Revenue</div>
+                    <div class="problem-desc">80% of callers won't leave a voicemail, and 85% won't call back if their first call goes unanswered.</div>
+                    <div class="problem-stat">$75B/year</div>
+                </div>
+                <div class="problem-card">
+                    <div class="problem-icon">💸</div>
+                    <div class="problem-title">High Labor Costs</div>
+                    <div class="problem-desc">Average call center agent costs $35,000-$50,000/year with high turnover rates of 30-45%.</div>
+                    <div class="problem-stat">45% Turnover</div>
+                </div>
+                <div class="problem-card">
+                    <div class="problem-icon">⏰</div>
+                    <div class="problem-title">Limited Availability</div>
+                    <div class="problem-desc">Customers expect 24/7 support, but staffing around the clock is prohibitively expensive for SMBs.</div>
+                    <div class="problem-stat">24/7 Expected</div>
+                </div>
+                <div class="problem-card">
+                    <div class="problem-icon">📉</div>
+                    <div class="problem-title">Inconsistent Quality</div>
+                    <div class="problem-desc">Human agents have bad days, get tired, and provide inconsistent customer experiences.</div>
+                    <div class="problem-stat">40% Variance</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 3: Solution -->
+    <div class="slide">
+        <div class="slide-content">
+            <div class="section-header">Our Solution</div>
+            <h1>AI Voice Agents That Sound Human</h1>
+            <div class="solution-grid">
+                <div class="solution-card">
+                    <div class="solution-icon">🤖</div>
+                    <div class="solution-title">Natural Conversations</div>
+                    <div class="solution-desc">Advanced LLM-powered agents that understand context, handle interruptions, and respond naturally.</div>
+                </div>
+                <div class="solution-card">
+                    <div class="solution-icon">⚡</div>
+                    <div class="solution-title">Instant Setup</div>
+                    <div class="solution-desc">Deploy a fully trained AI agent in minutes. No coding required. Just describe your business.</div>
+                </div>
+                <div class="solution-card">
+                    <div class="solution-icon">🌐</div>
+                    <div class="solution-title">Multi-Channel</div>
+                    <div class="solution-desc">Voice calls, WhatsApp, web chat - all from one platform with unified analytics.</div>
+                </div>
+                <div class="solution-card">
+                    <div class="solution-icon">🧠</div>
+                    <div class="solution-title">Custom Knowledge</div>
+                    <div class="solution-desc">Train on your documents, FAQs, and business processes. The AI knows your business.</div>
+                </div>
+                <div class="solution-card">
+                    <div class="solution-icon">📊</div>
+                    <div class="solution-title">Real-time Analytics</div>
+                    <div class="solution-desc">Track every conversation, measure sentiment, and get actionable insights.</div>
+                </div>
+                <div class="solution-card">
+                    <div class="solution-icon">🔗</div>
+                    <div class="solution-title">Seamless Integration</div>
+                    <div class="solution-desc">Connect to your CRM, calendar, and business tools with one-click integrations.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 4: Market -->
+    <div class="slide">
+        <div class="slide-content">
+            <div class="section-header">Market Opportunity</div>
+            <h1>A Massive & Growing Market</h1>
+            <div class="market-container">
+                <div class="chart-container">
+                    <canvas id="marketChart"></canvas>
+                </div>
+                <div class="market-stats">
+                    <div class="market-stat">
+                        <div class="market-stat-value">$15.7B</div>
+                        <div class="market-stat-label">Global Conversational AI Market by 2028</div>
+                    </div>
+                    <div class="market-stat">
+                        <div class="market-stat-value">22.6%</div>
+                        <div class="market-stat-label">CAGR (2023-2028)</div>
+                    </div>
+                    <div class="market-stat">
+                        <div class="market-stat-value">33M+</div>
+                        <div class="market-stat-label">SMBs in India alone</div>
+                    </div>
+                    <div class="market-stat">
+                        <div class="market-stat-value">$2.1B</div>
+                        <div class="market-stat-label">India TAM by 2026</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 5: Traction -->
+    <div class="slide">
+        <div class="slide-content">
+            <div class="section-header">Traction & Milestones</div>
+            <h1>Early But Growing Fast</h1>
+            <div class="timeline">
+                <div class="timeline-item">
+                    <div class="timeline-marker">Q3</div>
+                    <div class="timeline-content">
+                        <div class="timeline-title">Product Development</div>
+                        <div class="timeline-metric">MVP Complete</div>
+                        <div class="problem-desc">Built core voice AI platform with natural conversation capabilities</div>
+                    </div>
+                </div>
+                <div class="timeline-item">
+                    <div class="timeline-marker">Q4</div>
+                    <div class="timeline-content">
+                        <div class="timeline-title">Beta Launch</div>
+                        <div class="timeline-metric">50+ Beta Users</div>
+                        <div class="problem-desc">Onboarded initial customers across healthcare, real estate, and e-commerce</div>
+                    </div>
+                </div>
+                <div class="timeline-item">
+                    <div class="timeline-marker">Q1</div>
+                    <div class="timeline-content">
+                        <div class="timeline-title">Commercial Launch</div>
+                        <div class="timeline-metric">₹5L MRR Target</div>
+                        <div class="problem-desc">Full public launch with self-serve onboarding and pricing tiers</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 6: Business Model -->
+    <div class="slide">
+        <div class="slide-content">
+            <div class="section-header">Business Model</div>
+            <h1>SaaS + Usage-Based Pricing</h1>
+            <div class="solution-grid">
+                <div class="solution-card">
+                    <div class="solution-icon">🎯</div>
+                    <div class="solution-title">Starter</div>
+                    <div class="solution-desc">₹2,999/month<br>500 minutes included<br>1 AI Agent<br>Basic analytics</div>
+                </div>
+                <div class="solution-card">
+                    <div class="solution-icon">🚀</div>
+                    <div class="solution-title">Professional</div>
+                    <div class="solution-desc">₹9,999/month<br>2,000 minutes included<br>5 AI Agents<br>Advanced analytics & integrations</div>
+                </div>
+                <div class="solution-card">
+                    <div class="solution-icon">🏢</div>
+                    <div class="solution-title">Enterprise</div>
+                    <div class="solution-desc">Custom pricing<br>Unlimited minutes<br>Unlimited agents<br>Custom integrations & SLA</div>
+                </div>
+            </div>
+            <div class="stat-row" style="margin-top: 3rem;">
+                <div class="stat">
+                    <div class="stat-value">85%</div>
+                    <div class="stat-label">Gross Margin</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">$500</div>
+                    <div class="stat-label">Avg. ACV (Year 1)</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">120%</div>
+                    <div class="stat-label">Net Revenue Retention Target</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 7: Team -->
+    <div class="slide">
+        <div class="slide-content">
+            <div class="section-header">The Team</div>
+            <h1>Built by Builders</h1>
+            <div class="team-grid">
+                <div class="team-card">
+                    <div class="team-avatar">VV</div>
+                    <div class="team-name">Vishwas Verma</div>
+                    <div class="team-role">Founder & CEO</div>
+                    <div class="team-bio">Full-stack developer with experience in AI/ML and SaaS. Previously built and scaled multiple products.</div>
+                </div>
+                <div class="team-card">
+                    <div class="team-avatar">+</div>
+                    <div class="team-name">Hiring</div>
+                    <div class="team-role">CTO / Co-founder</div>
+                    <div class="team-bio">Looking for a technical co-founder with deep experience in voice AI, NLP, or real-time systems.</div>
+                </div>
+                <div class="team-card">
+                    <div class="team-avatar">+</div>
+                    <div class="team-name">Hiring</div>
+                    <div class="team-role">Head of Growth</div>
+                    <div class="team-bio">Looking for growth leader with B2B SaaS experience and strong SMB GTM expertise.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 8: Financials -->
+    <div class="slide">
+        <div class="slide-content">
+            <div class="section-header">Financial Projections</div>
+            <h1>Path to Profitability</h1>
+            <div class="financial-grid">
+                <div class="projection-table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Metric</th>
+                                <th>Year 1</th>
+                                <th>Year 2</th>
+                                <th>Year 3</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Customers</td>
+                                <td>100</td>
+                                <td>500</td>
+                                <td class="highlight">2,000</td>
+                            </tr>
+                            <tr>
+                                <td>ARR</td>
+                                <td>₹50L</td>
+                                <td>₹3Cr</td>
+                                <td class="highlight">₹15Cr</td>
+                            </tr>
+                            <tr>
+                                <td>Gross Margin</td>
+                                <td>75%</td>
+                                <td>82%</td>
+                                <td class="highlight">85%</td>
+                            </tr>
+                            <tr>
+                                <td>Team Size</td>
+                                <td>5</td>
+                                <td>15</td>
+                                <td class="highlight">40</td>
+                            </tr>
+                            <tr>
+                                <td>Net Burn</td>
+                                <td>₹1.5Cr</td>
+                                <td>₹80L</td>
+                                <td class="highlight">Profitable</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="chart-container">
+                    <canvas id="revenueChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 9: Investment Ask -->
+    <div class="slide">
+        <div class="slide-content">
+            <div class="ask-container">
+                <div class="section-header">Investment Ask</div>
+                <h1>Join Us in Building the Future of Business Communication</h1>
+                <div class="ask-amount">₹2.5 Crore</div>
+                <div class="valuation">Pre-money valuation: ₹10 Crore</div>
+                <div class="use-of-funds">
+                    <div class="fund-item">
+                        <div class="fund-percentage">50%</div>
+                        <div class="fund-label">Product & Engineering</div>
+                        <div class="fund-amount">₹1.25 Cr</div>
+                    </div>
+                    <div class="fund-item">
+                        <div class="fund-percentage">35%</div>
+                        <div class="fund-label">Sales & Marketing</div>
+                        <div class="fund-amount">₹87.5L</div>
+                    </div>
+                    <div class="fund-item">
+                        <div class="fund-percentage">15%</div>
+                        <div class="fund-label">Operations & Buffer</div>
+                        <div class="fund-amount">₹37.5L</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 10: Contact -->
+    <div class="slide">
+        <div class="slide-content contact-content">
+            <div class="section-header">Let's Talk</div>
+            <h1>Ready to Transform Customer Communication?</h1>
+            <div class="contact-grid">
+                <div class="contact-card">
+                    <div class="contact-icon">📧</div>
+                    <div class="contact-info">hello@voicory.com</div>
+                </div>
+                <div class="contact-card">
+                    <div class="contact-icon">🌐</div>
+                    <div class="contact-info">www.voicory.com</div>
+                </div>
+                <div class="contact-card">
+                    <div class="contact-icon">📱</div>
+                    <div class="contact-info">Schedule a Demo</div>
+                </div>
+            </div>
+            <div style="margin-top: 4rem;">
+                <div class="logo" style="font-size: 3rem;">Voicory</div>
+                <div class="subtitle" style="margin-top: 1rem; opacity: 0.7;">AI Voice Agents for Every Business</div>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="nav" id="nav"></div>
+<div class="controls">
+    <button class="btn" onclick="prevSlide()">← Previous</button>
+    <button class="btn" onclick="nextSlide()">Next →</button>
+    <button class="btn" onclick="window.print()">📄 Print</button>
+</div>
+<script>
+    // Slide navigation
+    let currentSlide = 0;
+    const slides = document.querySelectorAll('.slide');
+    const totalSlides = slides.length;
+
+    // Initialize navigation dots
+    function initNav() {
+        const nav = document.getElementById('nav');
+        nav.innerHTML = '';
+        for (let i = 0; i < totalSlides; i++) {
+            const dot = document.createElement('div');
+            dot.className = 'nav-dot' + (i === 0 ? ' active' : '');
+            dot.onclick = () => goToSlide(i);
+            nav.appendChild(dot);
+        }
+    }
+
+    function updateNav() {
+        const dots = document.querySelectorAll('.nav-dot');
+        dots.forEach((dot, i) => {
+            dot.classList.toggle('active', i === currentSlide);
+        });
+    }
+
+    function goToSlide(index) {
+        if (index < 0 || index >= totalSlides || index === currentSlide) return;
+
+        slides[currentSlide].classList.remove('active');
+        slides[currentSlide].classList.add(index > currentSlide ? 'prev' : '');
+
+        currentSlide = index;
+
+        slides.forEach((slide, i) => {
+            slide.classList.remove('active', 'prev');
+            if (i === currentSlide) {
+                slide.classList.add('active');
+            } else if (i < currentSlide) {
+                slide.classList.add('prev');
+            }
+        });
+
+        updateNav();
+        initCharts();
+    }
+
+    function nextSlide() {
+        if (currentSlide < totalSlides - 1) {
+            goToSlide(currentSlide + 1);
+        }
+    }
+
+    function prevSlide() {
+        if (currentSlide > 0) {
+            goToSlide(currentSlide - 1);
+        }
+    }
+
+    // Keyboard navigation
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowRight' || e.key === ' ') {
+            nextSlide();
+        } else if (e.key === 'ArrowLeft') {
+            prevSlide();
+        }
+    });
+
+    // Touch support
+    let touchStartX = 0;
+    let touchEndX = 0;
+
+    document.addEventListener('touchstart', (e) => {
+        touchStartX = e.changedTouches[0].screenX;
+    });
+
+    document.addEventListener('touchend', (e) => {
+        touchEndX = e.changedTouches[0].screenX;
+        handleSwipe();
+    });
+
+    function handleSwipe() {
+        const swipeThreshold = 50;
+        const diff = touchStartX - touchEndX;
+        if (Math.abs(diff) > swipeThreshold) {
+            if (diff > 0) {
+                nextSlide();
+            } else {
+                prevSlide();
+            }
+        }
+    }
+
+    // Charts
+    let marketChart = null;
+    let revenueChart = null;
+
+    function initCharts() {
+        // Market Chart
+        const marketCanvas = document.getElementById('marketChart');
+        if (marketCanvas && currentSlide === 3) {
+            if (marketChart) marketChart.destroy();
+            const ctx = marketCanvas.getContext('2d');
+            marketChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['2023', '2024', '2025', '2026', '2027', '2028'],
+                    datasets: [{
+                        label: 'Market Size ($B)',
+                        data: [5.4, 6.8, 8.5, 10.6, 13.2, 15.7],
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        pointBackgroundColor: '#10b981',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2,
+                        pointRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: '#f8fafc',
+                                font: { size: 14 }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                            ticks: { color: '#f8fafc' }
+                        },
+                        x: {
+                            grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                            ticks: { color: '#f8fafc' }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Revenue Chart
+        const revenueCanvas = document.getElementById('revenueChart');
+        if (revenueCanvas && currentSlide === 7) {
+            if (revenueChart) revenueChart.destroy();
+            const ctx = revenueCanvas.getContext('2d');
+            revenueChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Year 1', 'Year 2', 'Year 3'],
+                    datasets: [{
+                        label: 'ARR (₹ Lakhs)',
+                        data: [50, 300, 1500],
+                        backgroundColor: ['rgba(99, 102, 241, 0.7)', 'rgba(139, 92, 246, 0.7)', 'rgba(16, 185, 129, 0.7)'],
+                        borderColor: ['#6366f1', '#8b5cf6', '#10b981'],
+                        borderWidth: 2,
+                        borderRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: '#f8fafc',
+                                font: { size: 14 }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                            ticks: { color: '#f8fafc' }
+                        },
+                        x: {
+                            grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                            ticks: { color: '#f8fafc' }
+                        }
+                    }
+                }
+            });
+        }
+    }
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', () => {
+        initNav();
+        initCharts();
+    });
+</script>
+</body>
+</html>
