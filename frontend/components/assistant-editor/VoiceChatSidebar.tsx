@@ -1,6 +1,6 @@
 import {
-    Robot, X, Trash, Microphone, MicrophoneSlash, Phone, PhoneDisconnect,
-    SpeakerHigh, SpeakerSlash, Warning, CircleNotch, Waveform, Stop
+    Robot, X, Microphone, MicrophoneSlash, Phone, PhoneDisconnect,
+    SpeakerHigh, SpeakerSlash, Warning, CircleNotch, Waveform
 } from '@phosphor-icons/react';
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 
@@ -138,6 +138,10 @@ const VoiceChatSidebar: React.FC<VoiceChatSidebarProps> = ({
     const audioChunksRef = useRef<Blob[]>([]);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const streamRef = useRef<MediaStream | null>(null);
+    const analyserRef = useRef<AnalyserNode | null>(null);
+    const audioContextRef = useRef<AudioContext | null>(null);
+    const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
+    const hasSpokenRef = useRef<boolean>(false);
 
     // Scroll to bottom
     const scrollToBottom = () => {
@@ -251,7 +255,14 @@ const VoiceChatSidebar: React.FC<VoiceChatSidebarProps> = ({
         setCurrentPlayingId(null);
     }, []);
 
-    // Internal start recording (doesn't check isConnected to avoid circular dependency)
+    // VAD Configuration
+    const VAD_CONFIG = {
+        silenceThreshold: 0.01, // Volume threshold for silence detection
+        silenceDuration: 1500, // ms of silence before auto-stop
+        minSpeechDuration: 500, // minimum ms of speech before considering it valid
+    };
+
+    // Internal start recording with VAD (Voice Activity Detection)
     const startRecordingInternal = async () => {
         if (isRecording || isPlaying) return;
 
@@ -259,11 +270,22 @@ const VoiceChatSidebar: React.FC<VoiceChatSidebarProps> = ({
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             streamRef.current = stream;
 
+            // Set up audio analysis for VAD
+            const audioContext = new AudioContext();
+            audioContextRef.current = audioContext;
+            const analyser = audioContext.createAnalyser();
+            analyser.fftSize = 256;
+            analyserRef.current = analyser;
+            const source = audioContext.createMediaStreamSource(stream);
+            source.connect(analyser);
+
             const mediaRecorder = new MediaRecorder(stream, {
                 mimeType: 'audio/webm;codecs=opus'
             });
 
             audioChunksRef.current = [];
+            hasSpokenRef.current = false;
+            let speechStartTime: number | null = null;
 
             mediaRecorder.ondataavailable = (event) => {
                 if (event.data.size > 0) {
@@ -272,16 +294,87 @@ const VoiceChatSidebar: React.FC<VoiceChatSidebarProps> = ({
             };
 
             mediaRecorder.onstop = async () => {
-                if (audioChunksRef.current.length > 0) {
+                // Clean up audio context
+                if (audioContextRef.current) {
+                    audioContextRef.current.close();
+                    audioContextRef.current = null;
+                }
+                if (silenceTimerRef.current) {
+                    clearTimeout(silenceTimerRef.current);
+                    silenceTimerRef.current = null;
+                }
+                
+                if (audioChunksRef.current.length > 0 && hasSpokenRef.current) {
                     const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
                     await processVoiceInput(audioBlob);
+                } else if (!hasSpokenRef.current) {
+                    // No speech detected, restart listening
+                    setTranscription('No speech detected...');
+                    setTimeout(() => {
+                        setTranscription('');
+                        if (isConnected && !isPlaying && !isProcessing) {
+                            startRecordingInternal();
+                        }
+                    }, 1000);
                 }
             };
 
+            // Start VAD monitoring
+            const dataArray = new Uint8Array(analyser.frequencyBinCount);
+            
+            const checkAudioLevel = () => {
+                if (!analyserRef.current || !mediaRecorderRef.current || mediaRecorderRef.current.state !== 'recording') {
+                    return;
+                }
+
+                analyserRef.current.getByteFrequencyData(dataArray);
+                const average = dataArray.reduce((a, b) => a + b, 0) / dataArray.length / 255;
+                
+                if (average > VAD_CONFIG.silenceThreshold) {
+                    // Voice detected
+                    if (!speechStartTime) {
+                        speechStartTime = Date.now();
+                    }
+                    
+                    // Clear silence timer
+                    if (silenceTimerRef.current) {
+                        clearTimeout(silenceTimerRef.current);
+                        silenceTimerRef.current = null;
+                    }
+                    
+                    // Mark as spoken if speech duration is sufficient
+                    if (Date.now() - speechStartTime > VAD_CONFIG.minSpeechDuration) {
+                        hasSpokenRef.current = true;
+                        setTranscription('Listening...');
+                    }
+                } else if (hasSpokenRef.current && !silenceTimerRef.current) {
+                    // Silence detected after speech - start silence timer
+                    setTranscription('Processing...');
+                    silenceTimerRef.current = setTimeout(() => {
+                        // Auto-stop recording after silence
+                        if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+                            mediaRecorderRef.current.stop();
+                            if (streamRef.current) {
+                                streamRef.current.getTracks().forEach((track) => track.stop());
+                                streamRef.current = null;
+                            }
+                            setIsRecording(false);
+                        }
+                    }, VAD_CONFIG.silenceDuration);
+                }
+
+                // Continue monitoring
+                requestAnimationFrame(checkAudioLevel);
+            };
+
             mediaRecorderRef.current = mediaRecorder;
-            mediaRecorder.start();
+            mediaRecorder.start(100); // Collect data every 100ms
             setIsRecording(true);
             setTranscription('Listening...');
+            
+            // Start VAD
+            checkAudioLevel();
+            
         } catch (err) {
             console.error('Failed to start recording:', err);
             setError('Microphone access denied. Please allow microphone access.');
@@ -358,28 +451,37 @@ const VoiceChatSidebar: React.FC<VoiceChatSidebarProps> = ({
             streamRef.current.getTracks().forEach((track) => track.stop());
             streamRef.current = null;
         }
+        if (audioContextRef.current) {
+            audioContextRef.current.close();
+            audioContextRef.current = null;
+        }
+        if (silenceTimerRef.current) {
+            clearTimeout(silenceTimerRef.current);
+            silenceTimerRef.current = null;
+        }
         setIsConnected(false);
         setIsRecording(false);
         setTranscription('');
         setCallState('idle');
+        setMessages([]);
     };
 
-    // Public start recording
-    const startRecording = () => {
-        if (!isConnected) return;
-        startRecordingInternal();
-        setCallState('listening');
-    };
-
-    // Stop recording
+    // Stop recording (used internally and for cleanup)
     const stopRecording = () => {
+        if (silenceTimerRef.current) {
+            clearTimeout(silenceTimerRef.current);
+            silenceTimerRef.current = null;
+        }
         if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
             mediaRecorderRef.current.stop();
-            // Stop the stream tracks
-            if (streamRef.current) {
-                streamRef.current.getTracks().forEach((track) => track.stop());
-                streamRef.current = null;
-            }
+        }
+        if (streamRef.current) {
+            streamRef.current.getTracks().forEach((track) => track.stop());
+            streamRef.current = null;
+        }
+        if (audioContextRef.current) {
+            audioContextRef.current.close();
+            audioContextRef.current = null;
         }
         setIsRecording(false);
     };
@@ -540,13 +642,6 @@ const VoiceChatSidebar: React.FC<VoiceChatSidebarProps> = ({
         }
     };
 
-    // Clear conversation
-    const handleClear = () => {
-        stopAudio();
-        setMessages([]);
-        setError(null);
-    };
-
     const formatTime = (date: Date) => {
         return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     };
@@ -607,26 +702,17 @@ const VoiceChatSidebar: React.FC<VoiceChatSidebarProps> = ({
                 </div>
                 <div className="flex items-center gap-2">
                     {isConnected && (
-                        <>
-                            <button
-                                onClick={() => setIsMuted(!isMuted)}
-                                className={`p-2 rounded-lg transition-colors ${
-                                    isMuted
-                                        ? 'bg-red-500/20 text-red-400'
-                                        : 'text-textMuted hover:text-textMain hover:bg-surface'
-                                }`}
-                                title={isMuted ? 'Unmute' : 'Mute'}
-                            >
-                                {isMuted ? <SpeakerSlash size={16} /> : <SpeakerHigh size={16} />}
-                            </button>
-                            <button
-                                onClick={handleClear}
-                                className="p-2 text-textMuted hover:text-textMain hover:bg-surface rounded-lg transition-colors"
-                                title="Clear chat"
-                            >
-                                <Trash size={16} />
-                            </button>
-                        </>
+                        <button
+                            onClick={() => setIsMuted(!isMuted)}
+                            className={`p-2 rounded-lg transition-colors ${
+                                isMuted
+                                    ? 'bg-red-500/20 text-red-400'
+                                    : 'text-textMuted hover:text-textMain hover:bg-surface'
+                            }`}
+                            title={isMuted ? 'Unmute' : 'Mute'}
+                        >
+                            {isMuted ? <SpeakerSlash size={16} /> : <SpeakerHigh size={16} />}
+                        </button>
                     )}
                     <button
                         onClick={onClose}
@@ -841,61 +927,55 @@ const VoiceChatSidebar: React.FC<VoiceChatSidebarProps> = ({
                             <div ref={messagesEndRef} />
                         </div>
 
-                        {/* Bottom Controls */}
-                        <div className="flex-shrink-0 p-4 border-t border-white/5 bg-surface/50">
-                            <div className="flex items-center justify-center gap-6">
-                                {/* Mute Button */}
-                                <button
-                                    onClick={() => setIsMuted(!isMuted)}
-                                    className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${
-                                        isMuted
-                                            ? 'bg-red-500/20 text-red-400'
-                                            : 'bg-surface border border-white/10 text-textMain hover:border-white/20'
-                                    }`}
-                                >
-                                    {isMuted ? <MicrophoneSlash size={20} /> : <Microphone size={20} />}
-                                </button>
-
-                                {/* Main Record/Stop Button */}
-                                <button
-                                    onClick={isRecording ? stopRecording : startRecording}
-                                    disabled={isProcessing || isPlaying}
-                                    className={`w-16 h-16 rounded-full flex items-center justify-center transition-all ${
-                                        isRecording
-                                            ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30'
-                                            : isProcessing || isPlaying
-                                            ? 'bg-surface border border-white/10 text-textMuted cursor-not-allowed'
-                                            : 'bg-surface border-2 border-emerald-500 text-emerald-500 hover:bg-emerald-500/10'
-                                    }`}
-                                >
-                                    {isRecording ? (
-                                        <Stop size={28} weight="fill" />
-                                    ) : isProcessing ? (
-                                        <CircleNotch size={28} className="animate-spin" />
-                                    ) : isPlaying ? (
-                                        <SpeakerHigh size={28} className="animate-pulse" />
-                                    ) : (
-                                        <Microphone size={28} weight="fill" />
-                                    )}
-                                </button>
-
-                                {/* End Call Button */}
+                        {/* Bottom Controls - Single Hang Up Button */}
+                        <div className="flex-shrink-0 p-6 border-t border-white/5 bg-surface/50">
+                            <div className="flex items-center justify-center">
+                                {/* End Call Button - The only button needed */}
                                 <button
                                     onClick={handleDisconnect}
-                                    className="w-12 h-12 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-colors shadow-lg shadow-red-500/30"
+                                    className="w-16 h-16 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-all hover:scale-105 shadow-lg shadow-red-500/30"
                                 >
-                                    <PhoneDisconnect size={20} weight="fill" />
+                                    <PhoneDisconnect size={28} weight="fill" />
+                                </button>
+                            </div>
+
+                            {/* Status indicators */}
+                            <div className="flex items-center justify-center gap-4 mt-4">
+                                {/* Mute indicator */}
+                                <button
+                                    onClick={() => setIsMuted(!isMuted)}
+                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs transition-all ${
+                                        isMuted
+                                            ? 'bg-red-500/20 text-red-400'
+                                            : 'bg-surface/50 text-textMuted hover:text-textMain'
+                                    }`}
+                                >
+                                    {isMuted ? <MicrophoneSlash size={14} /> : <Microphone size={14} />}
+                                    {isMuted ? 'Muted' : 'Mic On'}
+                                </button>
+                                
+                                {/* Speaker indicator */}
+                                <button
+                                    onClick={() => setIsMuted(!isMuted)}
+                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs transition-all ${
+                                        isMuted
+                                            ? 'bg-red-500/20 text-red-400'
+                                            : 'bg-surface/50 text-textMuted hover:text-textMain'
+                                    }`}
+                                >
+                                    {isMuted ? <SpeakerSlash size={14} /> : <SpeakerHigh size={14} />}
+                                    {isMuted ? 'Speaker Off' : 'Speaker On'}
                                 </button>
                             </div>
 
                             <p className="text-[10px] text-textMuted text-center mt-3">
                                 {isRecording
-                                    ? '🎤 Recording... Tap to stop'
+                                    ? '🎤 Listening... (auto-detects when you stop)'
                                     : isPlaying
                                     ? '🔊 Assistant speaking...'
                                     : isProcessing
-                                    ? '⏳ Processing your message...'
-                                    : '🎤 Tap microphone to speak'}
+                                    ? '⏳ Processing...'
+                                    : '🎤 Speak naturally - auto-detects your voice'}
                             </p>
                         </div>
                     </div>
