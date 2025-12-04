@@ -326,6 +326,18 @@ const RealtimeVoiceChat: React.FC<RealtimeVoiceChatProps> = ({
         setCallState('connecting');
         setError(null);
 
+        // CRITICAL: Pre-initialize playback AudioContext during user interaction
+        // This prevents "AudioContext was not allowed to start" errors
+        // Browser autoplay policy requires user gesture to start AudioContext
+        if (!playbackContextRef.current || playbackContextRef.current.state === 'closed') {
+            playbackContextRef.current = new AudioContext();
+            console.log('[RealtimeVoice] 🔊 Pre-initialized playback AudioContext on user click');
+        }
+        if (playbackContextRef.current.state === 'suspended') {
+            await playbackContextRef.current.resume();
+            console.log('[RealtimeVoice] 🔊 Resumed playback AudioContext');
+        }
+
         try {
             // Step 1: Create session via REST API
             const response = await authFetch('/api/voice-stream/session', {
