@@ -42,9 +42,12 @@ const V4_CONFIG = {
     temperature: 0.7,
     
     // Sentence buffering for TTS
-    minSentenceLength: 20,    // Don't TTS tiny fragments
-    maxSentenceLength: 150,   // Don't wait too long
-    sentenceDelimiters: /[.!?।,;:]/,  // Include comma for faster chunks
+    // FIXED: Only split on sentence-ending punctuation, NOT commas
+    minSentenceLength: 30,    // Wait for longer chunks to avoid tiny fragments
+    maxSentenceLength: 200,   // Don't wait too long
+    // Only split on actual sentence endings (period, exclamation, question)
+    // NOT on commas, semicolons, or colons which can break mid-sentence
+    sentenceDelimiters: /[.!?।]+\s*/,
     
     // Conversation
     maxConversationHistory: 6,
@@ -513,7 +516,23 @@ class RealtimeVoiceSessionV4 {
             let fullResponse = '';
             let sentenceBuffer = '';
             let firstAudioSent = false;
-            let ttsPromises = [];
+            
+            // TTS queue - process sentences in ORDER, not parallel
+            const ttsQueue = [];
+            let ttsProcessing = false;
+
+            // Process TTS queue sequentially
+            const processTTSQueue = async () => {
+                if (ttsProcessing || ttsQueue.length === 0) return;
+                ttsProcessing = true;
+                
+                while (ttsQueue.length > 0 && !ttsAbort.aborted) {
+                    const { sentence, isFirst } = ttsQueue.shift();
+                    await this.streamTTSChunk(sentence, ttsAbort, isFirst, turnStart);
+                }
+                
+                ttsProcessing = false;
+            };
 
             // Build messages for LLM
             const messages = [
@@ -565,15 +584,17 @@ class RealtimeVoiceSessionV4 {
                     if (sentence) {
                         console.log(`[V4] 📝 Sentence ready: "${sentence.substring(0, 50)}..."`);
 
-                        // Start TTS immediately (don't await!)
-                        const ttsPromise = this.streamTTSChunk(sentence, ttsAbort, !firstAudioSent, turnStart);
-                        ttsPromises.push(ttsPromise);
-
+                        // Queue for sequential TTS (not parallel!)
+                        ttsQueue.push({ sentence, isFirst: !firstAudioSent });
+                        
                         if (!firstAudioSent) {
                             // Start speaking state on first chunk
                             this.setState('speaking');
                             firstAudioSent = true;
                         }
+                        
+                        // Start processing queue (non-blocking)
+                        processTTSQueue();
                     }
                 }
             }
@@ -585,12 +606,14 @@ class RealtimeVoiceSessionV4 {
 
             // Handle remaining buffer
             if (sentenceBuffer.trim() && !ttsAbort.aborted) {
-                const ttsPromise = this.streamTTSChunk(sentenceBuffer.trim(), ttsAbort, !firstAudioSent, turnStart);
-                ttsPromises.push(ttsPromise);
+                ttsQueue.push({ sentence: sentenceBuffer.trim(), isFirst: !firstAudioSent });
+                processTTSQueue();
             }
 
-            // Wait for all TTS to complete
-            await Promise.all(ttsPromises);
+            // Wait for TTS queue to finish
+            while ((ttsQueue.length > 0 || ttsProcessing) && !ttsAbort.aborted) {
+                await new Promise(resolve => setTimeout(resolve, 50));
+            }
 
             if (!ttsAbort.aborted) {
                 // Record full response
