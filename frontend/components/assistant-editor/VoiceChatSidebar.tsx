@@ -330,8 +330,14 @@ const VoiceChatSidebar: React.FC<VoiceChatSidebarProps> = ({
 
     // Internal start recording with VAD (Voice Activity Detection)
     const startRecordingInternal = async () => {
-        console.log('[RECORD] startRecordingInternal called, isRecording:', isRecording, 'isPlaying:', isPlaying);
-        if (isRecording || isPlaying) {
+        // Check using refs for current state to avoid stale closure issues
+        const currentlyRecording = mediaRecorderRef.current?.state === 'recording';
+        const currentlyPlaying = audioRef.current && !audioRef.current.paused;
+        
+        console.log('[RECORD] startRecordingInternal called');
+        console.log('[RECORD] State check - recording:', currentlyRecording, 'playing:', currentlyPlaying, 'isRecording:', isRecording, 'isPlaying:', isPlaying);
+        
+        if (currentlyRecording || currentlyPlaying) {
             console.log('[RECORD] Skipping - already recording or playing');
             return;
         }
