@@ -161,11 +161,12 @@ const RealtimeVoiceChat: React.FC<RealtimeVoiceChatProps> = ({
     selectedVoice,
     onClose
 }) => {
-    // VAD Configuration
+    // VAD Configuration - Tuned for professional call quality
     const VAD_CONFIG = {
-        silenceThreshold: 0.015,    // RMS threshold for speech detection
-        silenceDuration: 1200,      // ms of silence before processing
-        minSpeechDuration: 300,     // ms of speech required
+        silenceThreshold: 0.02,     // RMS threshold (slightly higher to avoid false triggers)
+        silenceDuration: 800,       // ms of silence before processing (faster response)
+        minSpeechDuration: 200,     // ms of speech required (faster detection)
+        interruptThreshold: 0.03,   // Higher threshold for barge-in during TTS
     };
 
     // State
@@ -177,26 +178,36 @@ const RealtimeVoiceChat: React.FC<RealtimeVoiceChatProps> = ({
     const [audioLevel, setAudioLevel] = useState(0);
     const [transcription, setTranscription] = useState('');
     const [isSpeechDetected, setIsSpeechDetected] = useState(false);
+    const [isPlayingAudio, setIsPlayingAudio] = useState(false);
 
     // Refs
     const wsRef = useRef<WebSocket | null>(null);
     const audioContextRef = useRef<AudioContext | null>(null);
+    const playbackContextRef = useRef<AudioContext | null>(null); // Separate context for playback
     const analyserRef = useRef<AnalyserNode | null>(null);
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const streamRef = useRef<MediaStream | null>(null);
     const audioQueueRef = useRef<AudioBuffer[]>([]);
     const isPlayingRef = useRef(false);
+    const currentSourceRef = useRef<AudioBufferSourceNode | null>(null); // Track current audio source for interruption
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const callStateRef = useRef<CallState>('idle'); // Ref for VAD to access current state
     
     // VAD refs
     const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
     const speechStartTimeRef = useRef<number | null>(null);
     const hasSpokenRef = useRef(false);
+    const vadFrameRef = useRef<number | null>(null); // Track VAD animation frame
 
     // Scroll to bottom
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
+
+    // Keep callStateRef in sync for VAD access
+    useEffect(() => {
+        callStateRef.current = callState;
+    }, [callState]);
 
     // Cleanup on unmount
     useEffect(() => {
@@ -424,10 +435,8 @@ const RealtimeVoiceChat: React.FC<RealtimeVoiceChatProps> = ({
         const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
 
         const checkVAD = () => {
-            if (!analyserRef.current || !wsRef.current) return;
-            if (callState !== 'listening') {
-                // Keep monitoring but don't process VAD during other states
-                requestAnimationFrame(checkVAD);
+            if (!analyserRef.current || !wsRef.current) {
+                vadFrameRef.current = null;
                 return;
             }
 
@@ -442,6 +451,35 @@ const RealtimeVoiceChat: React.FC<RealtimeVoiceChatProps> = ({
             const rms = Math.sqrt(sum / dataArray.length);
             setAudioLevel(rms);
 
+            const currentState = callStateRef.current;
+            
+            // BARGE-IN: Detect user speech during assistant speaking
+            if (currentState === 'speaking' && isPlayingRef.current) {
+                const isBargeIn = rms > VAD_CONFIG.interruptThreshold;
+                if (isBargeIn) {
+                    console.log('[VAD] BARGE-IN detected! User interrupting assistant');
+                    // Immediately stop playback and send interrupt
+                    stopAudioPlayback();
+                    if (wsRef.current?.readyState === WebSocket.OPEN) {
+                        wsRef.current.send(JSON.stringify({ type: 'interrupt' }));
+                    }
+                    // Start tracking user speech
+                    speechStartTimeRef.current = Date.now();
+                    hasSpokenRef.current = false;
+                    setIsSpeechDetected(true);
+                }
+                vadFrameRef.current = requestAnimationFrame(checkVAD);
+                return;
+            }
+
+            // During processing, just update visuals but don't trigger VAD logic
+            if (currentState === 'processing') {
+                setIsSpeechDetected(rms > VAD_CONFIG.silenceThreshold);
+                vadFrameRef.current = requestAnimationFrame(checkVAD);
+                return;
+            }
+
+            // Normal VAD during listening state
             const isSpeaking = rms > VAD_CONFIG.silenceThreshold;
             setIsSpeechDetected(isSpeaking);
 
@@ -484,13 +522,19 @@ const RealtimeVoiceChat: React.FC<RealtimeVoiceChatProps> = ({
                 }, VAD_CONFIG.silenceDuration);
             }
 
-            requestAnimationFrame(checkVAD);
+            vadFrameRef.current = requestAnimationFrame(checkVAD);
         };
 
-        checkVAD();
+        vadFrameRef.current = requestAnimationFrame(checkVAD);
     };
 
     const stopMicrophone = () => {
+        // Cancel VAD animation frame
+        if (vadFrameRef.current) {
+            cancelAnimationFrame(vadFrameRef.current);
+            vadFrameRef.current = null;
+        }
+
         // Clear VAD timer
         if (silenceTimerRef.current) {
             clearTimeout(silenceTimerRef.current);
@@ -522,12 +566,12 @@ const RealtimeVoiceChat: React.FC<RealtimeVoiceChatProps> = ({
 
     const handleAudioData = async (arrayBuffer: ArrayBuffer) => {
         try {
-            // Create audio context if needed
-            if (!audioContextRef.current || audioContextRef.current.state === 'closed') {
-                audioContextRef.current = new AudioContext();
+            // Use separate playback context to avoid conflicts with recording
+            if (!playbackContextRef.current || playbackContextRef.current.state === 'closed') {
+                playbackContextRef.current = new AudioContext();
             }
 
-            const audioContext = audioContextRef.current;
+            const audioContext = playbackContextRef.current;
 
             // Decode audio data
             const audioBuffer = await audioContext.decodeAudioData(arrayBuffer.slice(0));
@@ -548,19 +592,24 @@ const RealtimeVoiceChat: React.FC<RealtimeVoiceChatProps> = ({
     const playNextInQueue = async () => {
         if (audioQueueRef.current.length === 0) {
             isPlayingRef.current = false;
+            setIsPlayingAudio(false);
+            currentSourceRef.current = null;
             return;
         }
 
         isPlayingRef.current = true;
+        setIsPlayingAudio(true);
         const audioBuffer = audioQueueRef.current.shift()!;
 
-        if (!audioContextRef.current) return;
+        if (!playbackContextRef.current) return;
 
-        const source = audioContextRef.current.createBufferSource();
+        const source = playbackContextRef.current.createBufferSource();
         source.buffer = audioBuffer;
-        source.connect(audioContextRef.current.destination);
+        source.connect(playbackContextRef.current.destination);
+        currentSourceRef.current = source;
 
         source.onended = () => {
+            currentSourceRef.current = null;
             playNextInQueue();
         };
 
@@ -568,9 +617,32 @@ const RealtimeVoiceChat: React.FC<RealtimeVoiceChatProps> = ({
     };
 
     const stopAudioPlayback = () => {
+        console.log('[Audio] Stopping playback (barge-in)');
+        
+        // Stop current audio source immediately
+        if (currentSourceRef.current) {
+            try {
+                currentSourceRef.current.stop();
+            } catch (e) {
+                // Source might have already ended
+            }
+            currentSourceRef.current = null;
+        }
+        
+        // Clear queue
         audioQueueRef.current = [];
         isPlayingRef.current = false;
+        setIsPlayingAudio(false);
     };
+
+    // Close playback context on unmount
+    useEffect(() => {
+        return () => {
+            if (playbackContextRef.current) {
+                playbackContextRef.current.close().catch(() => {});
+            }
+        };
+    }, []);
 
     // ============================================
     // USER ACTIONS
@@ -789,9 +861,9 @@ const RealtimeVoiceChat: React.FC<RealtimeVoiceChatProps> = ({
 
                             {/* State Text */}
                             <p className="text-sm text-textMuted mt-2">
-                                {callState === 'speaking' && 'Assistant speaking...'}
-                                {callState === 'listening' && (isSpeechDetected ? '🎤 Voice detected...' : 'Listening...')}
-                                {callState === 'processing' && 'Processing...'}
+                                {callState === 'speaking' && (isPlayingAudio ? '🔊 Assistant speaking...' : 'Generating response...')}
+                                {callState === 'listening' && (isSpeechDetected ? '🎤 Voice detected...' : '👂 Listening...')}
+                                {callState === 'processing' && '⏳ Processing...'}
                             </p>
 
                             {/* Live Transcription */}

@@ -16,14 +16,14 @@ const { transcribe } = require('./stt');
 
 const REALTIME_CONFIG = {
     // Voice Activity Detection
-    vadSilenceMs: 800,          // Silence before processing speech
+    vadSilenceMs: 600,          // Reduced for faster response
     vadMinSpeechMs: 100,        // Minimum speech duration
     
     // Audio processing
     sampleRate: 16000,          // 16kHz for STT
     chunkSizeMs: 100,           // Audio chunk size
     
-    // TTS streaming chunk size (characters)
+    // TTS streaming - sentence-by-sentence for lower latency
     ttsChunkSize: 100,          // Send to TTS every N characters
     
     // Interruption
@@ -193,26 +193,25 @@ class RealtimeVoiceSession {
     async processAudio(audioData) {
         if (this.isEnded || this.isMuted) return;
 
-        // Just accumulate audio - VAD is handled by browser
+        // Accumulate audio - VAD is handled by browser
         this.audioBuffer.push(audioData);
         
-        // Interrupt if assistant is speaking and we receive audio
-        if (this.state === 'speaking' && REALTIME_CONFIG.interruptOnSpeech) {
-            console.log('[RealtimeVoice] Interrupt detected - user speaking');
-            this.interrupt();
-            this.setState('listening');
+        // Log periodically for debugging
+        if (this.audioBuffer.length % 50 === 0) {
+            console.log(`[RealtimeVoice] Audio buffer: ${this.audioBuffer.length} chunks`);
         }
     }
 
-    // Called when browser detects speech ended (via VAD)
+    // Called when browser detects speech ended (via VAD) or barge-in interrupt
     async onSpeechEnd() {
         if (this.isEnded) return;
         if (this.audioBuffer.length === 0) {
             console.log('[RealtimeVoice] speech_end received but no audio buffered');
+            this.setState('listening');
             return;
         }
 
-        console.log(`[RealtimeVoice] speech_end - Processing ${this.audioBuffer.length} audio chunks`);
+        console.log(`[RealtimeVoice] 🎤 speech_end - Processing ${this.audioBuffer.length} audio chunks`);
         await this.processCollectedAudio();
     }
 
@@ -397,15 +396,16 @@ class RealtimeVoiceSession {
     }
 
     // ============================================
-    // INTERRUPTION
+    // INTERRUPTION (BARGE-IN)
     // ============================================
 
     interrupt() {
-        console.log('[RealtimeVoice] Interrupting');
+        console.log('[RealtimeVoice] ⚡ BARGE-IN - Interrupting current response');
         
-        // Abort current TTS
+        // Abort current TTS generation
         if (this.currentTTSAbort) {
             this.currentTTSAbort.aborted = true;
+            console.log('[RealtimeVoice] TTS generation aborted');
         }
 
         // Clear audio buffer
@@ -413,6 +413,11 @@ class RealtimeVoiceSession {
         
         // Clear TTS queue
         this.ttsQueue = [];
+
+        // If we were speaking, switch back to listening
+        if (this.state === 'speaking') {
+            this.setState('listening');
+        }
     }
 
     // ============================================
