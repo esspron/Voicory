@@ -188,7 +188,12 @@ function setupWebSocket(server) {
                 },
                 onAudio: (audioChunk) => {
                     // Send binary audio data (streaming chunks!)
-                    ws.send(audioChunk);
+                    if (audioChunk && audioChunk.length > 0) {
+                        console.log(`[VoiceStreamV4] 🔊 Sending audio: ${audioChunk.length} bytes`);
+                        ws.send(audioChunk);
+                    } else {
+                        console.warn('[VoiceStreamV4] ⚠️ Empty audio chunk received');
+                    }
                 },
                 onStateChange: (state) => {
                     ws.send(JSON.stringify({

@@ -117,14 +117,20 @@ async function streamElevenLabsTTS(text, voiceId, settings = {}, onChunk) {
  * Google doesn't have true streaming, but we can parallelize
  */
 async function streamGoogleTTS(text, voiceId, languageCode, languageVoiceCodes, onChunk) {
+    console.log(`[V4 Google TTS] Synthesizing: "${text.substring(0, 50)}..." voiceId=${voiceId}`);
     const result = await synthesizeWithVoiceId(text, voiceId, languageCode);
     
     if (result.success) {
         const audioBuffer = Buffer.from(result.audioContent, 'base64');
-        if (onChunk) onChunk(audioBuffer);
+        console.log(`[V4 Google TTS] ✅ Got audio: ${audioBuffer.length} bytes`);
+        if (onChunk) {
+            console.log(`[V4 Google TTS] 📤 Calling onChunk callback`);
+            onChunk(audioBuffer);
+        }
         return audioBuffer;
     }
     
+    console.error(`[V4 Google TTS] ❌ Failed:`, result.error);
     throw new Error(result.error || 'Google TTS failed');
 }
 
@@ -653,12 +659,14 @@ class RealtimeVoiceSessionV4 {
             } else {
                 // Google TTS (or fallback)
                 const languageCode = this.getLanguageCode();
+                console.log(`[V4] 🔊 Using Google TTS for chunk`);
                 audioBuffer = await streamGoogleTTS(
                     text,
                     this.resolvedConfig.voiceId,
                     languageCode,
                     this.voiceConfig?.language_voice_codes,
                     (chunk) => {
+                        console.log(`[V4] 📤 streamTTSChunk onChunk callback: ${chunk.length} bytes`);
                         if (!abortController.aborted) {
                             this.onAudio(chunk);
                         }
@@ -697,6 +705,7 @@ class RealtimeVoiceSessionV4 {
         this.ttsAbort = abortController;
 
         try {
+            console.log(`[V4] 🔊 speakText: "${text.substring(0, 50)}..."`);
             const result = await synthesizeWithVoiceId(
                 text,
                 this.resolvedConfig.voiceId,
@@ -705,7 +714,10 @@ class RealtimeVoiceSessionV4 {
 
             if (!abortController.aborted && result.success) {
                 const audioBuffer = Buffer.from(result.audioContent, 'base64');
+                console.log(`[V4] 📤 Sending first message audio: ${audioBuffer.length} bytes`);
                 this.onAudio(audioBuffer);
+            } else if (!result.success) {
+                console.error('[V4] ❌ speakText TTS failed:', result.error);
             }
         } catch (error) {
             if (!abortController.aborted) {
