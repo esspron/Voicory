@@ -11,7 +11,7 @@
 const WebSocket = require('ws');
 const { openai } = require('../config');
 const { getCachedAssistant } = require('./assistant');
-const { synthesizeWithVoiceId, getVoiceById } = require('../routes/tts');
+const { synthesizeWithVoiceId, getVoiceConfig, getTTSOptimizedSystemPrompt } = require('./tts');
 
 // ============================================
 // CONFIGURATION
@@ -168,19 +168,30 @@ class WebRTCVoiceSession {
 
         this.resolvedConfig = config;
         
-        // Load voice config
+        // Load voice config and apply TTS-optimized prompts for Google voices
         if (config.voiceId) {
-            this.voiceConfig = await getVoiceById(config.voiceId);
+            this.voiceConfig = await getVoiceConfig(config.voiceId);
             console.log('[WebRTC] Voice:', { 
-                provider: this.voiceConfig?.provider, 
+                provider: this.voiceConfig?.tts_provider, 
                 voiceId: this.voiceConfig?.provider_voice_id 
             });
+            
+            // If using Google TTS, enhance system prompt for TTS-optimized output
+            if (this.voiceConfig?.tts_provider === 'google') {
+                const languageCode = this.resolvedConfig.languageSettings?.primary || 'en-IN';
+                this.resolvedConfig.systemPrompt = getTTSOptimizedSystemPrompt(
+                    config.systemPrompt || 'You are a helpful assistant.',
+                    { languageCode }
+                );
+                console.log('[WebRTC] 🎯 Applied TTS-optimized system prompt for Google Chirp 3 HD');
+            }
         }
 
         console.log('[WebRTC] Config:', {
             name: config.name,
             voiceId: config.voiceId,
             llmModel: config.llmModel,
+            voiceProvider: this.voiceConfig?.tts_provider,
         });
     }
 

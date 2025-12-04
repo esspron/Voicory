@@ -22,7 +22,7 @@
 
 const { getCachedAssistant } = require('./assistant');
 const { RealtimeSTTSession } = require('./realtimeSTT');
-const { synthesizeWithVoiceId, getVoiceConfig, synthesizeElevenLabs } = require('./tts');
+const { synthesizeWithVoiceId, getVoiceConfig, synthesizeElevenLabs, getTTSOptimizedSystemPrompt } = require('./tts');
 const OpenAI = require('openai');
 const axios = require('axios');
 
@@ -440,6 +440,16 @@ class RealtimeVoiceSessionV4 {
                 provider: this.voiceConfig?.tts_provider,
                 voiceId: this.voiceConfig?.provider_voice_id,
             });
+            
+            // Apply TTS-optimized system prompt for Google Chirp 3 HD voices
+            if (this.voiceConfig?.tts_provider === 'google') {
+                const languageCode = this.resolvedConfig?.languageSettings?.default || 'en-IN';
+                this.resolvedConfig.systemPrompt = getTTSOptimizedSystemPrompt(
+                    this.resolvedConfig.systemPrompt || 'You are a helpful assistant.',
+                    { languageCode }
+                );
+                console.log('[V4] 🎯 Applied TTS-optimized system prompt for Google Chirp 3 HD');
+            }
         }
     }
 

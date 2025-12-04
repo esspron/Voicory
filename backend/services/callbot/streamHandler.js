@@ -6,7 +6,7 @@
 const WebSocket = require('ws');
 const { transcribeStream } = require('../stt');
 const { processMessage } = require('../assistantProcessor');
-const { synthesizeWithVoiceId } = require('../tts');
+const { synthesizeWithVoiceId, getVoiceConfig, getTTSOptimizedSystemPrompt } = require('../tts');
 const { getCachedPhoneConfig, getCachedAssistant } = require('../assistant');
 const { supabase } = require('../../config');
 
@@ -64,11 +64,22 @@ class CallSession {
                     .eq('id', this.assistant.voice_id)
                     .single();
                 this.voice = voice;
+                
+                // Apply TTS-optimized system prompt for Google Chirp 3 HD voices
+                if (voice?.tts_provider === 'google') {
+                    const languageCode = this.assistant.language_settings?.default || 'en-IN';
+                    this.assistant.system_prompt = getTTSOptimizedSystemPrompt(
+                        this.assistant.system_prompt || 'You are a helpful assistant.',
+                        { languageCode }
+                    );
+                    console.log(`[CallSession] 🎯 Applied TTS-optimized prompt for Google Chirp 3 HD`);
+                }
             }
 
             console.log(`[CallSession] Initialized for call ${this.callSid}`, {
                 assistant: this.assistant.name,
-                voice: this.voice?.name || 'default'
+                voice: this.voice?.name || 'default',
+                voiceProvider: this.voice?.tts_provider
             });
 
             return true;

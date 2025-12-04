@@ -63,58 +63,55 @@ async function synthesize(options) {
 }
 
 // ============================================
-// GOOGLE CLOUD TTS - Chirp 3 HD
+// GOOGLE CLOUD TTS - Chirp 3 HD (Official SDK)
 // ============================================
 
-async function synthesizeGoogle(text, voiceName, languageCode, languageVoiceCodes = {}) {
-    if (!GOOGLE_TTS_API_KEY) {
-        return { success: false, error: 'GOOGLE_TTS_API_KEY not configured' };
-    }
+// Import enhanced Chirp 3 HD module using official @google-cloud/text-to-speech SDK
+const { 
+    synthesizeChirp3HD, 
+    formatTextForChirp3,
+    getTTSOptimizedSystemPrompt: chirp3GetTTSOptimizedSystemPrompt,
+    CHIRP3_HD_CONFIG 
+} = require('./googleChirp3HD');
+
+async function synthesizeGoogle(text, voiceName, languageCode, languageVoiceCodes = {}, options = {}) {
+    // Note: Official SDK uses GOOGLE_APPLICATION_CREDENTIALS or GOOGLE_TTS_CREDENTIALS env var
+    // GOOGLE_TTS_API_KEY is kept for backward compatibility with REST API fallback
 
     try {
-        // Build the full voice name using language_voice_codes if available
-        let fullVoiceName;
+        // Extract voice name from languageVoiceCodes if available
+        let actualVoiceName = voiceName;
         if (languageVoiceCodes && languageVoiceCodes[languageCode]) {
-            // Use the pre-mapped voice name (e.g., "hi-IN-Chirp3-HD-Achernar")
-            fullVoiceName = languageVoiceCodes[languageCode];
-        } else {
-            // Fallback: construct the voice name
-            fullVoiceName = `${languageCode}-Chirp3-HD-${voiceName}`;
+            // Extract just the voice name from full voice code (e.g., "hi-IN-Chirp3-HD-Achernar" -> "Achernar")
+            const fullName = languageVoiceCodes[languageCode];
+            const parts = fullName.split('-');
+            actualVoiceName = parts[parts.length - 1]; // Last part is the voice name
         }
 
-        console.log(`[Google TTS] Using voice: ${fullVoiceName}`);
+        console.log(`[Google TTS SDK] Voice: ${actualVoiceName}, Language: ${languageCode}`);
 
-        const response = await axios.post(
-            `${GOOGLE_TTS_ENDPOINT}?key=${GOOGLE_TTS_API_KEY}`,
-            {
-                input: { text },
-                voice: {
-                    languageCode: languageCode,
-                    name: fullVoiceName
-                },
-                audioConfig: {
-                    audioEncoding: 'MP3',
-                    speakingRate: 1.0,
-                    pitch: 0,
-                    volumeGainDb: 0,
-                    sampleRateHertz: 24000 // High quality for Chirp 3 HD
-                }
-            },
-            {
-                headers: { 'Content-Type': 'application/json' },
-                timeout: 30000
-            }
-        );
+        // Use official SDK synthesis with natural speech formatting
+        const audioContent = await synthesizeChirp3HD(text, {
+            voice: actualVoiceName,
+            languageCode,
+            formatText: true, // Enable conversational formatting
+            useSSML: false,   // Disable SSML for now (can be enabled for phone numbers, etc.)
+            audioEncoding: options.audioEncoding || 'MP3',
+            speakingRate: options.speakingRate || 1.0,
+        });
+
+        // Convert Buffer to base64
+        const audioBase64 = audioContent.toString('base64');
 
         return {
             success: true,
-            audioContent: response.data.audioContent, // Base64 encoded MP3
-            contentType: 'audio/mp3',
+            audioContent: audioBase64,
+            contentType: 'audio/mpeg',
             encoding: 'base64'
         };
     } catch (error) {
-        const errorMessage = error.response?.data?.error?.message || error.message;
-        console.error('[Google TTS Error]', errorMessage);
+        const errorMessage = error.message || 'Google TTS synthesis failed';
+        console.error('[Google TTS SDK Error]', errorMessage);
         return { success: false, error: errorMessage };
     }
 }
@@ -335,6 +332,9 @@ function getProviderStatus() {
 // EXPORTS
 // ============================================
 
+// Re-export getTTSOptimizedSystemPrompt from googleChirp3HD for convenience
+const { getTTSOptimizedSystemPrompt } = require('./googleChirp3HD');
+
 module.exports = {
     // Main functions
     synthesize,
@@ -346,6 +346,11 @@ module.exports = {
     synthesizeGoogle,
     synthesizeElevenLabs,
     synthesizeOpenAI,
+    
+    // Chirp 3 HD specific
+    getTTSOptimizedSystemPrompt,
+    CHIRP3_HD_CONFIG,
+    formatTextForChirp3,
     
     // Status
     getProviderStatus
