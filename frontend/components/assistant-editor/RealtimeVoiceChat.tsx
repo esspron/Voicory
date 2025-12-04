@@ -263,6 +263,10 @@ const RealtimeVoiceChat: React.FC<RealtimeVoiceChatProps> = ({
     const speechStartTimeRef = useRef<number | null>(null);
     const hasSpokenRef = useRef(false);
     const vadFrameRef = useRef<number | null>(null); // Track VAD animation frame
+    
+    // Audio collection refs (fix for WebM chunk corruption)
+    const audioChunksRef = useRef<Blob[]>([]);
+    const isCollectingRef = useRef(false);
 
     // Scroll to bottom
     useEffect(() => {
@@ -476,22 +480,22 @@ const RealtimeVoiceChat: React.FC<RealtimeVoiceChatProps> = ({
             const source = audioContext.createMediaStreamSource(stream);
             source.connect(analyser);
 
-            // Set up MediaRecorder
+            // Set up MediaRecorder - collect chunks locally, send complete file on speech_end
             const mediaRecorder = new MediaRecorder(stream, {
                 mimeType: 'audio/webm;codecs=opus'
             });
             mediaRecorderRef.current = mediaRecorder;
 
+            // Collect chunks locally (don't stream - WebM needs proper headers)
             mediaRecorder.ondataavailable = (event) => {
-                if (event.data.size > 0 && wsRef.current?.readyState === WebSocket.OPEN) {
-                    event.data.arrayBuffer().then(buffer => {
-                        wsRef.current?.send(buffer);
-                    });
+                if (event.data.size > 0 && isCollectingRef.current) {
+                    audioChunksRef.current.push(event.data);
                 }
             };
 
-            // Send audio every 100ms
+            // Collect audio every 100ms
             mediaRecorder.start(100);
+            isCollectingRef.current = true;
 
             // Reset VAD state
             hasSpokenRef.current = false;
@@ -566,7 +570,10 @@ const RealtimeVoiceChat: React.FC<RealtimeVoiceChatProps> = ({
                 // User is speaking
                 if (!speechStartTimeRef.current) {
                     speechStartTimeRef.current = Date.now();
-                    console.log('[VAD] Speech started');
+                    // Clear previous chunks and start fresh collection
+                    audioChunksRef.current = [];
+                    isCollectingRef.current = true;
+                    console.log('[VAD] Speech started - collecting audio');
                 }
 
                 // Clear silence timer
@@ -586,13 +593,28 @@ const RealtimeVoiceChat: React.FC<RealtimeVoiceChatProps> = ({
                 console.log('[VAD] Silence detected, starting timer');
                 setTranscription('Processing...');
                 
-                silenceTimerRef.current = setTimeout(() => {
-                    console.log('[VAD] Silence timeout - sending speech_end');
+                silenceTimerRef.current = setTimeout(async () => {
+                    console.log('[VAD] Silence timeout - sending complete audio');
                     
-                    // Send speech_end signal to server
-                    if (wsRef.current?.readyState === WebSocket.OPEN) {
+                    // Stop collecting
+                    isCollectingRef.current = false;
+                    
+                    // Create complete WebM blob from collected chunks
+                    if (audioChunksRef.current.length > 0 && wsRef.current?.readyState === WebSocket.OPEN) {
+                        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm;codecs=opus' });
+                        const audioBuffer = await audioBlob.arrayBuffer();
+                        
+                        console.log(`[VAD] Sending ${audioChunksRef.current.length} chunks as complete file (${audioBuffer.byteLength} bytes)`);
+                        
+                        // Send complete audio file
+                        wsRef.current.send(audioBuffer);
+                        
+                        // Then signal speech end
                         wsRef.current.send(JSON.stringify({ type: 'speech_end' }));
                     }
+                    
+                    // Clear chunks
+                    audioChunksRef.current = [];
                     
                     // Reset VAD state
                     hasSpokenRef.current = false;

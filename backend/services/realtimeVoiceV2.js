@@ -367,17 +367,17 @@ class RealtimeVoiceSessionV2 {
     async processAudio(audioData) {
         if (this.isEnded || this.isMuted) return;
 
-        this.audioBuffer.push(audioData);
+        // Store complete audio file (browser now sends complete WebM blob)
+        // We only expect one chunk now - the complete audio file
+        this.audioBuffer = [audioData]; // Replace instead of push
         
         // Record user audio
         if (REALTIME_CONFIG.enableRecording) {
             this.recorder.addUserAudio(audioData);
         }
         
-        // Start turn timer on first audio chunk
-        if (this.audioBuffer.length === 1) {
-            this.turnStartTime = Date.now();
-        }
+        // Start turn timer
+        this.turnStartTime = Date.now();
     }
 
     async onSpeechEnd() {
@@ -388,7 +388,8 @@ class RealtimeVoiceSessionV2 {
             return;
         }
 
-        console.log(`[RealtimeVoiceV2] 🎤 speech_end - ${this.audioBuffer.length} chunks`);
+        const audioSize = this.audioBuffer.reduce((sum, buf) => sum + buf.length, 0);
+        console.log(`[RealtimeVoiceV2] 🎤 speech_end - complete audio file (${audioSize} bytes)`);
         await this.processCollectedAudio();
     }
 
@@ -400,9 +401,11 @@ class RealtimeVoiceSessionV2 {
         const turnStart = this.turnStartTime || Date.now();
 
         try {
-            // Combine audio chunks
+            // Get complete audio file (browser sends as single WebM blob now)
             const combinedAudio = Buffer.concat(this.audioBuffer);
             this.audioBuffer = [];
+            
+            console.log(`[RealtimeVoiceV2] Processing audio: ${combinedAudio.length} bytes`);
 
             // STT with latency tracking
             const sttStart = Date.now();
@@ -416,7 +419,7 @@ class RealtimeVoiceSessionV2 {
             console.log(`[RealtimeVoiceV2] ⏱️ STT: ${sttLatency}ms`);
 
             if (!sttResult.success || !sttResult.text?.trim()) {
-                console.log('[RealtimeVoiceV2] No transcription');
+                console.log('[RealtimeVoiceV2] No transcription - STT result:', sttResult);
                 this.setState('listening');
                 return;
             }
