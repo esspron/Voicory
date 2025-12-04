@@ -23,21 +23,16 @@ const REALTIME_STT_CONFIG = {
     // Model - gpt-4o-transcribe for best multilingual support
     model: 'gpt-4o-transcribe',
     
-    // Audio format - PCM16 mono 16kHz or 24kHz
+    // Audio format - PCM16 mono 24kHz
     inputAudioFormat: 'pcm16',
-    sampleRate: 24000, // 24kHz recommended for quality
+    sampleRate: 24000,
     
-    // Server-side VAD settings
+    // Server-side VAD settings (snake_case for OpenAI API)
     vad: {
         type: 'server_vad',
-        threshold: 0.5,           // Speech detection threshold (0-1)
-        prefixPaddingMs: 300,     // Audio to include before speech start
-        silenceDurationMs: 500,   // Silence duration to end utterance
-    },
-    
-    // Noise reduction
-    noiseReduction: {
-        type: 'near_field',  // 'near_field' for close mic, 'far_field' for distant
+        threshold: 0.6,              // Higher threshold to filter fan noise (0-1)
+        prefix_padding_ms: 300,      // Audio to include before speech start
+        silence_duration_ms: 700,    // Longer silence to avoid cutting off speech
     },
     
     // Reconnection
@@ -156,11 +151,12 @@ class RealtimeSTTSession {
         try {
             const event = JSON.parse(data.toString());
             
-            // Log event type for debugging (not full payload)
-            if (event.type !== 'input_audio_buffer.speech_started' && 
-                event.type !== 'input_audio_buffer.speech_stopped') {
-                console.log(`[RealtimeSTT] 📨 Event: ${event.type}`);
-            }
+            // Log ALL events for debugging
+            console.log(`[RealtimeSTT] 📨 Event: ${event.type}`, 
+                event.type === 'error' ? event.error : 
+                event.type.includes('transcription') ? { delta: event.delta?.substring?.(0, 50), transcript: event.transcript?.substring?.(0, 50) } : 
+                ''
+            );
 
             switch (event.type) {
                 // Session events
@@ -169,17 +165,15 @@ class RealtimeSTTSession {
                     break;
 
                 case 'transcription_session.updated':
-                    console.log(`[RealtimeSTT] Session configured`);
+                    console.log(`[RealtimeSTT] ✅ Session configured successfully`);
                     break;
 
                 // Speech detection events
                 case 'input_audio_buffer.speech_started':
-                    console.log(`[RealtimeSTT] 🎤 Speech started`);
                     this.onSpeechStart();
                     break;
 
                 case 'input_audio_buffer.speech_stopped':
-                    console.log(`[RealtimeSTT] 🎤 Speech stopped`);
                     this.onSpeechEnd();
                     break;
 
@@ -189,9 +183,10 @@ class RealtimeSTTSession {
                     this.lastItemId = event.item_id;
                     break;
 
-                // Transcription events
+                // Transcription events - these are what we need!
                 case 'conversation.item.input_audio_transcription.delta':
                     // Partial/streaming transcript
+                    console.log(`[RealtimeSTT] 🔤 Partial: "${event.delta}"`);
                     if (event.delta) {
                         this.handlePartialTranscript(event.item_id, event.delta);
                     }
@@ -199,6 +194,7 @@ class RealtimeSTTSession {
 
                 case 'conversation.item.input_audio_transcription.completed':
                     // Final transcript for an utterance
+                    console.log(`[RealtimeSTT] ✅ Final transcript: "${event.transcript}"`);
                     if (event.transcript) {
                         this.handleFinalTranscript(event.item_id, event.transcript);
                     }
@@ -211,10 +207,8 @@ class RealtimeSTTSession {
                     break;
 
                 default:
-                    // Log unhandled events for debugging
-                    if (event.type) {
-                        console.log(`[RealtimeSTT] Unhandled event: ${event.type}`);
-                    }
+                    // Log unhandled events
+                    break;
             }
         } catch (error) {
             console.error('[RealtimeSTT] Failed to parse message:', error);
@@ -245,24 +239,28 @@ class RealtimeSTTSession {
 
     sendSessionConfig() {
         // OpenAI Realtime API requires config inside a 'session' object
+        // Reference: https://platform.openai.com/docs/api-reference/realtime
         const config = {
             type: 'transcription_session.update',
             session: {
                 input_audio_format: REALTIME_STT_CONFIG.inputAudioFormat,
                 input_audio_transcription: {
                     model: REALTIME_STT_CONFIG.model,
-                    prompt: this.prompt,
                     language: this.language || null, // null = auto-detect
                 },
-                turn_detection: REALTIME_STT_CONFIG.vad,
-                input_audio_noise_reduction: REALTIME_STT_CONFIG.noiseReduction,
+                turn_detection: {
+                    type: 'server_vad',
+                    threshold: REALTIME_STT_CONFIG.vad.threshold,
+                    prefix_padding_ms: REALTIME_STT_CONFIG.vad.prefix_padding_ms,
+                    silence_duration_ms: REALTIME_STT_CONFIG.vad.silence_duration_ms,
+                },
             }
         };
 
         console.log(`[RealtimeSTT] 📤 Sending session config:`, {
             model: config.session.input_audio_transcription.model,
             language: config.session.input_audio_transcription.language || 'auto',
-            vad: config.session.turn_detection.type,
+            vad: config.session.turn_detection,
         });
 
         this.send(config);
