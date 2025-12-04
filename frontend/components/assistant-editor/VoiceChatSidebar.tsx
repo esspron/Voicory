@@ -48,7 +48,8 @@ const LiveWaveform: React.FC<{
     color?: string;
     bars?: number;
     isSpeaking?: boolean;
-}> = ({ isActive, color = 'bg-primary', bars = 5, isSpeaking = false }) => {
+    audioLevel?: number; // 0-1 for real audio level
+}> = ({ isActive, color = 'bg-primary', bars = 5, isSpeaking = false, audioLevel = 0 }) => {
     const [heights, setHeights] = useState<number[]>(Array(bars).fill(4));
 
     useEffect(() => {
@@ -58,25 +59,73 @@ const LiveWaveform: React.FC<{
         }
 
         const interval = setInterval(() => {
+            // Use real audio level if available, otherwise random
+            const baseHeight = audioLevel > 0 ? audioLevel * 40 : (isSpeaking ? 16 : 8);
+            const variation = audioLevel > 0 ? audioLevel * 20 : (isSpeaking ? 24 : 12);
+            
             setHeights(
                 Array(bars)
                     .fill(0)
-                    .map(() => (isSpeaking ? 8 + Math.random() * 24 : 4 + Math.random() * 12))
+                    .map(() => Math.max(4, baseHeight + Math.random() * variation))
             );
-        }, 100);
+        }, 80);
 
         return () => clearInterval(interval);
-    }, [isActive, bars, isSpeaking]);
+    }, [isActive, bars, isSpeaking, audioLevel]);
 
     return (
         <div className="flex items-center justify-center gap-1 h-8">
             {heights.map((height, i) => (
                 <div
                     key={i}
-                    className={`w-1 ${color} rounded-full transition-all duration-100`}
+                    className={`w-1 ${color} rounded-full transition-all duration-75`}
                     style={{ height: `${height}px` }}
                 />
             ))}
+        </div>
+    );
+};
+
+// ============================================
+// AUDIO LEVEL INDICATOR COMPONENT  
+// Shows real-time audio input level
+// ============================================
+const AudioLevelIndicator: React.FC<{
+    level: number; // 0-1
+    isActive: boolean;
+    isSpeechDetected: boolean;
+}> = ({ level, isActive, isSpeechDetected }) => {
+    if (!isActive) return null;
+    
+    const percentage = Math.min(100, level * 100 * 10); // Scale up for visibility
+    
+    return (
+        <div className="w-full px-4 mt-2">
+            <div className="flex items-center gap-2">
+                <Microphone 
+                    size={14} 
+                    weight={isSpeechDetected ? "fill" : "regular"}
+                    className={isSpeechDetected ? "text-emerald-400" : "text-textMuted"} 
+                />
+                <div className="flex-1 h-2 bg-white/5 rounded-full overflow-hidden">
+                    <div 
+                        className={`h-full rounded-full transition-all duration-75 ${
+                            isSpeechDetected 
+                                ? 'bg-gradient-to-r from-emerald-500 to-emerald-400' 
+                                : 'bg-gradient-to-r from-textMuted/50 to-textMuted/30'
+                        }`}
+                        style={{ width: `${percentage}%` }}
+                    />
+                </div>
+                <span className={`text-xs font-mono w-8 ${isSpeechDetected ? 'text-emerald-400' : 'text-textMuted'}`}>
+                    {percentage.toFixed(0)}%
+                </span>
+            </div>
+            {isSpeechDetected && (
+                <p className="text-xs text-emerald-400 text-center mt-1 animate-pulse">
+                    ● Voice detected
+                </p>
+            )}
         </div>
     );
 };
@@ -131,6 +180,8 @@ const VoiceChatSidebar: React.FC<VoiceChatSidebarProps> = ({
     const [transcription, setTranscription] = useState('');
     const [currentPlayingId, setCurrentPlayingId] = useState<string | null>(null);
     const [callState, setCallState] = useState<'idle' | 'connecting' | 'speaking' | 'listening' | 'processing'>('idle');
+    const [audioLevel, setAudioLevel] = useState(0); // Real-time audio level 0-1
+    const [isSpeechDetected, setIsSpeechDetected] = useState(false); // Is voice currently detected
 
     // Refs
     const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -142,6 +193,7 @@ const VoiceChatSidebar: React.FC<VoiceChatSidebarProps> = ({
     const audioContextRef = useRef<AudioContext | null>(null);
     const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
     const hasSpokenRef = useRef<boolean>(false);
+    const startRecordingRef = useRef<(() => void) | null>(null); // Ref for startRecording function
 
     // Scroll to bottom
     const scrollToBottom = () => {
@@ -184,10 +236,14 @@ const VoiceChatSidebar: React.FC<VoiceChatSidebarProps> = ({
 
     // Play audio from base64
     const playAudio = useCallback(async (base64Audio: string, messageId: string, autoListenAfter = true) => {
+        console.log('[AUDIO] playAudio called, autoListenAfter:', autoListenAfter, 'isConnected:', isConnected, 'isMuted:', isMuted);
+        
         if (isMuted) {
+            console.log('[AUDIO] Muted, skipping playback');
             if (autoListenAfter && isConnected) {
                 setCallState('listening');
-                startRecordingInternal();
+                console.log('[AUDIO] Starting recording after muted skip...');
+                startRecordingRef.current?.();
             }
             return;
         }
@@ -198,6 +254,7 @@ const VoiceChatSidebar: React.FC<VoiceChatSidebarProps> = ({
                 audioRef.current = null;
             }
 
+            console.log('[AUDIO] Decoding base64 audio, length:', base64Audio.length);
             const binaryString = atob(base64Audio);
             const bytes = new Uint8Array(binaryString.length);
             for (let i = 0; i < binaryString.length; i++) {
@@ -205,6 +262,7 @@ const VoiceChatSidebar: React.FC<VoiceChatSidebarProps> = ({
             }
             const blob = new Blob([bytes], { type: 'audio/mpeg' });
             const audioUrl = URL.createObjectURL(blob);
+            console.log('[AUDIO] Created audio blob, size:', blob.size);
 
             const audio = new Audio(audioUrl);
             audioRef.current = audio;
@@ -213,34 +271,42 @@ const VoiceChatSidebar: React.FC<VoiceChatSidebarProps> = ({
             setCallState('speaking');
 
             audio.onended = () => {
+                console.log('[AUDIO] Audio playback ended');
                 setIsPlaying(false);
                 setCurrentPlayingId(null);
                 URL.revokeObjectURL(audioUrl);
                 // Auto-start listening after assistant speaks
                 if (autoListenAfter && isConnected) {
+                    console.log('[AUDIO] Auto-starting listening after playback...');
                     setCallState('listening');
-                    startRecordingInternal();
+                    // Use ref to avoid stale closure
+                    setTimeout(() => {
+                        console.log('[AUDIO] Calling startRecordingRef...');
+                        startRecordingRef.current?.();
+                    }, 100);
                 }
             };
 
-            audio.onerror = () => {
-                console.error('Audio playback error');
+            audio.onerror = (e) => {
+                console.error('[AUDIO] Audio playback error:', e);
                 setIsPlaying(false);
                 setCurrentPlayingId(null);
                 if (autoListenAfter && isConnected) {
                     setCallState('listening');
-                    startRecordingInternal();
+                    startRecordingRef.current?.();
                 }
             };
 
+            console.log('[AUDIO] Starting playback...');
             await audio.play();
+            console.log('[AUDIO] Playback started successfully');
         } catch (err) {
-            console.error('Failed to play audio:', err);
+            console.error('[AUDIO] Failed to play audio:', err);
             setIsPlaying(false);
             setCurrentPlayingId(null);
             if (autoListenAfter && isConnected) {
                 setCallState('listening');
-                startRecordingInternal();
+                startRecordingRef.current?.();
             }
         }
     }, [isMuted, isConnected]);
@@ -255,29 +321,47 @@ const VoiceChatSidebar: React.FC<VoiceChatSidebarProps> = ({
         setCurrentPlayingId(null);
     }, []);
 
-    // VAD Configuration
+    // VAD Configuration - IMPORTANT: These values are tuned for typical speech
     const VAD_CONFIG = {
-        silenceThreshold: 0.01, // Volume threshold for silence detection
-        silenceDuration: 1500, // ms of silence before auto-stop
-        minSpeechDuration: 500, // minimum ms of speech before considering it valid
+        silenceThreshold: 0.008, // Volume threshold - 0.8% (very sensitive to detect quiet speech)
+        silenceDuration: 1500, // 1.5 seconds of silence before auto-stop
+        minSpeechDuration: 200, // minimum 200ms of speech before considering it valid
     };
 
     // Internal start recording with VAD (Voice Activity Detection)
     const startRecordingInternal = async () => {
-        if (isRecording || isPlaying) return;
+        console.log('[RECORD] startRecordingInternal called, isRecording:', isRecording, 'isPlaying:', isPlaying);
+        if (isRecording || isPlaying) {
+            console.log('[RECORD] Skipping - already recording or playing');
+            return;
+        }
 
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            console.log('[RECORD] Requesting microphone access...');
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+                audio: {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true,
+                    sampleRate: 16000,
+                }
+            });
             streamRef.current = stream;
+            console.log('[VAD] Microphone stream started, tracks:', stream.getAudioTracks().length);
+            console.log('[VAD] Audio track settings:', stream.getAudioTracks()[0]?.getSettings());
 
             // Set up audio analysis for VAD
             const audioContext = new AudioContext();
             audioContextRef.current = audioContext;
+            console.log('[VAD] AudioContext created, state:', audioContext.state);
+            
             const analyser = audioContext.createAnalyser();
-            analyser.fftSize = 256;
+            analyser.fftSize = 256; // Smaller for faster processing
+            analyser.smoothingTimeConstant = 0.5; // Less smoothing = more responsive
             analyserRef.current = analyser;
             const source = audioContext.createMediaStreamSource(stream);
             source.connect(analyser);
+            console.log('[VAD] Analyser connected, frequencyBinCount:', analyser.frequencyBinCount);
 
             const mediaRecorder = new MediaRecorder(stream, {
                 mimeType: 'audio/webm;codecs=opus'
@@ -304,6 +388,10 @@ const VoiceChatSidebar: React.FC<VoiceChatSidebarProps> = ({
                     silenceTimerRef.current = null;
                 }
                 
+                // Reset audio level indicators
+                setAudioLevel(0);
+                setIsSpeechDetected(false);
+                
                 if (audioChunksRef.current.length > 0 && hasSpokenRef.current) {
                     const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
                     await processVoiceInput(audioBlob);
@@ -321,19 +409,49 @@ const VoiceChatSidebar: React.FC<VoiceChatSidebarProps> = ({
 
             // Start VAD monitoring
             const dataArray = new Uint8Array(analyser.frequencyBinCount);
+            let frameCount = 0;
+            let maxLevelSeen = 0;
             
             const checkAudioLevel = () => {
                 if (!analyserRef.current || !mediaRecorderRef.current || mediaRecorderRef.current.state !== 'recording') {
+                    setAudioLevel(0);
+                    setIsSpeechDetected(false);
                     return;
                 }
 
                 analyserRef.current.getByteFrequencyData(dataArray);
-                const average = dataArray.reduce((a, b) => a + b, 0) / dataArray.length / 255;
                 
-                if (average > VAD_CONFIG.silenceThreshold) {
+                // Calculate RMS (root mean square) for better voice detection
+                let sum = 0;
+                for (let i = 0; i < dataArray.length; i++) {
+                    const val = dataArray[i] ?? 0;
+                    const normalized = val / 255;
+                    sum += normalized * normalized;
+                }
+                const rms = Math.sqrt(sum / dataArray.length);
+                
+                // Update audio level for UI (every frame for smooth animation)
+                setAudioLevel(rms);
+                
+                // Also get max value
+                const maxVal = Math.max(...dataArray) / 255;
+                if (maxVal > maxLevelSeen) maxLevelSeen = maxVal;
+                
+                // Debug logging every 30 frames (~0.5 seconds)
+                frameCount++;
+                if (frameCount % 30 === 0) {
+                    console.log(`[VAD] RMS: ${rms.toFixed(4)}, Max: ${maxVal.toFixed(4)}, MaxSeen: ${maxLevelSeen.toFixed(4)}, Threshold: ${VAD_CONFIG.silenceThreshold}, HasSpoken: ${hasSpokenRef.current}`);
+                }
+                
+                // Use RMS for detection (more reliable than average)
+                const isVoiceDetected = rms > VAD_CONFIG.silenceThreshold;
+                setIsSpeechDetected(isVoiceDetected);
+                
+                if (isVoiceDetected) {
                     // Voice detected
                     if (!speechStartTime) {
                         speechStartTime = Date.now();
+                        console.log('[VAD] Speech START detected, RMS:', rms.toFixed(4));
                     }
                     
                     // Clear silence timer
@@ -344,13 +462,20 @@ const VoiceChatSidebar: React.FC<VoiceChatSidebarProps> = ({
                     
                     // Mark as spoken if speech duration is sufficient
                     if (Date.now() - speechStartTime > VAD_CONFIG.minSpeechDuration) {
+                        if (!hasSpokenRef.current) {
+                            console.log('[VAD] Valid speech detected after', VAD_CONFIG.minSpeechDuration, 'ms');
+                        }
                         hasSpokenRef.current = true;
                         setTranscription('Listening...');
                     }
                 } else if (hasSpokenRef.current && !silenceTimerRef.current) {
                     // Silence detected after speech - start silence timer
+                    console.log('[VAD] Silence detected, starting timer for', VAD_CONFIG.silenceDuration, 'ms');
                     setTranscription('Processing...');
                     silenceTimerRef.current = setTimeout(() => {
+                        console.log('[VAD] Silence timer completed, stopping recording');
+                        setAudioLevel(0);
+                        setIsSpeechDetected(false);
                         // Auto-stop recording after silence
                         if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
                             mediaRecorderRef.current.stop();
@@ -381,6 +506,11 @@ const VoiceChatSidebar: React.FC<VoiceChatSidebarProps> = ({
         }
     };
 
+    // Keep startRecordingRef updated so playAudio can call it
+    useEffect(() => {
+        startRecordingRef.current = startRecordingInternal;
+    }, [isRecording, isPlaying, isConnected, isProcessing]);
+
     // Connect and play first message
     const handleConnect = async () => {
         setCallState('connecting');
@@ -396,14 +526,16 @@ const VoiceChatSidebar: React.FC<VoiceChatSidebarProps> = ({
             setIsProcessing(true);
             setCallState('speaking');
             try {
+                // Always pass assistantConfig to use current form values (like ChatSidebar)
                 const response = await authFetch('/api/voice-preview/first-message', {
                     method: 'POST',
                     body: JSON.stringify({
                         assistantId,
-                        assistantConfig: assistantId ? undefined : {
+                        assistantConfig: {
                             name: formData.name,
                             firstMessage: formData.firstMessage,
                             voiceId: formData.voiceId,
+                            languageSettings: formData.languageSettings,
                         },
                         languageCode: getLanguageCode()
                     })
@@ -490,6 +622,8 @@ const VoiceChatSidebar: React.FC<VoiceChatSidebarProps> = ({
     const processVoiceInput = async (audioBlob: Blob) => {
         setCallState('processing');
         setTranscription('Processing speech...');
+        
+        console.log('[STT] Processing audio blob, size:', audioBlob.size, 'bytes, type:', audioBlob.type);
 
         try {
             // Convert blob to base64
@@ -499,6 +633,7 @@ const VoiceChatSidebar: React.FC<VoiceChatSidebarProps> = ({
                     const result = reader.result as string;
                     const base64 = result?.split(',')[1];
                     if (base64) {
+                        console.log('[STT] Base64 audio length:', base64.length);
                         resolve(base64);
                     } else {
                         reject(new Error('Failed to convert audio to base64'));
@@ -509,6 +644,7 @@ const VoiceChatSidebar: React.FC<VoiceChatSidebarProps> = ({
             reader.readAsDataURL(audioBlob);
             const base64Audio = await base64Promise;
 
+            console.log('[STT] Calling STT API...');
             // Call STT API
             const sttResponse = await authFetch('/api/stt/transcribe-base64', {
                 method: 'POST',
@@ -520,12 +656,14 @@ const VoiceChatSidebar: React.FC<VoiceChatSidebarProps> = ({
             });
 
             const sttData = await sttResponse.json();
+            console.log('[STT] Response:', sttData);
 
             if (!sttResponse.ok) {
                 throw new Error(sttData.error || 'Speech recognition failed');
             }
 
             const transcribedText = sttData.text?.trim();
+            console.log('[STT] Transcribed text:', transcribedText);
 
             if (!transcribedText) {
                 setTranscription('No speech detected. Try again.');
@@ -578,29 +716,30 @@ const VoiceChatSidebar: React.FC<VoiceChatSidebarProps> = ({
                 content: msg.content
             }));
 
+            // Always pass assistantConfig to use current form values (like ChatSidebar does)
             const response = await authFetch('/api/voice-preview/speak', {
                 method: 'POST',
                 body: JSON.stringify({
                     message: text,
                     assistantId,
-                    assistantConfig: assistantId
-                        ? undefined
-                        : {
-                              name: formData.name,
-                              systemPrompt: formData.systemPrompt,
-                              firstMessage: formData.firstMessage,
-                              voiceId: formData.voiceId,
-                              languageSettings: formData.languageSettings,
-                              styleSettings: formData.styleSettings,
-                              llmModel: formData.llmModel,
-                              temperature: formData.temperature,
-                              maxTokens: formData.maxTokens,
-                              ragEnabled: formData.ragEnabled,
-                              ragSimilarityThreshold: formData.ragSimilarityThreshold,
-                              ragMaxResults: formData.ragMaxResults,
-                              ragInstructions: formData.ragInstructions,
-                              knowledgeBaseIds: formData.knowledgeBaseIds
-                          },
+                    assistantConfig: {
+                        name: formData.name,
+                        systemPrompt: formData.systemPrompt,
+                        firstMessage: formData.firstMessage,
+                        messagingSystemPrompt: formData.messagingSystemPrompt,
+                        messagingFirstMessage: formData.messagingFirstMessage,
+                        voiceId: formData.voiceId,
+                        languageSettings: formData.languageSettings,
+                        styleSettings: formData.styleSettings,
+                        llmModel: formData.llmModel,
+                        temperature: formData.temperature,
+                        maxTokens: formData.maxTokens,
+                        ragEnabled: formData.ragEnabled,
+                        ragSimilarityThreshold: formData.ragSimilarityThreshold,
+                        ragMaxResults: formData.ragMaxResults,
+                        ragInstructions: formData.ragInstructions,
+                        knowledgeBaseIds: formData.knowledgeBaseIds
+                    },
                     voiceId: formData.voiceId,
                     languageCode: getLanguageCode(),
                     conversationHistory,
@@ -841,11 +980,19 @@ const VoiceChatSidebar: React.FC<VoiceChatSidebarProps> = ({
                                 <div className="h-12 w-48">
                                     <LiveWaveform
                                         isActive={callState === 'speaking' || callState === 'listening'}
-                                        color={callState === 'speaking' ? 'bg-primary' : 'bg-emerald-500'}
+                                        color={callState === 'speaking' ? 'bg-primary' : isSpeechDetected ? 'bg-emerald-400' : 'bg-emerald-500'}
                                         bars={12}
                                         isSpeaking={callState === 'speaking'}
+                                        audioLevel={callState === 'listening' ? audioLevel : 0}
                                     />
                                 </div>
+                                
+                                {/* Audio Level Indicator - Only show when listening */}
+                                <AudioLevelIndicator 
+                                    level={audioLevel}
+                                    isActive={callState === 'listening'}
+                                    isSpeechDetected={isSpeechDetected}
+                                />
                             </div>
                         </div>
 
