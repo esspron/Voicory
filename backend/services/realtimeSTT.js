@@ -28,12 +28,25 @@ const REALTIME_STT_CONFIG = {
     sampleRate: 24000,
     
     // Server-side VAD settings (snake_case for OpenAI API)
-    // TUNED FOR FAN/AC NOISE: Higher threshold = less sensitive to background noise
+    // TUNED FOR NOISY ENVIRONMENT: Prevent false triggers from clicks, sneezes, breathing
+    // 
+    // THRESHOLD (0-1): How confident VAD must be that sound is speech
+    //   0.5 = Sensitive (triggers easily)
+    //   0.8 = Moderate
+    //   0.9+ = Strict (only clear speech triggers)
+    //
+    // SILENCE_DURATION_MS: How long silence before ending turn
+    //   500ms = Quick (may cut off pauses)
+    //   800ms = Natural speech pauses
+    //   1000ms+ = Very forgiving
+    //
+    // PREFIX_PADDING_MS: Audio captured BEFORE VAD triggers (captures word start)
+    //
     vad: {
         type: 'server_vad',
-        threshold: 0.8,              // VERY HIGH threshold to filter fan/AC noise (0-1)
-        prefix_padding_ms: 200,      // Less padding for faster response
-        silence_duration_ms: 500,    // Faster turn detection
+        threshold: 0.85,             // Higher = only clear speech triggers (not clicks/sneezes)
+        prefix_padding_ms: 300,      // Capture beginning of words
+        silence_duration_ms: 700,    // Wait longer before ending turn (natural pauses)
     },
     
     // Reconnection

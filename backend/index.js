@@ -61,6 +61,7 @@ const ttsRoutes = require('./routes/tts');
 const voicePreviewRoutes = require('./routes/voicePreview');
 const sttRoutes = require('./routes/stt');
 const { router: voiceStreamRoutes, setupWebSocket: setupVoiceStreamWebSocket } = require('./routes/voiceStream');
+const { router: webrtcVoiceRoutes, setupWebSocket: setupWebRTCWebSocket } = require('./routes/webrtcVoice');
 
 // ============================================
 // UTILITIES
@@ -217,6 +218,7 @@ app.use('/api/tts', apiRateLimit, ttsRoutes);
 app.use('/api/stt', apiRateLimit, sttRoutes);
 app.use('/api/voice-preview', apiRateLimit, voicePreviewRoutes);
 app.use('/api/voice-stream', apiRateLimit, voiceStreamRoutes);
+app.use('/api/webrtc-voice', apiRateLimit, webrtcVoiceRoutes);
 
 // Payment routes with stricter rate limit (prevent abuse)
 app.use('/api/payments', strictRateLimit, paymentRoutes);
@@ -283,7 +285,15 @@ try {
     console.error('⚠️ Failed to initialize Voice Preview WebSocket:', error.message);
 }
 
-// 2. CallBot WebSocket (Twilio Media Streams) - Optional
+// 2. WebRTC Voice WebSocket (New clean implementation)
+try {
+    setupWebRTCWebSocket(server);
+    console.log('🎙️ WebRTC Voice WebSocket enabled (/api/webrtc-voice/ws/*)');
+} catch (error) {
+    console.error('⚠️ Failed to initialize WebRTC Voice WebSocket:', error.message);
+}
+
+// 3. CallBot WebSocket (Twilio Media Streams) - Optional
 if (process.env.ENABLE_VOICE_STREAMING === 'true') {
     try {
         const { initializeWebSocket } = require('./services/callbot/websocket');
