@@ -122,13 +122,17 @@ function setupWebSocket(server) {
 
     // Handle upgrade requests
     server.on('upgrade', (request, socket, head) => {
-        const url = new URL(request.url, `http://${request.headers.host}`);
+        // Guard against missing url
+        if (!request || !request.url) {
+            return; // Let other handlers deal with it
+        }
+
+        const url = new URL(request.url, `http://${request.headers.host || 'localhost'}`);
         const pathname = url.pathname;
 
-        // Only handle voice stream paths
+        // Only handle voice stream paths - DO NOT destroy socket for other paths!
         if (!pathname.startsWith('/api/voice-stream/ws/')) {
-            socket.destroy();
-            return;
+            return; // Let other handlers deal with it (WebRTC, CallBot, etc.)
         }
 
         const sessionId = pathname.split('/').pop();
