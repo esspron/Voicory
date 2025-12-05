@@ -349,11 +349,10 @@ class WebRTCVoiceSession {
                 break;
 
             case 'input_audio_buffer.speech_started':
-                console.log('[WebRTC] 🎤 Speech started');
-                // Interrupt TTS if speaking (natural barge-in)
-                if (this.state === 'speaking') {
-                    this.interruptTTS();
-                }
+                console.log('[WebRTC] 🎤 Speech started (audio detected)');
+                // DON'T interrupt here - wait for actual transcript
+                // This is just audio energy detection, not real speech
+                // Industry best practice: only interrupt on meaningful transcript
                 break;
 
             case 'input_audio_buffer.speech_stopped':
@@ -364,7 +363,19 @@ class WebRTCVoiceSession {
                 const transcript = event.transcript?.trim();
                 if (transcript) {
                     console.log(`[WebRTC] 📝 Transcript: "${transcript}"`);
-                    this.handleTranscript(transcript);
+                    
+                    // Check if this is meaningful speech (not just filler/noise)
+                    if (this.isMeaningfulSpeech(transcript)) {
+                        // Interrupt if still speaking - user wants to talk
+                        if (this.state === 'speaking') {
+                            console.log('[WebRTC] ⚡ Meaningful speech detected - interrupting');
+                            this.interruptTTS();
+                        }
+                        this.handleTranscript(transcript);
+                    } else {
+                        console.log(`[WebRTC] 🔇 Filtered non-meaningful: "${transcript}"`);
+                        // Don't process filler words/noise
+                    }
                 }
                 break;
 
@@ -373,6 +384,47 @@ class WebRTCVoiceSession {
                 this.onError(new Error(event.error?.message || 'STT error'));
                 break;
         }
+    }
+
+    /**
+     * Check if transcript contains meaningful speech vs filler/noise
+     * Industry practice: filter out non-actionable utterances
+     */
+    isMeaningfulSpeech(transcript) {
+        if (!transcript) return false;
+        
+        const cleaned = transcript.toLowerCase().trim();
+        
+        // Too short to be meaningful (single char, etc)
+        if (cleaned.length < 2) return false;
+        
+        // Common filler words and non-speech sounds
+        const FILLER_PATTERNS = [
+            // English fillers
+            /^(um+|uh+|ah+|eh+|oh+|hm+|hmm+|mm+|mhm+|uh-huh|nah)$/i,
+            // Hesitations
+            /^(er+|err+|erm+)$/i,
+            // Acknowledgments that shouldn't interrupt
+            /^(okay|ok|yeah|yep|yup|yes|no|nope|sure|right|alright)$/i,
+            // Throat sounds / non-words
+            /^(ahem|cough|sigh|laugh|haha|hehe)$/i,
+            // Repeated single sounds
+            /^(.)\1{2,}$/i,  // "aaa", "mmm", etc.
+        ];
+        
+        for (const pattern of FILLER_PATTERNS) {
+            if (pattern.test(cleaned)) {
+                return false;
+            }
+        }
+        
+        // Check for actual word content (at least one word with 3+ chars)
+        const words = cleaned.split(/\s+/);
+        const hasRealWord = words.some(word => 
+            word.length >= 3 && /^[a-z]+$/i.test(word)
+        );
+        
+        return hasRealWord;
     }
 
     // Send audio to STT
