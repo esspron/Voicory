@@ -57,9 +57,6 @@ const paymentRoutes = require('./routes/payments');
 const couponRoutes = require('./routes/coupons');
 const adminRoutes = require('./routes/admin');
 const widgetRoutes = require('./routes/widget');
-const ttsRoutes = require('./routes/tts');
-const sttRoutes = require('./routes/stt');
-const { router: webrtcVoiceRoutes, setupWebSocket: setupWebRTCWebSocket } = require('./routes/webrtcVoice');
 
 // ============================================
 // UTILITIES
@@ -212,9 +209,6 @@ app.use('/api', apiRateLimit, testChatRoutes);
 app.use('/api/whatsapp', apiRateLimit, whatsappOAuthRoutes);
 app.use('/api/coupons', apiRateLimit, couponRoutes);
 app.use('/api/admin', apiRateLimit, adminRoutes);
-app.use('/api/tts', apiRateLimit, ttsRoutes);
-app.use('/api/stt', apiRateLimit, sttRoutes);
-app.use('/api/webrtc-voice', apiRateLimit, webrtcVoiceRoutes);
 
 // Payment routes with stricter rate limit (prevent abuse)
 app.use('/api/payments', strictRateLimit, paymentRoutes);
@@ -268,31 +262,5 @@ app.use((err, req, res, next) => {
 // START SERVER WITH GRACEFUL SHUTDOWN
 // ============================================
 const server = setupGracefulShutdown(app, supabase, port);
-
-// ============================================
-// INITIALIZE WEBSOCKET FOR VOICE STREAMING
-// ============================================
-
-// WebRTC Voice WebSocket (Clean implementation - OpenAI Realtime STT + LLM + TTS)
-try {
-    setupWebRTCWebSocket(server);
-    console.log('🎙️ WebRTC Voice WebSocket enabled (/api/webrtc-voice/ws/*)');
-} catch (error) {
-    console.error('⚠️ Failed to initialize WebRTC Voice WebSocket:', error.message);
-}
-
-// CallBot WebSocket (Twilio Media Streams) - Optional
-if (process.env.ENABLE_VOICE_STREAMING === 'true') {
-    try {
-        const { initializeWebSocket } = require('./services/callbot/websocket');
-        initializeWebSocket(server, '/media-stream');
-        console.log('🎤 CallBot streaming WebSocket enabled (/media-stream)');
-    } catch (error) {
-        console.error('⚠️ Failed to initialize CallBot WebSocket:', error.message);
-    }
-} else {
-    console.log('📞 CallBot streaming disabled (using Gather mode)');
-    console.log('   Set ENABLE_VOICE_STREAMING=true to enable low-latency mode');
-}
 
 module.exports = { app, server };

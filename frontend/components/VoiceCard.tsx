@@ -1,7 +1,7 @@
-import { DotsThree, Copy, Star, Check, CurrencyInr, Lightning, Rocket } from '@phosphor-icons/react';
+import { DotsThree, Copy, Star, Check, CurrencyInr } from '@phosphor-icons/react';
 import React from 'react';
 
-import { Voice, PricingTier } from '../types';
+import { Voice } from '../types';
 
 import VoiceSamplePlayer from './VoiceSamplePlayer';
 
@@ -10,24 +10,14 @@ interface VoiceCardProps {
     onSelect?: (voice: Voice) => void;
 }
 
-// Tier badge configuration (white-labeled - no provider info shown to customers)
-const TIER_CONFIG: Record<PricingTier, { label: string; icon: React.ElementType; color: string; bgColor: string }> = {
-    spark: { label: 'Spark', icon: Lightning, color: 'text-emerald-400', bgColor: 'bg-emerald-500/10 border-emerald-500/20' },
-    boost: { label: 'Boost', icon: Rocket, color: 'text-primary', bgColor: 'bg-primary/10 border-primary/20' },
-    fusion: { label: 'Fusion', icon: Star, color: 'text-violet-400', bgColor: 'bg-violet-500/10 border-violet-500/20' },
-};
-
 const VoiceCard: React.FC<VoiceCardProps> = ({ voice, onSelect }) => {
     const [copied, setCopied] = React.useState(false);
     
     const copyVoiceId = () => {
-        navigator.clipboard.writeText(voice.providerVoiceId || voice.elevenlabsVoiceId);
+        navigator.clipboard.writeText(voice.elevenlabsVoiceId);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
     };
-
-    const tierConfig = voice.pricingTier ? TIER_CONFIG[voice.pricingTier] : null;
-    const TierIcon = tierConfig?.icon;
 
     return (
         <div className="group relative bg-surface/50 backdrop-blur-sm border border-white/[0.06] rounded-2xl p-5 hover:border-primary/30 hover:bg-white/[0.02] transition-all duration-300">
@@ -53,16 +43,6 @@ const VoiceCard: React.FC<VoiceCardProps> = ({ voice, onSelect }) => {
                     <DotsThree size={20} weight="bold" />
                 </button>
             </div>
-
-            {/* Tier Badge (white-labeled - no provider shown) */}
-            {tierConfig && TierIcon && (
-                <div className="flex items-center gap-2 mb-3">
-                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border ${tierConfig.bgColor} ${tierConfig.color}`}>
-                        <TierIcon size={10} weight="fill" />
-                        {tierConfig.label}
-                    </span>
-                </div>
-            )}
 
             {/* Description */}
             {voice.description && (

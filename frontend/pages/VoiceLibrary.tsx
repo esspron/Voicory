@@ -1,46 +1,11 @@
-import { MagnifyingGlass, Star, Microphone, Sparkle, FunnelSimple, X, SpeakerHigh, CircleNotch, Globe, Lightning, Rocket } from '@phosphor-icons/react';
+import { MagnifyingGlass, Star, Microphone, Sparkle, FunnelSimple, X, SpeakerHigh, GenderIntersex, Translate, CircleNotch } from '@phosphor-icons/react';
 import React, { useEffect, useState, useMemo } from 'react';
 
 import { FadeIn } from '../components/ui/FadeIn';
 import Select, { type SelectOption } from '../components/ui/Select';
 import VoiceCard from '../components/VoiceCard';
 import { getVoices } from '../services/voicoryService';
-import { Voice, PricingTier } from '../types';
-
-// Pricing tier configuration
-const PRICING_TIERS = [
-    {
-        id: 'all' as const,
-        label: 'All Voices',
-        icon: Globe,
-        description: 'Browse all available voices',
-        priceRange: null,
-    },
-    {
-        id: 'spark' as const,
-        label: 'Spark',
-        icon: Lightning,
-        description: 'Affordable & reliable',
-        priceRange: '₹2-5/min',
-        color: 'emerald',
-    },
-    {
-        id: 'boost' as const,
-        label: 'Boost',
-        icon: Rocket,
-        description: 'Premium HD quality',
-        priceRange: '₹6-15/min',
-        color: 'primary',
-    },
-    {
-        id: 'fusion' as const,
-        label: 'Fusion',
-        icon: Star,
-        description: 'Ultra-realistic AI',
-        priceRange: '₹16-25/min',
-        color: 'violet',
-    },
-] as const;
+import { Voice } from '../types';
 
 // Skeleton loader component
 const VoiceCardSkeleton = () => (
@@ -72,7 +37,6 @@ const VoiceLibrary: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
-    const [tierFilter, setTierFilter] = useState<'all' | PricingTier>('all');
 
     // Filters
     const [selectedLanguage, setSelectedLanguage] = useState<SelectOption>({ value: 'All', label: 'All Languages' });
@@ -117,11 +81,6 @@ const VoiceLibrary: React.FC = () => {
     // Filter voices
     const filteredVoices = useMemo(() => {
         return voices.filter(voice => {
-            // Tier filter
-            if (tierFilter !== 'all' && voice.pricingTier !== tierFilter) {
-                return false;
-            }
-
             // Search filter
             if (searchQuery) {
                 const query = searchQuery.toLowerCase();
@@ -150,18 +109,7 @@ const VoiceLibrary: React.FC = () => {
 
             return true;
         });
-    }, [voices, searchQuery, selectedLanguage, selectedGender, selectedTag, tierFilter]);
-
-    // Count voices by tier
-    const tierCounts = useMemo(() => {
-        const counts: Record<string, number> = { all: voices.length, spark: 0, boost: 0, fusion: 0 };
-        voices.forEach(voice => {
-            if (voice.pricingTier) {
-                counts[voice.pricingTier] = (counts[voice.pricingTier] || 0) + 1;
-            }
-        });
-        return counts;
-    }, [voices]);
+    }, [voices, searchQuery, selectedLanguage, selectedGender, selectedTag]);
 
     // Separate featured and regular voices
     const featuredVoices = filteredVoices.filter(v => v.isFeatured);
@@ -176,10 +124,9 @@ const VoiceLibrary: React.FC = () => {
         setSelectedLanguage({ value: 'All', label: 'All Languages' });
         setSelectedGender({ value: 'All', label: 'All Genders' });
         setSelectedTag({ value: 'All', label: 'All Tags' });
-        setTierFilter('all');
     };
 
-    const hasActiveFilters = searchQuery || selectedLanguage.value !== 'All' || selectedGender.value !== 'All' || selectedTag.value !== 'All' || tierFilter !== 'all';
+    const hasActiveFilters = searchQuery || selectedLanguage.value !== 'All' || selectedGender.value !== 'All' || selectedTag.value !== 'All';
 
     return (
         <div className="min-h-screen bg-background relative">
@@ -203,47 +150,6 @@ const VoiceLibrary: React.FC = () => {
                             </p>
                         </div>
                     </div>
-                </div>
-
-                {/* Tier Tabs */}
-                <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
-                    {PRICING_TIERS.map((tier) => {
-                        const isActive = tierFilter === tier.id;
-                        const TierIcon = tier.icon;
-                        return (
-                            <button
-                                key={tier.id}
-                                onClick={() => setTierFilter(tier.id)}
-                                className={`group relative flex items-center gap-2.5 px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 shrink-0 ${
-                                    isActive
-                                        ? 'bg-gradient-to-r from-primary/15 to-primary/5 text-textMain border border-primary/20 shadow-lg shadow-primary/5'
-                                        : 'text-textMuted hover:text-textMain hover:bg-white/[0.03] border border-transparent'
-                                }`}
-                            >
-                                {isActive && (
-                                    <div className="absolute -left-0.5 top-1/2 -translate-y-1/2 w-1 h-1 bg-primary rounded-full animate-pulse" />
-                                )}
-                                <TierIcon
-                                    size={18}
-                                    weight={isActive ? 'fill' : 'regular'}
-                                    className={isActive ? 'text-primary' : 'group-hover:text-primary transition-colors'}
-                                />
-                                <span>{tier.label}</span>
-                                {tier.priceRange && (
-                                    <span className={`text-xs px-1.5 py-0.5 rounded-md ${
-                                        isActive ? 'bg-primary/20 text-primary' : 'bg-white/5 text-textMuted'
-                                    }`}>
-                                        {tier.priceRange}
-                                    </span>
-                                )}
-                                <span className={`text-xs px-1.5 py-0.5 rounded-full ${
-                                    isActive ? 'bg-white/10 text-textMain' : 'bg-white/5 text-textMuted'
-                                }`}>
-                                    {tierCounts[tier.id] || 0}
-                                </span>
-                            </button>
-                        );
-                    })}
                 </div>
 
                 {/* Search & Filters Bar */}

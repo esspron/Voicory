@@ -1,5 +1,5 @@
 
-import { Voice, VoiceSample, VoiceWithSamples, Assistant, AssistantInput, AssistantTool, PhoneNumber, ApiKey, CallLog, Customer, SipTrunkCredential, UserProfile, CustomerConversation, CustomerMemory, CustomerInsight, CustomerContext, MemoryConfig, ActionItem, TranscriptMessage, TTSProvider, PricingTier, LatencyTier, QualityTier, PricingTierConfig, TTSProviderConfig } from '../types';
+import { Voice, VoiceSample, VoiceWithSamples, Assistant, AssistantInput, AssistantTool, PhoneNumber, ApiKey, CallLog, Customer, SipTrunkCredential, UserProfile, CustomerConversation, CustomerMemory, CustomerInsight, CustomerContext, MemoryConfig, ActionItem, TranscriptMessage } from '../types';
 
 import { authFetch } from '../lib/api';
 import { supabase } from './supabase';
@@ -84,30 +84,16 @@ const mapVoiceFromDB = (v: any): Voice => ({
     name: v.name,
     description: v.description || undefined,
     gender: v.gender as Voice['gender'],
-    // Legacy ElevenLabs fields (backward compatibility)
     elevenlabsVoiceId: v.elevenlabs_voice_id,
     elevenlabsModelId: v.elevenlabs_model_id || 'eleven_multilingual_v2',
-    // NEW: Multi-provider fields
-    ttsProvider: (v.tts_provider as TTSProvider) || 'elevenlabs',
-    providerVoiceId: v.provider_voice_id || v.elevenlabs_voice_id,
-    providerModel: v.provider_model || v.elevenlabs_model_id || undefined,
-    pricingTier: (v.pricing_tier as PricingTier) || 'fusion',
-    latencyTier: (v.latency_tier as LatencyTier) || 'medium',
-    qualityTier: (v.quality_tier as QualityTier) || 'premium',
-    supportsStreaming: v.supports_streaming ?? true,
-    languageVoiceCodes: v.language_voice_codes || undefined,
-    // Categorization
     accent: v.accent,
     primaryLanguage: v.primary_language,
     supportedLanguages: v.supported_languages || [],
     tags: v.tags || [],
-    // Voice settings defaults
     defaultStability: Number(v.default_stability) || 0.5,
     defaultSimilarity: Number(v.default_similarity) || 0.75,
     defaultStyle: Number(v.default_style) || 0,
-    // Pricing
     costPerMin: Number(v.cost_per_min),
-    // Status
     isActive: v.is_active,
     isFeatured: v.is_featured,
     isPremium: v.is_premium || false,
@@ -282,236 +268,6 @@ export const getAvailableLanguages = async (): Promise<string[]> => {
     } catch (error) {
         console.error('Error fetching available languages:', error);
         return ['Hindi', 'English', 'Tamil']; // Fallback
-    }
-};
-
-// ============================================
-// MULTI-PROVIDER VOICE FUNCTIONS (NEW)
-// ============================================
-
-/**
- * Get voices by pricing tier (Spark/Boost/Fusion)
- */
-export const getVoicesByTier = async (tier: PricingTier): Promise<Voice[]> => {
-    try {
-        const { data, error } = await supabase
-            .from('voices')
-            .select('*')
-            .eq('is_active', true)
-            .eq('pricing_tier', tier)
-            .order('display_order', { ascending: true });
-
-        if (error) throw error;
-
-        return (data || []).map(mapVoiceFromDB);
-    } catch (error) {
-        console.error(`Error fetching ${tier} voices:`, error);
-        throw error;
-    }
-};
-
-/**
- * Get voices by TTS provider
- */
-export const getVoicesByProvider = async (provider: TTSProvider): Promise<Voice[]> => {
-    try {
-        const { data, error } = await supabase
-            .from('voices')
-            .select('*')
-            .eq('is_active', true)
-            .eq('tts_provider', provider)
-            .order('display_order', { ascending: true });
-
-        if (error) throw error;
-
-        return (data || []).map(mapVoiceFromDB);
-    } catch (error) {
-        console.error(`Error fetching ${provider} voices:`, error);
-        throw error;
-    }
-};
-
-/**
- * Get voices grouped by pricing tier
- */
-export const getVoicesGroupedByTier = async (): Promise<Record<PricingTier, Voice[]>> => {
-    try {
-        const { data, error } = await supabase
-            .from('voices')
-            .select('*')
-            .eq('is_active', true)
-            .order('pricing_tier', { ascending: true })
-            .order('display_order', { ascending: true });
-
-        if (error) throw error;
-
-        const voices = (data || []).map(mapVoiceFromDB);
-        
-        return {
-            spark: voices.filter(v => v.pricingTier === 'spark'),
-            boost: voices.filter(v => v.pricingTier === 'boost'),
-            fusion: voices.filter(v => v.pricingTier === 'fusion')
-        };
-    } catch (error) {
-        console.error('Error fetching voices grouped by tier:', error);
-        throw error;
-    }
-};
-
-/**
- * Get low-latency voices (for real-time applications)
- */
-export const getLowLatencyVoices = async (): Promise<Voice[]> => {
-    try {
-        const { data, error } = await supabase
-            .from('voices')
-            .select('*')
-            .eq('is_active', true)
-            .in('latency_tier', ['ultra-low', 'low'])
-            .eq('supports_streaming', true)
-            .order('display_order', { ascending: true });
-
-        if (error) throw error;
-
-        return (data || []).map(mapVoiceFromDB);
-    } catch (error) {
-        console.error('Error fetching low-latency voices:', error);
-        throw error;
-    }
-};
-
-/**
- * Get voices that support a specific language
- */
-export const getVoicesByLanguage = async (language: string): Promise<Voice[]> => {
-    try {
-        const { data, error } = await supabase
-            .from('voices')
-            .select('*')
-            .eq('is_active', true)
-            .or(`primary_language.eq.${language},supported_languages.cs.{${language}}`)
-            .order('display_order', { ascending: true });
-
-        if (error) throw error;
-
-        return (data || []).map(mapVoiceFromDB);
-    } catch (error) {
-        console.error(`Error fetching voices for language ${language}:`, error);
-        throw error;
-    }
-};
-
-/**
- * Get pricing tier configurations
- */
-export const getPricingTiers = async (): Promise<PricingTierConfig[]> => {
-    try {
-        const { data, error } = await supabase
-            .from('pricing_tiers')
-            .select('*')
-            .order('display_order', { ascending: true });
-
-        if (error) throw error;
-
-        return (data || []).map((t: any) => ({
-            id: t.id as PricingTier,
-            name: t.name,
-            displayName: t.display_name,
-            description: t.description,
-            basePricePerMin: Number(t.base_price_per_min),
-            maxLanguages: t.max_languages,
-            supportsStreaming: t.supports_streaming,
-            supportsVoiceCloning: t.supports_voice_cloning,
-            prioritySupport: t.priority_support,
-            badgeColor: t.badge_color,
-            iconName: t.icon_name,
-            displayOrder: t.display_order
-        }));
-    } catch (error) {
-        console.error('Error fetching pricing tiers:', error);
-        // Return default tiers as fallback
-        return [
-            {
-                id: 'spark',
-                name: 'spark',
-                displayName: 'Spark',
-                description: 'Budget-friendly voices powered by Google WaveNet',
-                basePricePerMin: 5,
-                maxLanguages: 3,
-                supportsStreaming: true,
-                supportsVoiceCloning: false,
-                prioritySupport: false,
-                badgeColor: '#3B82F6',
-                iconName: 'Lightning',
-                displayOrder: 1
-            },
-            {
-                id: 'boost',
-                name: 'boost',
-                displayName: 'Boost',
-                description: 'Premium quality with Google Chirp3-HD and OpenAI',
-                basePricePerMin: 7.5,
-                maxLanguages: 10,
-                supportsStreaming: true,
-                supportsVoiceCloning: false,
-                prioritySupport: false,
-                badgeColor: '#8B5CF6',
-                iconName: 'Rocket',
-                displayOrder: 2
-            },
-            {
-                id: 'fusion',
-                name: 'fusion',
-                displayName: 'Fusion',
-                description: 'Ultra-realistic ElevenLabs voices with voice cloning',
-                basePricePerMin: 10,
-                maxLanguages: 29,
-                supportsStreaming: true,
-                supportsVoiceCloning: true,
-                prioritySupport: true,
-                badgeColor: '#F59E0B',
-                iconName: 'Star',
-                displayOrder: 3
-            }
-        ];
-    }
-};
-
-/**
- * Get TTS provider configurations
- */
-export const getTTSProviders = async (): Promise<TTSProviderConfig[]> => {
-    try {
-        const { data, error } = await supabase
-            .from('tts_providers')
-            .select('*')
-            .eq('is_active', true)
-            .order('id', { ascending: true });
-
-        if (error) throw error;
-
-        return (data || []).map((p: any) => ({
-            id: p.id as TTSProvider,
-            name: p.name,
-            displayName: p.display_name,
-            supportsStreaming: p.supports_streaming,
-            supportsSSML: p.supports_ssml,
-            availableModels: p.available_models || [],
-            hindiSupport: p.hindi_support,
-            tamilSupport: p.tamil_support,
-            teluguSupport: p.telugu_support,
-            bengaliSupport: p.bengali_support,
-            marathiSupport: p.marathi_support,
-            gujaratiSupport: p.gujarati_support,
-            kannadaSupport: p.kannada_support,
-            malayalamSupport: p.malayalam_support,
-            punjabiSupport: p.punjabi_support,
-            urduSupport: p.urdu_support,
-            isActive: p.is_active
-        }));
-    } catch (error) {
-        console.error('Error fetching TTS providers:', error);
-        throw error;
     }
 };
 

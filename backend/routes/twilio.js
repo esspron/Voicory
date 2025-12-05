@@ -11,52 +11,6 @@ const { searchKnowledgeBase, formatRAGContext } = require('../services/rag');
 const { resolveTemplateVariables } = require('../services/template');
 const { formatMemoryForPrompt } = require('../services/memory');
 const { verifySupabaseAuth } = require('../lib/auth');
-const { processMessage } = require('../services/assistantProcessor');
-const { synthesizeWithVoiceId } = require('../services/tts');
-
-// In-memory conversation history for active calls (use Redis in production)
-const callConversations = new Map();
-
-// In-memory audio cache for TTS (use Redis/S3 in production)
-// Key: unique audio ID, Value: { audioContent, contentType, createdAt }
-const audioCache = new Map();
-
-// Clean up old audio cache entries every 5 minutes
-setInterval(() => {
-    const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
-    for (const [key, value] of audioCache.entries()) {
-        if (value.createdAt < fiveMinutesAgo) {
-            audioCache.delete(key);
-        }
-    }
-}, 60 * 1000);
-
-/**
- * Serve TTS audio for Twilio
- * GET /api/webhooks/twilio/audio/:audioId
- */
-router.get('/audio/:audioId', (req, res) => {
-    try {
-        const { audioId } = req.params;
-        const audioData = audioCache.get(audioId);
-
-        if (!audioData) {
-            return res.status(404).send('Audio not found');
-        }
-
-        const audioBuffer = Buffer.from(audioData.audioContent, 'base64');
-        res.set({
-            'Content-Type': audioData.contentType,
-            'Content-Length': audioBuffer.length,
-            'Cache-Control': 'no-cache'
-        });
-        res.send(audioBuffer);
-
-    } catch (error) {
-        console.error('❌ Error serving audio:', error);
-        res.status(500).send('Error serving audio');
-    }
-});
 
 // ============================================
 // TWILIO PHONE NUMBER IMPORT
@@ -429,47 +383,24 @@ router.post('/:userId/voice', async (req, res) => {
             console.log('📝 Call logged:', callLog?.id);
         }
 
-        // Check if streaming mode is enabled (for real-time low-latency calls)
-        const useStreaming = process.env.ENABLE_VOICE_STREAMING === 'true';
-        const backendUrl = process.env.BACKEND_URL || 'https://api.voicory.com';
-        // Support both http and https for WebSocket URL
-        const wsUrl = backendUrl
-            .replace(/^https?:\/\//, (match) => match === 'https://' ? 'wss://' : 'ws://');
+        // TODO: In production, integrate with real-time voice AI service
+        // For now, return TwiML with the assistant's first message
+        // This could be extended to:
+        // 1. Connect to a WebSocket for real-time AI conversation
+        // 2. Use Twilio <Stream> to stream audio to an AI service
+        // 3. Use <Gather> to collect speech input and process with AI
         
         res.type('text/xml');
-        
-        if (useStreaming) {
-            // ============================================
-            // STREAMING MODE - Real-time WebSocket (Low Latency ~300ms)
-            // ============================================
-            console.log('🚀 Using streaming mode for call');
-            res.send(`
-                <Response>
-                    <Connect>
-                        <Stream url="${wsUrl}/media-stream">
-                            <Parameter name="userId" value="${userId}"/>
-                            <Parameter name="phoneNumber" value="${callData.To}"/>
-                            <Parameter name="assistantId" value="${assistant.id}"/>
-                        </Stream>
-                    </Connect>
-                </Response>
-            `);
-        } else {
-            // ============================================
-            // GATHER MODE - HTTP-based (Higher Latency ~2-4s, Simpler)
-            // ============================================
-            console.log('📞 Using gather mode for call');
-            res.send(`
-                <Response>
-                    <Say voice="Polly.Joanna">${escapeXml(firstMessage)}</Say>
-                    <Gather input="speech" timeout="5" speechTimeout="auto" action="/api/webhooks/twilio/${userId}/voice/gather" method="POST">
-                        <Say voice="Polly.Joanna">I'm listening...</Say>
-                    </Gather>
-                    <Say voice="Polly.Joanna">I didn't hear anything. Goodbye!</Say>
-                    <Hangup/>
-                </Response>
-            `);
-        }
+        res.send(`
+            <Response>
+                <Say voice="Polly.Joanna">${escapeXml(firstMessage)}</Say>
+                <Gather input="speech" timeout="5" speechTimeout="auto" action="/api/webhooks/twilio/${userId}/voice/gather" method="POST">
+                    <Say voice="Polly.Joanna">I'm listening...</Say>
+                </Gather>
+                <Say voice="Polly.Joanna">I didn't hear anything. Goodbye!</Say>
+                <Hangup/>
+            </Response>
+        `);
 
     } catch (error) {
         console.error('❌ Twilio voice webhook error:', error);
@@ -486,22 +417,18 @@ router.post('/:userId/voice', async (req, res) => {
 /**
  * Twilio Voice Gather Callback - Handles speech input (User-specific)
  * POST /api/webhooks/twilio/:userId/voice/gather
- * 
- * FLOW: User Speech → LLM Processing → TTS Response → Continue Conversation
  */
 router.post('/:userId/voice/gather', async (req, res) => {
     try {
         const { userId } = req.params;
-        const { SpeechResult, CallSid, From, To, Confidence } = req.body;
+        const { SpeechResult, CallSid, From, To } = req.body;
         
         console.log('🎤 Speech gathered:', {
             userId,
             callSid: CallSid,
-            speechResult: SpeechResult,
-            confidence: Confidence
+            speechResult: SpeechResult
         });
 
-        // Handle no speech detected
         if (!SpeechResult) {
             res.type('text/xml');
             return res.send(`
@@ -521,10 +448,7 @@ router.post('/:userId/voice/gather', async (req, res) => {
             .from('phone_numbers')
             .select(`
                 *,
-                assistant:assistants(
-                    *,
-                    voice:voices(*)
-                )
+                assistant:assistants(*)
             `)
             .eq('twilio_phone_number', To)
             .eq('user_id', userId)
@@ -540,172 +464,17 @@ router.post('/:userId/voice/gather', async (req, res) => {
             `);
         }
 
-        const assistant = phoneConfig.assistant;
-        const voice = assistant.voice;
+        // TODO: In production, use OpenAI/Claude to generate a response
+        // For now, acknowledge the input
+        const acknowledgment = `I heard you say: ${SpeechResult}. Thank you for calling. We will process your request. Goodbye!`;
 
-        // ============================================
-        // CONVERSATION HISTORY MANAGEMENT
-        // ============================================
-        // Get or initialize conversation history for this call
-        if (!callConversations.has(CallSid)) {
-            callConversations.set(CallSid, {
-                messages: [],
-                startedAt: new Date(),
-                turnCount: 0
-            });
-        }
-        const conversation = callConversations.get(CallSid);
-        conversation.turnCount++;
-
-        // Add user message to history
-        conversation.messages.push({
-            role: 'user',
-            content: SpeechResult,
-            timestamp: new Date().toISOString()
-        });
-
-        // ============================================
-        // LLM PROCESSING
-        // ============================================
-        console.log('🤖 Processing with LLM...');
-        const startTime = Date.now();
-
-        let llmResponse;
-        try {
-            const result = await processMessage({
-                message: SpeechResult,
-                assistantId: assistant.id,
-                channel: 'calls', // Use 'calls' for voice
-                conversationHistory: conversation.messages.slice(-10), // Last 10 messages
-                userId: userId
-            });
-
-            llmResponse = result.response || result.text || result.message || 
-                "I'm sorry, I couldn't process your request.";
-            
-            console.log('✅ LLM response generated:', {
-                responseLength: llmResponse.length,
-                processingTime: Date.now() - startTime
-            });
-        } catch (llmError) {
-            console.error('❌ LLM processing failed:', llmError);
-            llmResponse = "I'm sorry, I'm having trouble processing that. Could you please try again?";
-        }
-
-        // Add assistant response to history
-        conversation.messages.push({
-            role: 'assistant',
-            content: llmResponse,
-            timestamp: new Date().toISOString()
-        });
-
-        // ============================================
-        // TTS RESPONSE
-        // ============================================
-        let audioUrl = null;
-        const languageCode = assistant.language || 'en-IN';
-
-        // Try to generate TTS audio if voice is configured
-        if (voice?.voice_id) {
-            try {
-                console.log('🔊 Generating TTS audio...');
-                const ttsResult = await synthesizeWithVoiceId(
-                    llmResponse,
-                    voice.voice_id,
-                    languageCode
-                );
-                
-                if (ttsResult?.success && ttsResult?.audioContent) {
-                    // Store audio in cache and generate URL
-                    const audioId = `${CallSid}_${Date.now()}`;
-                    audioCache.set(audioId, {
-                        audioContent: ttsResult.audioContent,
-                        contentType: ttsResult.contentType || 'audio/mp3',
-                        createdAt: Date.now()
-                    });
-                    
-                    // Generate the audio URL (use backend URL)
-                    const backendUrl = process.env.BACKEND_URL || 'https://api.voicory.com';
-                    audioUrl = `${backendUrl}/api/webhooks/twilio/audio/${audioId}`;
-                    console.log('✅ TTS audio cached:', audioUrl);
-                }
-            } catch (ttsError) {
-                console.error('⚠️ TTS failed, falling back to Polly:', ttsError.message);
-            }
-        }
-
-        // ============================================
-        // CHECK FOR CONVERSATION END
-        // ============================================
-        const shouldEndCall = checkForCallEnd(SpeechResult, llmResponse, conversation.turnCount);
-
-        // ============================================
-        // GENERATE TwiML RESPONSE
-        // ============================================
         res.type('text/xml');
-
-        if (shouldEndCall) {
-            // Clean up conversation history
-            setTimeout(() => callConversations.delete(CallSid), 60000);
-            
-            // Log call completion
-            await logCallTurn(CallSid, phoneConfig.id, assistant.id, userId, SpeechResult, llmResponse, 'completed');
-
-            if (audioUrl) {
-                return res.send(`
-                    <Response>
-                        <Play>${escapeXml(audioUrl)}</Play>
-                        <Say voice="Polly.Joanna">Thank you for calling. Goodbye!</Say>
-                        <Hangup/>
-                    </Response>
-                `);
-            } else {
-                return res.send(`
-                    <Response>
-                        <Say voice="Polly.Joanna">${escapeXml(llmResponse)}</Say>
-                        <Say voice="Polly.Joanna">Thank you for calling. Goodbye!</Say>
-                        <Hangup/>
-                    </Response>
-                `);
-            }
-        }
-
-        // Continue conversation
-        await logCallTurn(CallSid, phoneConfig.id, assistant.id, userId, SpeechResult, llmResponse, 'in_progress');
-
-        if (audioUrl) {
-            // Use TTS audio
-            res.send(`
-                <Response>
-                    <Play>${escapeXml(audioUrl)}</Play>
-                    <Gather input="speech" timeout="5" speechTimeout="auto" action="/api/webhooks/twilio/${userId}/voice/gather" method="POST">
-                        <Pause length="1"/>
-                    </Gather>
-                    <Say voice="Polly.Joanna">I didn't hear anything. Are you still there?</Say>
-                    <Gather input="speech" timeout="5" speechTimeout="auto" action="/api/webhooks/twilio/${userId}/voice/gather" method="POST">
-                        <Say voice="Polly.Joanna">I'm listening...</Say>
-                    </Gather>
-                    <Say voice="Polly.Joanna">Goodbye!</Say>
-                    <Hangup/>
-                </Response>
-            `);
-        } else {
-            // Fallback to Polly TTS
-            res.send(`
-                <Response>
-                    <Say voice="Polly.Joanna">${escapeXml(llmResponse)}</Say>
-                    <Gather input="speech" timeout="5" speechTimeout="auto" action="/api/webhooks/twilio/${userId}/voice/gather" method="POST">
-                        <Pause length="1"/>
-                    </Gather>
-                    <Say voice="Polly.Joanna">I didn't hear anything. Are you still there?</Say>
-                    <Gather input="speech" timeout="5" speechTimeout="auto" action="/api/webhooks/twilio/${userId}/voice/gather" method="POST">
-                        <Say voice="Polly.Joanna">I'm listening...</Say>
-                    </Gather>
-                    <Say voice="Polly.Joanna">Goodbye!</Say>
-                    <Hangup/>
-                </Response>
-            `);
-        }
+        res.send(`
+            <Response>
+                <Say voice="Polly.Joanna">${escapeXml(acknowledgment)}</Say>
+                <Hangup/>
+            </Response>
+        `);
 
     } catch (error) {
         console.error('❌ Twilio gather webhook error:', error);
@@ -718,60 +487,6 @@ router.post('/:userId/voice/gather', async (req, res) => {
         `);
     }
 });
-
-/**
- * Helper function to check if conversation should end
- */
-function checkForCallEnd(userMessage, assistantResponse, turnCount) {
-    const lowerUser = userMessage.toLowerCase();
-    const lowerAssistant = assistantResponse.toLowerCase();
-
-    // Check for goodbye phrases from user
-    const goodbyePhrases = ['goodbye', 'bye', 'thanks bye', 'thank you bye', 'that\'s all', 'nothing else', 'hang up', 'end call'];
-    const userWantsToEnd = goodbyePhrases.some(phrase => lowerUser.includes(phrase));
-
-    // Check if assistant said goodbye
-    const assistantEndPhrases = ['goodbye', 'take care', 'have a great day'];
-    const assistantEnding = assistantEndPhrases.some(phrase => lowerAssistant.includes(phrase));
-
-    // Auto-end after many turns (prevent infinite loops)
-    const maxTurns = 30;
-
-    return userWantsToEnd || assistantEnding || turnCount >= maxTurns;
-}
-
-/**
- * Helper function to log call turn to database
- */
-async function logCallTurn(callSid, phoneNumberId, assistantId, userId, userMessage, assistantResponse, status) {
-    try {
-        // Update call_logs with latest transcript
-        const { data: existingLog } = await supabase
-            .from('call_logs')
-            .select('transcript')
-            .eq('call_sid', callSid)
-            .single();
-
-        const existingTranscript = existingLog?.transcript || [];
-        const updatedTranscript = [
-            ...existingTranscript,
-            { role: 'user', content: userMessage, timestamp: new Date().toISOString() },
-            { role: 'assistant', content: assistantResponse, timestamp: new Date().toISOString() }
-        ];
-
-        await supabase
-            .from('call_logs')
-            .update({
-                transcript: updatedTranscript,
-                status: status,
-                updated_at: new Date().toISOString()
-            })
-            .eq('call_sid', callSid);
-
-    } catch (error) {
-        console.error('⚠️ Failed to log call turn:', error.message);
-    }
-}
 
 /**
  * Helper function to escape XML special characters

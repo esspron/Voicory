@@ -10,7 +10,6 @@ import { useParams, useNavigate } from 'react-router-dom';
 import CallsTab from '../components/assistant-editor/CallsTab';
 import TestsTab from '../components/assistant-editor/TestsTab';
 import ChatSidebar from '../components/assistant-editor/ChatSidebar';
-import WebRTCVoiceChat from '../components/assistant-editor/WebRTCVoiceChat';
 import KnowledgeBaseTab from '../components/assistant-editor/KnowledgeBaseTab';
 import LLMSelectorModal from '../components/assistant-editor/LLMSelectorModal';
 import MemoryTab from '../components/assistant-editor/MemoryTab';
@@ -202,7 +201,6 @@ const AssistantEditor: React.FC = () => {
     const [showPromptGenerator, setShowPromptGenerator] = useState(false);
     const [deleting, setDeleting] = useState(false);
     const [showChatSidebar, setShowChatSidebar] = useState(false);
-    const [showVoiceChatSidebar, setShowVoiceChatSidebar] = useState(false);
     
     // Clipboard for assistant ID
     const { copy: copyId, copied: copiedId } = useClipboard({ timeout: 2000 });
@@ -741,18 +739,13 @@ const AssistantEditor: React.FC = () => {
                         <ChatCircle size={16} weight="fill" className="group-hover:scale-110 transition-transform" />
                         Chat
                     </button>
-                    {/* Talk to Assistant - Voice call */}
+                    {/* Talk to Assistant - Voice call (coming soon) */}
                     <button
-                        onClick={() => setShowVoiceChatSidebar(true)}
-                        disabled={saving || !formData.voiceId}
-                        className={`group flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm transition-all ${
-                            formData.voiceId 
-                                ? 'bg-gradient-to-r from-emerald-500/20 to-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/30 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-emerald-500/20' 
-                                : 'bg-primary/10 border border-primary/30 text-primary/50 cursor-not-allowed'
-                        }`}
-                        title={formData.voiceId ? 'Voice call preview' : 'Select a voice first'}
+                        className="group flex items-center gap-2 px-4 py-2.5 bg-primary/10 border border-primary/30 rounded-xl text-sm text-primary hover:bg-primary/20 transition-all cursor-not-allowed opacity-70"
+                        disabled
+                        title="Voice calling coming soon"
                     >
-                        <Phone size={16} weight="fill" className={formData.voiceId ? 'group-hover:scale-110 transition-transform' : ''} />
+                        <Phone size={16} weight="fill" />
                         Talk to Assistant
                     </button>
                     <button
@@ -1013,16 +1006,6 @@ const AssistantEditor: React.FC = () => {
                     selectedVoice={selectedVoice}
                     activeTab={activeTab}
                     onClose={() => setShowChatSidebar(false)}
-                />
-            )}
-
-            {/* Voice Chat Sidebar - WebRTC with OpenAI Realtime STT */}
-            {showVoiceChatSidebar && (
-                <WebRTCVoiceChat
-                    assistantId={assistantId}
-                    formData={formData}
-                    selectedVoice={selectedVoice}
-                    onClose={() => setShowVoiceChatSidebar(false)}
                 />
             )}
 
