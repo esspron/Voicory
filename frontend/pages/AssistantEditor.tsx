@@ -10,7 +10,6 @@ import { useParams, useNavigate } from 'react-router-dom';
 import CallsTab from '../components/assistant-editor/CallsTab';
 import TestsTab from '../components/assistant-editor/TestsTab';
 import ChatSidebar from '../components/assistant-editor/ChatSidebar';
-import RealtimeVoiceChat from '../components/assistant-editor/RealtimeVoiceChat';
 import WebRTCVoiceChat from '../components/assistant-editor/WebRTCVoiceChat';
 import KnowledgeBaseTab from '../components/assistant-editor/KnowledgeBaseTab';
 import LLMSelectorModal from '../components/assistant-editor/LLMSelectorModal';
@@ -204,7 +203,6 @@ const AssistantEditor: React.FC = () => {
     const [deleting, setDeleting] = useState(false);
     const [showChatSidebar, setShowChatSidebar] = useState(false);
     const [showVoiceChatSidebar, setShowVoiceChatSidebar] = useState(false);
-    const [useWebRTCVoice, setUseWebRTCVoice] = useState(true); // Default to new WebRTC implementation
     
     // Clipboard for assistant ID
     const { copy: copyId, copied: copiedId } = useClipboard({ timeout: 2000 });
@@ -1018,23 +1016,14 @@ const AssistantEditor: React.FC = () => {
                 />
             )}
 
-            {/* Voice Chat Sidebar - Real-time Voice with Interruption */}
+            {/* Voice Chat Sidebar - WebRTC with OpenAI Realtime STT */}
             {showVoiceChatSidebar && (
-                useWebRTCVoice ? (
-                    <WebRTCVoiceChat
-                        assistantId={assistantId}
-                        formData={formData}
-                        selectedVoice={selectedVoice}
-                        onClose={() => setShowVoiceChatSidebar(false)}
-                    />
-                ) : (
-                    <RealtimeVoiceChat
-                        assistantId={assistantId}
-                        formData={formData}
-                        selectedVoice={selectedVoice}
-                        onClose={() => setShowVoiceChatSidebar(false)}
-                    />
-                )
+                <WebRTCVoiceChat
+                    assistantId={assistantId}
+                    formData={formData}
+                    selectedVoice={selectedVoice}
+                    onClose={() => setShowVoiceChatSidebar(false)}
+                />
             )}
 
             {/* Prompt Generator Modal */}

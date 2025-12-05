@@ -63,52 +63,57 @@ async function synthesize(options) {
 }
 
 // ============================================
-// GOOGLE CLOUD TTS - Chirp 3 HD (REST API)
+// GOOGLE CLOUD TTS - Chirp 3 HD
 // ============================================
 
-// Import Chirp 3 HD module using simple REST API
-const { 
-    synthesizeChirp3HD, 
-    synthesizeWithFullVoiceName,
-    getTTSOptimizedSystemPrompt: chirp3GetTTSOptimizedSystemPrompt,
-} = require('./googleChirp3HD');
-
-async function synthesizeGoogle(text, voiceName, languageCode, languageVoiceCodes = {}, options = {}) {
+async function synthesizeGoogle(text, voiceName, languageCode, languageVoiceCodes = {}) {
+    if (!GOOGLE_TTS_API_KEY) {
+        return { success: false, error: 'GOOGLE_TTS_API_KEY not configured' };
+    }
 
     try {
-        // Get full voice name from languageVoiceCodes if available
-        let fullVoiceName = null;
-        let actualVoiceName = voiceName || 'Achernar';
-        
+        // Build the full voice name using language_voice_codes if available
+        let fullVoiceName;
         if (languageVoiceCodes && languageVoiceCodes[languageCode]) {
-            // Use full voice name directly: "en-IN-Chirp3-HD-Achernar"
+            // Use the pre-mapped voice name (e.g., "hi-IN-Chirp3-HD-Achernar")
             fullVoiceName = languageVoiceCodes[languageCode];
-            // Extract just the voice name for logging
-            const parts = fullVoiceName.split('-');
-            actualVoiceName = parts[parts.length - 1];
+        } else {
+            // Fallback: construct the voice name
+            fullVoiceName = `${languageCode}-Chirp3-HD-${voiceName}`;
         }
 
-        console.log(`[Google TTS] Voice: ${actualVoiceName}, Language: ${languageCode}`);
+        console.log(`[Google TTS] Using voice: ${fullVoiceName}`);
 
-        // Use simple REST API synthesis
-        const audioContent = await synthesizeChirp3HD(text, {
-            voice: actualVoiceName,
-            languageCode: languageCode,
-            audioEncoding: options.audioEncoding || 'MP3',
-            speakingRate: options.speakingRate || 1.0,
-        });
-
-        // Convert Buffer to base64
-        const audioBase64 = audioContent.toString('base64');
+        const response = await axios.post(
+            `${GOOGLE_TTS_ENDPOINT}?key=${GOOGLE_TTS_API_KEY}`,
+            {
+                input: { text },
+                voice: {
+                    languageCode: languageCode,
+                    name: fullVoiceName
+                },
+                audioConfig: {
+                    audioEncoding: 'MP3',
+                    speakingRate: 1.0,
+                    pitch: 0,
+                    volumeGainDb: 0,
+                    sampleRateHertz: 24000 // High quality for Chirp 3 HD
+                }
+            },
+            {
+                headers: { 'Content-Type': 'application/json' },
+                timeout: 30000
+            }
+        );
 
         return {
             success: true,
-            audioContent: audioBase64,
-            contentType: 'audio/mpeg',
+            audioContent: response.data.audioContent, // Base64 encoded MP3
+            contentType: 'audio/mp3',
             encoding: 'base64'
         };
     } catch (error) {
-        const errorMessage = error.message || 'Google TTS synthesis failed';
+        const errorMessage = error.response?.data?.error?.message || error.message;
         console.error('[Google TTS Error]', errorMessage);
         return { success: false, error: errorMessage };
     }
@@ -330,9 +335,6 @@ function getProviderStatus() {
 // EXPORTS
 // ============================================
 
-// Re-export getTTSOptimizedSystemPrompt from googleChirp3HD for convenience
-const { getTTSOptimizedSystemPrompt } = require('./googleChirp3HD');
-
 module.exports = {
     // Main functions
     synthesize,
@@ -344,9 +346,6 @@ module.exports = {
     synthesizeGoogle,
     synthesizeElevenLabs,
     synthesizeOpenAI,
-    
-    // Chirp 3 HD specific
-    getTTSOptimizedSystemPrompt,
     
     // Status
     getProviderStatus
