@@ -63,39 +63,37 @@ async function synthesize(options) {
 }
 
 // ============================================
-// GOOGLE CLOUD TTS - Chirp 3 HD (Official SDK)
+// GOOGLE CLOUD TTS - Chirp 3 HD (REST API)
 // ============================================
 
-// Import enhanced Chirp 3 HD module using official @google-cloud/text-to-speech SDK
+// Import Chirp 3 HD module using simple REST API
 const { 
     synthesizeChirp3HD, 
-    formatTextForChirp3,
+    synthesizeWithFullVoiceName,
     getTTSOptimizedSystemPrompt: chirp3GetTTSOptimizedSystemPrompt,
-    CHIRP3_HD_CONFIG 
 } = require('./googleChirp3HD');
 
 async function synthesizeGoogle(text, voiceName, languageCode, languageVoiceCodes = {}, options = {}) {
-    // Note: Official SDK uses GOOGLE_APPLICATION_CREDENTIALS or GOOGLE_TTS_CREDENTIALS env var
-    // GOOGLE_TTS_API_KEY is kept for backward compatibility with REST API fallback
 
     try {
-        // Extract voice name from languageVoiceCodes if available
-        let actualVoiceName = voiceName;
+        // Get full voice name from languageVoiceCodes if available
+        let fullVoiceName = null;
+        let actualVoiceName = voiceName || 'Achernar';
+        
         if (languageVoiceCodes && languageVoiceCodes[languageCode]) {
-            // Extract just the voice name from full voice code (e.g., "hi-IN-Chirp3-HD-Achernar" -> "Achernar")
-            const fullName = languageVoiceCodes[languageCode];
-            const parts = fullName.split('-');
-            actualVoiceName = parts[parts.length - 1]; // Last part is the voice name
+            // Use full voice name directly: "en-IN-Chirp3-HD-Achernar"
+            fullVoiceName = languageVoiceCodes[languageCode];
+            // Extract just the voice name for logging
+            const parts = fullVoiceName.split('-');
+            actualVoiceName = parts[parts.length - 1];
         }
 
-        console.log(`[Google TTS SDK] Voice: ${actualVoiceName}, Language: ${languageCode}`);
+        console.log(`[Google TTS] Voice: ${actualVoiceName}, Language: ${languageCode}`);
 
-        // Use official SDK synthesis with natural speech formatting
+        // Use simple REST API synthesis
         const audioContent = await synthesizeChirp3HD(text, {
             voice: actualVoiceName,
-            languageCode,
-            formatText: true, // Enable conversational formatting
-            useSSML: false,   // Disable SSML for now (can be enabled for phone numbers, etc.)
+            languageCode: languageCode,
             audioEncoding: options.audioEncoding || 'MP3',
             speakingRate: options.speakingRate || 1.0,
         });
@@ -111,7 +109,7 @@ async function synthesizeGoogle(text, voiceName, languageCode, languageVoiceCode
         };
     } catch (error) {
         const errorMessage = error.message || 'Google TTS synthesis failed';
-        console.error('[Google TTS SDK Error]', errorMessage);
+        console.error('[Google TTS Error]', errorMessage);
         return { success: false, error: errorMessage };
     }
 }
@@ -349,8 +347,6 @@ module.exports = {
     
     // Chirp 3 HD specific
     getTTSOptimizedSystemPrompt,
-    CHIRP3_HD_CONFIG,
-    formatTextForChirp3,
     
     // Status
     getProviderStatus
