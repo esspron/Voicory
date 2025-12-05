@@ -389,42 +389,68 @@ class WebRTCVoiceSession {
     /**
      * Check if transcript contains meaningful speech vs filler/noise
      * Industry practice: filter out non-actionable utterances
+     * 
+     * IMPORTANT: Only filter PURE filler utterances.
+     * If there's ANY real content, let it through for interruption.
      */
     isMeaningfulSpeech(transcript) {
         if (!transcript) return false;
         
-        const cleaned = transcript.toLowerCase().trim();
+        // Remove punctuation and normalize
+        const cleaned = transcript
+            .toLowerCase()
+            .replace(/[.,!?;:'"()-]/g, '')  // Remove punctuation
+            .trim();
         
         // Too short to be meaningful (single char, etc)
         if (cleaned.length < 2) return false;
         
-        // Common filler words and non-speech sounds
-        const FILLER_PATTERNS = [
-            // English fillers
-            /^(um+|uh+|ah+|eh+|oh+|hm+|hmm+|mm+|mhm+|uh-huh|nah)$/i,
-            // Hesitations
-            /^(er+|err+|erm+)$/i,
-            // Acknowledgments that shouldn't interrupt
-            /^(okay|ok|yeah|yep|yup|yes|no|nope|sure|right|alright)$/i,
-            // Throat sounds / non-words
-            /^(ahem|cough|sigh|laugh|haha|hehe)$/i,
-            // Repeated single sounds
-            /^(.)\1{2,}$/i,  // "aaa", "mmm", etc.
-        ];
+        // PURE filler utterances (entire transcript is just this)
+        const PURE_FILLERS = new Set([
+            // Single sounds
+            'um', 'uh', 'ah', 'eh', 'oh', 'hm', 'hmm', 'mm', 'mhm', 'uhuh', 'uh huh', 'uh-huh',
+            // Hesitations  
+            'er', 'err', 'erm', 'umm', 'uhh', 'ahh',
+            // Non-speech
+            'ahem', 'cough', 'sigh', 'laugh', 'haha', 'hehe', 'lol',
+            // Repeated sounds
+            'aaa', 'mmm', 'uuu', 'eee',
+        ]);
         
-        for (const pattern of FILLER_PATTERNS) {
-            if (pattern.test(cleaned)) {
-                return false;
-            }
+        // If the entire transcript is just a filler, reject it
+        if (PURE_FILLERS.has(cleaned)) {
+            return false;
         }
         
-        // Check for actual word content (at least one word with 3+ chars)
-        const words = cleaned.split(/\s+/);
-        const hasRealWord = words.some(word => 
-            word.length >= 3 && /^[a-z]+$/i.test(word)
-        );
+        // Check if it's just repeated single char (like "aaaaaa")
+        if (/^(.)\1+$/.test(cleaned)) {
+            return false;
+        }
         
-        return hasRealWord;
+        // If we have multiple words OR a word with 3+ chars, it's meaningful
+        const words = cleaned.split(/\s+/).filter(w => w.length > 0);
+        
+        // Multiple words = meaningful (e.g., "oh sorry", "wait stop", "hold on")
+        if (words.length >= 2) {
+            return true;
+        }
+        
+        // Single word with 3+ characters = meaningful
+        if (words.length === 1 && words[0].length >= 3) {
+            // But filter out single-word acknowledgments that shouldn't interrupt
+            const SINGLE_WORD_FILLERS = new Set([
+                'okay', 'ok', 'yeah', 'yep', 'yup', 'yes', 'no', 'nope', 
+                'sure', 'right', 'alright', 'fine', 'cool', 'nice', 'great',
+                'thanks', 'thank', 'bye', 'goodbye', 'hey', 'hi', 'hello'
+            ]);
+            
+            if (SINGLE_WORD_FILLERS.has(words[0])) {
+                return false;
+            }
+            return true;
+        }
+        
+        return false;
     }
 
     // Send audio to STT
