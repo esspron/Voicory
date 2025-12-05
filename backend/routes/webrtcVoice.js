@@ -18,6 +18,33 @@ const router = express.Router();
 const activeSessions = new Map();
 
 // ============================================
+// SESSION CLEANUP (Production Memory Management)
+// ============================================
+const SESSION_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes max session lifetime
+const CLEANUP_INTERVAL_MS = 60 * 1000; // Check every minute
+
+setInterval(() => {
+    const now = Date.now();
+    let cleaned = 0;
+    
+    for (const [sessionId, session] of activeSessions.entries()) {
+        // Clean up sessions older than 5 minutes
+        if (session.createdAt && (now - session.createdAt) > SESSION_TIMEOUT_MS) {
+            // If it's a WebRTCVoiceSession with end method, call it
+            if (typeof session.end === 'function') {
+                try { session.end(); } catch (e) { /* ignore */ }
+            }
+            activeSessions.delete(sessionId);
+            cleaned++;
+        }
+    }
+    
+    if (cleaned > 0) {
+        console.log(`[WebRTC Cleanup] Removed ${cleaned} stale session(s). Active: ${activeSessions.size}`);
+    }
+}, CLEANUP_INTERVAL_MS);
+
+// ============================================
 // REST: Create Session
 // ============================================
 
@@ -83,6 +110,24 @@ router.post('/session', async (req, res) => {
 function setupWebSocket(server) {
     const { WebSocketServer } = require('ws');
     
+    // Allowed origins for WebSocket connections
+    const ALLOWED_ORIGINS = [
+        'http://localhost:5173',
+        'http://localhost:3000',
+        'https://app.voicory.com',
+        'https://voicory.com',
+        'https://www.voicory.com',
+    ];
+    
+    // Check if origin is allowed (also allows Vercel/Railway preview URLs)
+    const isOriginAllowed = (origin) => {
+        if (!origin) return process.env.NODE_ENV !== 'production'; // Allow no origin in dev
+        if (ALLOWED_ORIGINS.includes(origin)) return true;
+        if (/\.vercel\.app$/.test(origin)) return true;
+        if (/\.railway\.app$/.test(origin)) return true;
+        return false;
+    };
+    
     const wss = new WebSocketServer({ 
         noServer: true,
         perMessageDeflate: false // Disable compression for lower latency
@@ -101,6 +146,15 @@ function setupWebSocket(server) {
         // Only handle webrtc-voice paths
         if (!pathname.startsWith('/api/webrtc-voice/ws/')) {
             return; // Let other handlers deal with it
+        }
+
+        // Validate origin for security
+        const origin = request.headers.origin;
+        if (!isOriginAllowed(origin)) {
+            console.log(`[WebRTC WS] ❌ Rejected connection from origin: ${origin}`);
+            socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
+            socket.destroy();
+            return;
         }
 
         const sessionId = pathname.split('/').pop()?.split('?')[0];
@@ -179,6 +233,10 @@ function setupWebSocket(server) {
 
                 onError: (error) => {
                     sendJson(ws, { type: 'error', error: error.message });
+                },
+
+                onMetrics: (metrics) => {
+                    sendJson(ws, { type: 'metrics', metrics });
                 },
             });
 

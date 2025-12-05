@@ -60,6 +60,7 @@ class WebRTCVoiceSession {
             onAudio,
             onStateChange,
             onError,
+            onMetrics,
         } = options;
 
         this.sessionId = sessionId || `webrtc_${Date.now()}`;
@@ -73,6 +74,7 @@ class WebRTCVoiceSession {
         this.onAudio = onAudio || (() => {});
         this.onStateChange = onStateChange || (() => {});
         this.onError = onError || (() => {});
+        this.onMetrics = onMetrics || (() => {});
 
         // State
         this.state = 'idle'; // idle, listening, processing, speaking
@@ -450,6 +452,13 @@ class WebRTCVoiceSession {
             
             console.log(`[WebRTC] ⏱️ LLM response: ${llmLatency}ms`);
 
+            // Track latency metrics
+            if (!this.latencyMetrics) {
+                this.latencyMetrics = { turnCount: 0, llmLatencies: [], ttsLatencies: [], totalLatencies: [] };
+            }
+            this.latencyMetrics.turnCount++;
+            this.latencyMetrics.llmLatencies.push(llmLatency);
+
             if (responseText) {
                 // Record assistant response
                 this.conversationHistory.push({
@@ -458,8 +467,8 @@ class WebRTCVoiceSession {
                 });
                 this.onResponse(responseText);
                 
-                // Speak the response
-                await this.speakText(responseText);
+                // Speak the response (TTS latency tracked inside)
+                await this.speakText(responseText, llmLatency);
             }
 
             this.setState('listening');
@@ -511,12 +520,13 @@ class WebRTCVoiceSession {
     // TTS (Text-to-Speech)
     // ============================================
 
-    async speakText(text) {
+    async speakText(text, llmLatency = 0) {
         if (this.isEnded || !text) return;
 
         this.setState('speaking');
         this.isSpeaking = true;
         this.ttsAbortController = { aborted: false };
+        const turnStartTime = Date.now() - llmLatency; // Approximate turn start
 
         try {
             console.log(`[WebRTC] 🔊 TTS: "${text.substring(0, 50)}..."`);
@@ -565,8 +575,19 @@ class WebRTCVoiceSession {
             if (result.success) {
                 const audioBuffer = Buffer.from(result.audioContent, 'base64');
                 const ttsLatency = Date.now() - ttsStart;
+                const totalLatency = Date.now() - turnStartTime;
                 
                 console.log(`[WebRTC] ⏱️ TTS latency: ${ttsLatency}ms, size: ${audioBuffer.length} bytes`);
+                console.log(`[WebRTC] ⏱️ Total turn latency: ${totalLatency}ms`);
+                
+                // Track metrics
+                if (this.latencyMetrics) {
+                    this.latencyMetrics.ttsLatencies.push(ttsLatency);
+                    this.latencyMetrics.totalLatencies.push(totalLatency);
+                    
+                    // Emit metrics to frontend
+                    this.emitMetrics();
+                }
                 
                 // Send audio to client
                 this.onAudio(audioBuffer);
@@ -605,6 +626,40 @@ class WebRTCVoiceSession {
             console.log(`[WebRTC] State: ${this.state} → ${newState}`);
             this.state = newState;
             this.onStateChange(newState);
+        }
+    }
+
+    // ============================================
+    // METRICS
+    // ============================================
+
+    /**
+     * Calculate and emit latency metrics to frontend
+     */
+    emitMetrics() {
+        if (!this.latencyMetrics || this.latencyMetrics.turnCount === 0) return;
+
+        const calcStats = (arr) => {
+            if (!arr || arr.length === 0) return { avg: 0, p50: 0, p99: 0 };
+            const sorted = [...arr].sort((a, b) => a - b);
+            const avg = Math.round(arr.reduce((a, b) => a + b, 0) / arr.length);
+            const p50 = sorted[Math.floor(sorted.length * 0.5)] || 0;
+            const p99 = sorted[Math.floor(sorted.length * 0.99)] || sorted[sorted.length - 1] || 0;
+            return { avg, p50: Math.round(p50), p99: Math.round(p99) };
+        };
+
+        const metrics = {
+            turnCount: this.latencyMetrics.turnCount,
+            stt: { avg: 0, p50: 0, p99: 0 }, // STT handled by OpenAI Realtime
+            llm: { firstToken: calcStats(this.latencyMetrics.llmLatencies) },
+            tts: { firstChunk: calcStats(this.latencyMetrics.ttsLatencies) },
+            total: { toFirstAudio: calcStats(this.latencyMetrics.totalLatencies) }
+        };
+
+        // Send metrics to frontend via a special callback
+        // We need to use a separate callback for this
+        if (this.onMetrics) {
+            this.onMetrics(metrics);
         }
     }
 }

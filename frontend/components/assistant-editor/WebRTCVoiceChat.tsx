@@ -485,6 +485,12 @@ const WebRTCVoiceChat: React.FC<WebRTCVoiceChatProps> = ({
                 stopAudioPlayback();
                 break;
 
+            case 'stop_audio':
+                // Backend signals to stop audio (barge-in)
+                console.log('[WebRTC] 🛑 Stop audio signal received');
+                stopAudioPlayback();
+                break;
+
             case 'error':
                 setError(message.error || 'Unknown error');
                 break;
