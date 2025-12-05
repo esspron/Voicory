@@ -11,7 +11,8 @@
 const WebSocket = require('ws');
 const { openai } = require('../config');
 const { getCachedAssistant } = require('./assistant');
-const { synthesizeWithVoiceId, getVoiceConfig, getTTSOptimizedSystemPrompt } = require('./tts');
+const { synthesizeWithVoiceId, getVoiceConfig, getTTSOptimizedSystemPrompt, synthesize } = require('./tts');
+const { synthesizeChirp3HD } = require('./googleChirp3HD');
 
 // ============================================
 // CONFIGURATION
@@ -397,12 +398,40 @@ class WebRTCVoiceSession {
             console.log(`[WebRTC] 🔊 TTS: "${text.substring(0, 50)}..."`);
             
             const ttsStart = Date.now();
+            let result;
             
-            const result = await synthesizeWithVoiceId(
-                text,
-                this.resolvedConfig.voiceId,
-                this.resolvedConfig.languageSettings?.primary || 'en'
-            );
+            // If voiceId is configured, use it
+            if (this.resolvedConfig.voiceId) {
+                result = await synthesizeWithVoiceId(
+                    text,
+                    this.resolvedConfig.voiceId,
+                    this.resolvedConfig.languageSettings?.primary || 'en-IN'
+                );
+            } else {
+                // Fallback to Google Chirp 3 HD with default voice
+                console.log('[WebRTC] 🔄 Using fallback Google Chirp 3 HD TTS');
+                try {
+                    const languageCode = this.resolvedConfig.languageSettings?.primary || 'en-IN';
+                    const audioBuffer = await synthesizeChirp3HD(text, {
+                        voice: 'Puck',  // Default friendly voice
+                        languageCode: languageCode,
+                        audioEncoding: 'MP3',
+                        speakingRate: 1.0,
+                    });
+                    result = {
+                        success: true,
+                        audioContent: audioBuffer.toString('base64'),
+                    };
+                } catch (fallbackError) {
+                    console.error('[WebRTC] Fallback TTS also failed:', fallbackError.message);
+                    // Try OpenAI TTS as last resort
+                    result = await synthesize({
+                        text,
+                        provider: 'openai',
+                        voiceId: 'alloy',
+                    });
+                }
+            }
 
             if (this.ttsAbortController.aborted) {
                 console.log('[WebRTC] TTS aborted (barge-in)');
