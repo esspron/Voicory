@@ -229,7 +229,7 @@ const { data } = await supabase.from('assistants')
 - **Deployment**:
   - **Website**: Vercel (`https://www.voicory.com`)
   - **Frontend/Dashboard**: Vercel (`https://app.voicory.com`)
-  - **Backend**: Railway (`https://api.voicory.com`)
+  - **Backend**: Google Cloud Run (`https://api.voicory.com`)
 
 ## 2. Code Quality Standards (ENFORCED)
 
@@ -533,12 +533,12 @@ export const getVoices = async (): Promise<Voice[]> => {
 ## 8. Data Flow Architecture
 
 ### READ Operations → Frontend (Vercel) → Supabase Direct
-### WRITE Operations from Webhooks → Backend (Railway) → Supabase
+### WRITE Operations from Webhooks → Backend (Cloud Run) → Supabase
 
 | Operation | Path | Reason |
 |-----------|------|--------|
 | Read data | Frontend → Supabase | Fast direct connection |
-| Webhook writes | Railway → Supabase | Needs stable URL + secrets |
+| Webhook writes | Cloud Run → Supabase | Needs stable URL + secrets |
 
 ### Key Rules:
 1. **Never route reads through backend** - adds unnecessary latency
@@ -558,20 +558,30 @@ export const getVoices = async (): Promise<Voice[]> => {
 - Tables: `voices`, `assistants`, `phone_numbers`, `api_keys`, `call_logs`, `customers`, `customer_memories`, `customer_conversations`
 - **RLS**: Always active; queries scoped to authenticated user
 
-### Backend (Railway)
+### Backend (Google Cloud Run)
 - URL: `https://api.voicory.com`
+- Region: `europe-west1`
+- Service: `backendvoicory`
 - Handles: Webhooks, heavy processing, secret API calls
 - **Redis Caching**: Enabled via Upstash for performance
+- **Auto-scaling**: Min 1, Max 20 instances
+- **Auto-deploy**: Triggers on push to `main` via Cloud Build
 
 ### Redis Cache (Upstash)
 - **Provider**: Upstash (HTTP-based, serverless)
 - **Region**: Mumbai (ap-south-1)
 - **SDK**: `@upstash/redis` (HTTP mode, production recommended)
 
-#### Environment Variables (Railway)
+#### Environment Variables (Cloud Run)
 ```env
+NODE_ENV=production
+SUPABASE_URL=https://ssxirklimsdmsnwgtwfs.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=<your-service-role-key>
 UPSTASH_REDIS_REST_URL=https://your-redis.upstash.io
 UPSTASH_REDIS_REST_TOKEN=your-token
+OPENAI_API_KEY=<your-openai-key>
+FACEBOOK_APP_ID=<your-facebook-app-id>
+FACEBOOK_APP_SECRET=<your-facebook-app-secret>
 ```
 
 #### Cached Data
@@ -614,10 +624,10 @@ curl https://api.voicory.com/health
 - **CallBot**: When voice call delays > 200ms OR 1000+ users
 - **ChatBot**: When WhatsApp queue backing up OR 5000+ users
 
-### Railway Multi-Service Setup
+### Google Cloud Run Multi-Service Setup
 ```
-Railway Project
-├── backend (main) ← Currently deployed
+GCP Project: voicory
+├── backendvoicory (main) ← Currently deployed (europe-west1)
 ├── callbot ← Deploy when scaling voice
 └── chatbot ← Deploy when scaling WhatsApp
 ```
@@ -631,26 +641,37 @@ Railway Project
 5. ❌ **Don't forget icon weights** - Always specify `weight="bold"` or `weight="fill"`
 6. ❌ **Don't skip Redis cache** - Always check cache before DB queries in backend
 7. ❌ **Don't use ioredis in serverless** - Use `@upstash/redis` HTTP SDK
+8. ❌ **Don't forget PORT=8080** - Cloud Run requires port 8080 (set automatically)
 
 ## 13.1 Production URLs
 
-| Service | URL | Purpose |
-|---------|-----|---------|
-| **Website** | `https://www.voicory.com` | Marketing site (Next.js) |
-| **Dashboard** | `https://app.voicory.com` | SaaS Dashboard (React/Vite) |
-| **Backend API** | `https://api.voicory.com` | API, Webhooks, Processing |
-| **Supabase** | `https://ssxirklimsdmsnwgtwfs.supabase.co` | Database & Auth |
+| Service | URL | Platform | Purpose |
+|---------|-----|----------|--------|
+| **Website** | `https://www.voicory.com` | Vercel | Marketing site (Next.js) |
+| **Dashboard** | `https://app.voicory.com` | Vercel | SaaS Dashboard (React/Vite) |
+| **Backend API** | `https://api.voicory.com` | Google Cloud Run | API, Webhooks, Processing |
+| **Cloud Run Direct** | `https://backendvoicory-732127099858.europe-west1.run.app` | Google Cloud Run | Direct Cloud Run URL |
+| **Supabase** | `https://ssxirklimsdmsnwgtwfs.supabase.co` | Supabase | Database & Auth |
 
 ## 13.2 Deployment Commands
 
-### 🚀 Backend (Railway) - Auto-deploys on git push
+### 🚀 Backend (Google Cloud Run) - Auto-deploys on git push
 ```bash
-# Backend auto-deploys when you push to main branch
+# Backend auto-deploys when you push to main branch via Cloud Build
 cd /home/vishwasverma/vapi-in-dashboard-3/dashboard-app
 git add backend/
 git commit -m "fix: backend changes"
 git push origin main
-# Railway automatically detects changes in backend/ and deploys
+# Cloud Build automatically builds Docker image and deploys to Cloud Run
+```
+
+### 🔧 Manual Backend Deployment (if needed)
+```bash
+# Deploy backend manually via gcloud CLI
+gcloud run deploy backendvoicory \
+  --source=backend/ \
+  --region=europe-west1 \
+  --allow-unauthenticated
 ```
 
 ### 🌐 Frontend Dashboard (Vercel) - Manual deploy via CLI
@@ -684,7 +705,7 @@ git add .
 git commit -m "feat: update all services"
 git push origin main
 
-# Railway auto-deploys backend from main branch
+# Cloud Build auto-deploys backend to Cloud Run from main branch
 # Vercel auto-deploys frontend and website from main branch (if connected)
 
 # OR manual Vercel deploys:
