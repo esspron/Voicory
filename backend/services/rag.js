@@ -58,41 +58,28 @@ async function searchKnowledgeBase(query, knowledgeBaseIds, threshold = 0.5, max
  */
 function formatRAGContext(documents, ragInstructions = '') {
     if (!documents || documents.length === 0) {
-        // No documents found - but DON'T override the system prompt completely
-        // The AI should still use its identity and general instructions
+        // No documents found - minimal guidance, let the system prompt handle it
+        // Only restrict factual business questions, not identity/conversation
         return `
 
---- KNOWLEDGE BASE STATUS ---
-No specific information was found in the knowledge base for this query.
-
-GUIDELINES:
-- For questions about your identity, role, or how you can help: Use your system instructions above.
-- For specific factual questions about products, pricing, policies, or business details: Say "I don't have specific information about that in my knowledge base. Is there something else I can help you with?"
-- You can still have natural conversations and respond to greetings, small talk, and general questions using your personality from the system instructions.
---- END KNOWLEDGE BASE STATUS ---`;
+[Knowledge Base: No relevant documents found for this query]
+Note: If user asks about specific products, pricing, or policies not in your instructions, say you'll need to check on that.`;
     }
     
-    let context = '\n\n--- KNOWLEDGE BASE CONTEXT (VERIFIED INFORMATION) ---\n';
-    context += 'Use this verified information to answer questions about products, pricing, policies, and business details.\n\n';
+    let context = '\n\n--- KNOWLEDGE BASE CONTEXT ---\n';
+    context += 'Use this information to answer questions about products, pricing, policies, and business details:\n\n';
     
     documents.forEach((doc, i) => {
         const content = doc.content?.slice(0, 3000) || '';
-        context += `[Source ${i + 1}: ${doc.name}]\n${content}\n\n`;
+        context += `[${doc.name}]\n${content}\n\n`;
     });
     
-    context += '--- END KNOWLEDGE BASE CONTEXT ---\n\n';
-    
-    // Balanced anti-hallucination rules
-    context += `📋 KNOWLEDGE BASE RULES:
-1. For factual business questions (pricing, features, policies): Use ONLY the knowledge base above
-2. For identity questions ("who are you", "what's your name"): Use your system instructions
-3. For general conversation (greetings, small talk): Respond naturally using your personality
-4. DO NOT make up prices, features, dates, or business details not in the knowledge base
-5. If asked about something factual that's NOT in the knowledge base, say you don't have that information`;
+    context += '--- END KNOWLEDGE BASE ---\n';
+    context += 'For factual questions, use the knowledge base above. For identity/general questions, use your system instructions.';
 
     // Add custom RAG instructions if provided
     if (ragInstructions && ragInstructions.trim()) {
-        context += `\n\nADDITIONAL INSTRUCTIONS: ${ragInstructions}`;
+        context += `\n${ragInstructions}`;
     }
     
     return context;

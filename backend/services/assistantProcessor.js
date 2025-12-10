@@ -210,18 +210,11 @@ function buildBaseSystemPrompt(assistant) {
     let systemPrompt = assistant.instruction || assistant.system_prompt || 
         'You are a helpful, friendly AI assistant. Be conversational and helpful.';
     
-    // Prepend strong assistant identity (this should NOT be overridden by RAG)
+    // Add a simple identity reminder at the top (don't override the instruction's own identity)
+    // The instruction already contains the full role definition, so just add a reminder
     if (assistant.name) {
-        const identityBlock = `=== YOUR IDENTITY (ALWAYS USE THIS) ===
-Your name is ${assistant.name}.
-When asked "who are you", "what's your name", "are you [anything]", or similar identity questions:
-- Always introduce yourself as ${assistant.name}
-- You can mention your role/purpose from the instructions below
-- This identity information takes priority over any knowledge base restrictions
-=== END IDENTITY ===
-
-`;
-        systemPrompt = identityBlock + systemPrompt;
+        const identityReminder = `IMPORTANT: Your name is ${assistant.name}. For identity questions like "who are you", "what's your name", "are you X", always respond based on your role defined below - NOT generic responses.\n\n`;
+        systemPrompt = identityReminder + systemPrompt;
     }
 
     return systemPrompt;
