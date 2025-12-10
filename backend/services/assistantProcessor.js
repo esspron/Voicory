@@ -163,12 +163,20 @@ async function processMessage(options) {
  * Priority: assistantConfig > assistantId (for live preview)
  */
 async function resolveAssistantConfig(assistantId, assistantConfig, channel) {
+    // DEBUG: Log what we received
+    console.log('[resolveAssistantConfig] assistantId:', assistantId);
+    console.log('[resolveAssistantConfig] assistantConfig provided:', !!assistantConfig);
     if (assistantConfig) {
+        console.log('[resolveAssistantConfig] assistantConfig.instruction length:', assistantConfig.instruction?.length || 0);
+    }
+
+    if (assistantConfig && assistantConfig.instruction) {
         // Use live config (converts frontend format to DB format)
         // Now using unified 'instruction' field instead of separate prompts
+        console.log('[resolveAssistantConfig] Using LIVE assistantConfig (not DB)');
         return {
             name: assistantConfig.name,
-            instruction: assistantConfig.instruction || assistantConfig.systemPrompt,
+            instruction: assistantConfig.instruction,
             language_settings: assistantConfig.languageSettings || { default: 'en', autoDetect: false },
             style_settings: assistantConfig.styleSettings || { mode: 'friendly' },
             llm_model: assistantConfig.llmModel || DEFAULTS.LLM_MODEL,
@@ -190,6 +198,7 @@ async function resolveAssistantConfig(assistantId, assistantConfig, channel) {
 
     if (assistantId) {
         // Fetch from database (cached)
+        console.log('[resolveAssistantConfig] Using DB assistant (assistantId)');
         const assistant = await getCachedAssistant(assistantId);
         if (!assistant) return null;
 
