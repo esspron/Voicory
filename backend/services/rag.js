@@ -54,25 +54,26 @@ async function searchKnowledgeBase(query, knowledgeBaseIds, threshold = 0.5, max
 
 /**
  * Format RAG context for injection into system prompt
- * Includes strict anti-hallucination instructions
+ * Balanced approach: RAG for factual business info, but allows system prompt for identity/general questions
  */
 function formatRAGContext(documents, ragInstructions = '') {
     if (!documents || documents.length === 0) {
-        // No documents found - return strict "no info" instruction
+        // No documents found - but DON'T override the system prompt completely
+        // The AI should still use its identity and general instructions
         return `
 
 --- KNOWLEDGE BASE STATUS ---
-⚠️ NO RELEVANT INFORMATION FOUND in the knowledge base for this query.
+No specific information was found in the knowledge base for this query.
 
-STRICT INSTRUCTION: Since no relevant information was found, you MUST respond with:
-"I don't have information about that in my knowledge base. Is there something else I can help you with?"
-
-DO NOT make up information. DO NOT guess. DO NOT use your general knowledge.
+GUIDELINES:
+- For questions about your identity, role, or how you can help: Use your system instructions above.
+- For specific factual questions about products, pricing, policies, or business details: Say "I don't have specific information about that in my knowledge base. Is there something else I can help you with?"
+- You can still have natural conversations and respond to greetings, small talk, and general questions using your personality from the system instructions.
 --- END KNOWLEDGE BASE STATUS ---`;
     }
     
     let context = '\n\n--- KNOWLEDGE BASE CONTEXT (VERIFIED INFORMATION) ---\n';
-    context += '⚠️ CRITICAL: You may ONLY use the information below to answer. DO NOT add any information not present here.\n\n';
+    context += 'Use this verified information to answer questions about products, pricing, policies, and business details.\n\n';
     
     documents.forEach((doc, i) => {
         const content = doc.content?.slice(0, 3000) || '';
@@ -81,14 +82,13 @@ DO NOT make up information. DO NOT guess. DO NOT use your general knowledge.
     
     context += '--- END KNOWLEDGE BASE CONTEXT ---\n\n';
     
-    // Add strict anti-hallucination rules
-    context += `🚫 ANTI-HALLUCINATION RULES (MANDATORY):
-1. ONLY use information from the KNOWLEDGE BASE CONTEXT above
-2. If the user asks about something NOT in the context above, say: "I don't have information about that in my knowledge base."
-3. DO NOT make up prices, features, dates, names, or any other details
-4. DO NOT use your general knowledge - ONLY use the knowledge base
-5. If you're unsure, say you don't have that information
-6. Be specific and quote from the knowledge base when possible`;
+    // Balanced anti-hallucination rules
+    context += `📋 KNOWLEDGE BASE RULES:
+1. For factual business questions (pricing, features, policies): Use ONLY the knowledge base above
+2. For identity questions ("who are you", "what's your name"): Use your system instructions
+3. For general conversation (greetings, small talk): Respond naturally using your personality
+4. DO NOT make up prices, features, dates, or business details not in the knowledge base
+5. If asked about something factual that's NOT in the knowledge base, say you don't have that information`;
 
     // Add custom RAG instructions if provided
     if (ragInstructions && ragInstructions.trim()) {

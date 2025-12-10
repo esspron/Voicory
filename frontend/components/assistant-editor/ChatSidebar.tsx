@@ -5,25 +5,28 @@ import React, { useState, useRef, useEffect } from 'react';
 
 import { useAuth } from '../../contexts/AuthContext';
 import { authFetch } from '../../lib/api';
-import { Voice, LanguageSettings, StyleSettings } from '../../types';
+import { Voice, LanguageSettings, StyleSettings, DynamicVariablesConfig } from '../../types';
 
 interface AssistantFormData {
     name: string;
-    systemPrompt: string;
-    firstMessage: string;
-    messagingSystemPrompt: string;
-    messagingFirstMessage: string;
+    // Unified instruction field (like Vapi, Retell, LiveKit)
+    instruction: string;
     languageSettings: LanguageSettings;
     styleSettings: StyleSettings;
+    // Dynamic Variables for personalization
+    dynamicVariables: DynamicVariablesConfig;
     llmModel: string;
     temperature: number;
     maxTokens: number;
+    timezone: string;
     // RAG settings
     ragEnabled: boolean;
     ragSimilarityThreshold: number;
     ragMaxResults: number;
     ragInstructions: string;
     knowledgeBaseIds: string[];
+    // Memory settings
+    memoryEnabled: boolean;
 }
 
 type TabId = 'calls' | 'messages' | 'memory' | 'workflow' | 'knowledge-base' | 'analysis' | 'tools' | 'tests' | 'widget';
@@ -79,14 +82,8 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ assistantId, formData, select
             content: msg.content
         }));
 
-        // Determine which system prompt and first message to use based on active tab
+        // Determine channel based on active tab
         const isMessaging = activeTab === 'messages';
-        const systemPromptToUse = isMessaging 
-            ? (formData.messagingSystemPrompt || formData.systemPrompt)
-            : formData.systemPrompt;
-        const firstMessageToUse = isMessaging
-            ? (formData.messagingFirstMessage || formData.firstMessage)
-            : formData.firstMessage;
 
         const response = await authFetch('/api/test-chat', {
             method: 'POST',
@@ -98,19 +95,23 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ assistantId, formData, select
                 channel: isMessaging ? 'messaging' : 'calls',
                 assistantConfig: {
                     name: formData.name,
-                    systemPrompt: systemPromptToUse,
-                    firstMessage: firstMessageToUse,
+                    // Use unified 'instruction' field (matches backend expectation)
+                    instruction: formData.instruction,
                     languageSettings: formData.languageSettings,
                     styleSettings: formData.styleSettings,
+                    dynamicVariables: formData.dynamicVariables,
                     llmModel: formData.llmModel,
                     temperature: formData.temperature,
                     maxTokens: formData.maxTokens,
+                    timezone: formData.timezone,
                     // RAG settings
                     ragEnabled: formData.ragEnabled,
                     ragSimilarityThreshold: formData.ragSimilarityThreshold,
                     ragMaxResults: formData.ragMaxResults,
                     ragInstructions: formData.ragInstructions,
                     knowledgeBaseIds: formData.knowledgeBaseIds,
+                    // Memory settings
+                    memoryEnabled: formData.memoryEnabled,
                 }
             }),
         });
