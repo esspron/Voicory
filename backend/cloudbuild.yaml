@@ -1,0 +1,103 @@
+# Cloud Build configuration for auto-deploying to all 3 Cloud Run regions
+# Triggered on push to main branch
+# Deploys to: India (asia-south1), USA (us-central1), Europe (europe-west1)
+
+steps:
+  # ============================================
+  # Step 1: Build the Docker image
+  # ============================================
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'Build'
+    args:
+      - 'build'
+      - '-t'
+      - 'asia-south1-docker.pkg.dev/voicory/cloud-run-source-deploy/backendvoicory:$COMMIT_SHA'
+      - '-t'
+      - 'asia-south1-docker.pkg.dev/voicory/cloud-run-source-deploy/backendvoicory:latest'
+      - '.'
+
+  # ============================================
+  # Step 2: Push image to Artifact Registry
+  # ============================================
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'Push'
+    args:
+      - 'push'
+      - '--all-tags'
+      - 'asia-south1-docker.pkg.dev/voicory/cloud-run-source-deploy/backendvoicory'
+
+  # ============================================
+  # Step 3: Deploy to India (asia-south1)
+  # ============================================
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:slim'
+    id: 'Deploy-India'
+    entrypoint: 'gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - 'backendvoicory'
+      - '--image=asia-south1-docker.pkg.dev/voicory/cloud-run-source-deploy/backendvoicory:$COMMIT_SHA'
+      - '--region=asia-south1'
+      - '--platform=managed'
+      - '--allow-unauthenticated'
+      - '--memory=512Mi'
+      - '--cpu=1'
+      - '--min-instances=1'
+      - '--max-instances=10'
+      - '--timeout=300'
+      - '--set-env-vars=NODE_ENV=production'
+
+  # ============================================
+  # Step 4: Deploy to USA (us-central1)
+  # ============================================
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:slim'
+    id: 'Deploy-USA'
+    entrypoint: 'gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - 'backendvoicory-us'
+      - '--image=asia-south1-docker.pkg.dev/voicory/cloud-run-source-deploy/backendvoicory:$COMMIT_SHA'
+      - '--region=us-central1'
+      - '--platform=managed'
+      - '--allow-unauthenticated'
+      - '--memory=512Mi'
+      - '--cpu=1'
+      - '--min-instances=0'
+      - '--max-instances=10'
+      - '--timeout=300'
+      - '--set-env-vars=NODE_ENV=production'
+
+  # ============================================
+  # Step 5: Deploy to Europe (europe-west1)
+  # ============================================
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:slim'
+    id: 'Deploy-Europe'
+    entrypoint: 'gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - 'backendvoicory-eu'
+      - '--image=asia-south1-docker.pkg.dev/voicory/cloud-run-source-deploy/backendvoicory:$COMMIT_SHA'
+      - '--region=europe-west1'
+      - '--platform=managed'
+      - '--allow-unauthenticated'
+      - '--memory=512Mi'
+      - '--cpu=1'
+      - '--min-instances=0'
+      - '--max-instances=10'
+      - '--timeout=300'
+      - '--set-env-vars=NODE_ENV=production'
+
+# Store the built image
+images:
+  - 'asia-south1-docker.pkg.dev/voicory/cloud-run-source-deploy/backendvoicory:$COMMIT_SHA'
+  - 'asia-south1-docker.pkg.dev/voicory/cloud-run-source-deploy/backendvoicory:latest'
+
+# Build options
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: 'E2_HIGHCPU_8'
+
+# Timeout for the entire build (15 minutes)
+timeout: '900s'
