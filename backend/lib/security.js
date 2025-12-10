@@ -343,17 +343,19 @@ const xssPatterns = [
  * These fields contain natural language that may include SQL-like words
  */
 const sqlInjectionWhitelist = [
-    // Inbound call prompts
+    // Unified instruction field (new)
+    'instruction',
+    // Legacy inbound call prompts (for backwards compatibility)
     'systemPrompt',
     'system_prompt',
     'firstMessage',
     'first_message',
-    // Outbound call prompts
+    // Legacy outbound call prompts
     'outboundSystemPrompt',
     'outbound_system_prompt',
     'outboundFirstMessage',
     'outbound_first_message',
-    // Messaging prompts (WhatsApp/Chat)
+    // Legacy messaging prompts (WhatsApp/Chat)
     'messagingSystemPrompt',
     'messaging_system_prompt',
     'messagingFirstMessage',

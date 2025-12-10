@@ -1,4 +1,6 @@
 import type { Metadata } from 'next'
+import { Navbar } from '@/components/Navbar'
+import { Footer } from '@/components/Footer'
 
 export const metadata: Metadata = {
   title: 'Privacy Policy | Voicory',
@@ -7,6 +9,8 @@ export const metadata: Metadata = {
 
 export default function PrivacyPolicyPage() {
   return (
+    <>
+    <Navbar />
     <main className="min-h-screen bg-background text-textMain py-24">
       <div className="max-w-4xl mx-auto px-6 md:px-8">
         <h1 className="text-4xl md:text-5xl font-bold mb-8">Privacy Policy</h1>
@@ -27,7 +31,7 @@ export default function PrivacyPolicyPage() {
             <h3 className="text-xl font-medium mb-3">2.1 Personal Information</h3>
             <ul className="list-disc list-inside text-textMuted space-y-2 ml-4">
               <li>Name and contact information (email, phone number)</li>
-              <li>Billing information (processed securely via Stripe/Razorpay)</li>
+              <li>Billing information (processed securely via Paddle)</li>
               <li>Company/Organization details</li>
               <li>Account credentials</li>
             </ul>
@@ -83,11 +87,17 @@ export default function PrivacyPolicyPage() {
               We do not sell your personal information. We may share data with:
             </p>
             <ul className="list-disc list-inside text-textMuted space-y-2 ml-4 mt-3">
-              <li>Payment processors (Stripe, Razorpay) for billing</li>
-              <li>Cloud service providers for hosting</li>
+              <li><strong>Paddle.com</strong> — our Merchant of Record for payment processing, invoicing, and tax compliance</li>
+              <li>Cloud service providers (Google Cloud, Supabase) for hosting</li>
+              <li>AI providers (OpenAI, ElevenLabs) for voice and language processing</li>
               <li>Analytics providers (anonymized data only)</li>
               <li>Law enforcement when legally required</li>
             </ul>
+            <p className="text-textMuted leading-relaxed mt-4">
+              When you make a purchase, your payment information is collected directly by 
+              Paddle. We do not store your full credit card details. Please refer to 
+              Paddle&apos;s privacy policy for how they handle your payment data.
+            </p>
           </section>
 
           <section>
@@ -159,5 +169,7 @@ export default function PrivacyPolicyPage() {
         </div>
       </div>
     </main>
+    <Footer />
+    </>
   )
 }

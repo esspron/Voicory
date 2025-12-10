@@ -1,215 +1,182 @@
 import type { Metadata } from 'next'
+import Link from 'next/link'
+import { Navbar } from '@/components/Navbar'
+import { Footer } from '@/components/Footer'
 
 export const metadata: Metadata = {
   title: 'Refund Policy | Voicory',
-  description: 'Refund and Cancellation Policy for Voicory AI Voice Calling Platform',
+  description: 'Refund Policy for Voicory AI Voice and Chat Platform - Prepaid Credits',
 }
 
 export default function RefundPolicyPage() {
   return (
+    <>
+    <Navbar />
     <main className="min-h-screen bg-background text-textMain py-24">
       <div className="max-w-4xl mx-auto px-6 md:px-8">
-        <h1 className="text-4xl md:text-5xl font-bold mb-8">Refund & Cancellation Policy</h1>
-        <p className="text-textMuted mb-8">Last updated: January 2025</p>
+        <h1 className="text-4xl md:text-5xl font-bold mb-8">Refund Policy</h1>
+        <p className="text-textMuted mb-8">Last updated: December 2025</p>
 
         <div className="prose prose-invert max-w-none space-y-8">
           <section>
             <h2 className="text-2xl font-semibold mb-4">1. Overview</h2>
             <p className="text-textMuted leading-relaxed">
-              At Voicory, we want you to be completely satisfied with our AI voice calling 
-              platform. This policy outlines our refund and cancellation procedures.
+              Voicory operates on a <strong>prepaid credits</strong> (pay-per-usage) model. 
+              You purchase credits in advance, and these credits are consumed as you use 
+              our AI voice and chat services. This policy outlines our refund procedures 
+              for credit purchases.
             </p>
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold mb-4">2. Free Trial</h2>
+            <h2 className="text-2xl font-semibold mb-4">2. Free Credits</h2>
             <p className="text-textMuted leading-relaxed">
-              We offer a 14-day free trial with 100 minutes of call time. No credit card 
-              is required to start the trial. This allows you to fully evaluate our 
-              Service before committing to a paid plan.
+              New accounts receive <strong>50 free credits</strong> to test our services. 
+              Free credits are promotional and are not eligible for refund or cash value.
             </p>
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold mb-4">3. Subscription Cancellation</h2>
-            <h3 className="text-xl font-medium mb-3">3.1 Monthly Plans</h3>
-            <p className="text-textMuted leading-relaxed">
-              You may cancel your monthly subscription at any time. Your cancellation 
-              will take effect at the end of the current billing cycle. You will continue 
-              to have access to the Service until that date.
-            </p>
-
-            <h3 className="text-xl font-medium mb-3 mt-6">3.2 Annual Plans</h3>
-            <p className="text-textMuted leading-relaxed">
-              Annual plans can be cancelled at any time. However, refunds for annual 
-              plans are subject to the refund eligibility criteria below.
-            </p>
-
-            <h3 className="text-xl font-medium mb-3 mt-6">3.3 How to Cancel</h3>
-            <ul className="list-disc list-inside text-textMuted space-y-2 ml-4">
-              <li>Log into your Voicory dashboard</li>
-              <li>Navigate to Settings → Billing</li>
-              <li>Click &quot;Cancel Subscription&quot;</li>
-              <li>Confirm your cancellation</li>
-            </ul>
-            <p className="text-textMuted leading-relaxed mt-4">
-              Alternatively, email us at billing@voicory.com with your cancellation request.
-            </p>
-          </section>
-
-          <section>
-            <h2 className="text-2xl font-semibold mb-4">4. Refund Eligibility</h2>
+            <h2 className="text-2xl font-semibold mb-4">3. Credit Purchase Refunds</h2>
             
             <div className="bg-primary/10 border border-primary/20 rounded-xl p-6 mb-6">
-              <h3 className="text-xl font-medium mb-3 text-primary">Full Refund (Within 7 Days)</h3>
-              <p className="text-textMuted leading-relaxed">
-                If you are not satisfied with our Service, you may request a full refund 
-                within 7 days of your first paid subscription. This applies to both monthly 
-                and annual plans.
+              <h3 className="text-xl font-medium mb-3 text-primary">✅ Eligible for Full Refund</h3>
+              <p className="text-textMuted leading-relaxed mb-3">
+                You may request a <strong>full refund</strong> if:
               </p>
-            </div>
-
-            <div className="bg-surface border border-border rounded-xl p-6 mb-6">
-              <h3 className="text-xl font-medium mb-3">Partial Refund (Annual Plans Only)</h3>
-              <p className="text-textMuted leading-relaxed">
-                For annual plans cancelled after 7 days but within 30 days:
-              </p>
-              <ul className="list-disc list-inside text-textMuted space-y-2 ml-4 mt-3">
-                <li>Refund = Total paid - (Monthly rate × months used) - 10% admin fee</li>
-                <li>Minimum usage period: 1 month</li>
+              <ul className="list-disc list-inside text-textMuted space-y-2 ml-4">
+                <li>The request is made within <strong>7 days</strong> of purchase</li>
+                <li><strong>No credits</strong> from the package have been used</li>
+                <li>This is your first refund request</li>
               </ul>
             </div>
 
-            <div className="bg-surface border border-border rounded-xl p-6">
-              <h3 className="text-xl font-medium mb-3">No Refund</h3>
-              <p className="text-textMuted leading-relaxed">
-                Refunds are NOT available for:
+            <div className="bg-surface border border-white/10 rounded-xl p-6 mb-6">
+              <h3 className="text-xl font-medium mb-3">❌ NOT Eligible for Refund</h3>
+              <p className="text-textMuted leading-relaxed mb-3">
+                Refunds are <strong>not available</strong> for:
               </p>
-              <ul className="list-disc list-inside text-textMuted space-y-2 ml-4 mt-3">
-                <li>Cancellations after 30 days</li>
-                <li>Usage-based charges (extra minutes consumed)</li>
-                <li>Add-on purchases (voice cloning, integrations)</li>
+              <ul className="list-disc list-inside text-textMuted space-y-2 ml-4">
+                <li>Credit packages where <strong>any credits have been used</strong> (even 1 credit)</li>
+                <li>Purchases older than 7 days</li>
+                <li>Free or promotional credits</li>
+                <li>Bonus credits received from referrals or coupons</li>
                 <li>Accounts terminated for Terms of Service violations</li>
-                <li>Partial months of service</li>
+                <li>Multiple refund requests (one refund per customer)</li>
               </ul>
+            </div>
+
+            <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-6">
+              <h3 className="text-xl font-medium mb-3 text-amber-400">⚠️ Important Note</h3>
+              <p className="text-textMuted leading-relaxed">
+                Because credits are consumed immediately upon use, we cannot offer partial 
+                refunds for partially used packages. Please use your free credits to 
+                evaluate our service before making a purchase.
+              </p>
             </div>
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold mb-4">5. Refund Process</h2>
-            <h3 className="text-xl font-medium mb-3">5.1 Request Submission</h3>
-            <p className="text-textMuted leading-relaxed">
-              To request a refund, email billing@voicory.com with:
+            <h2 className="text-2xl font-semibold mb-4">4. How to Request a Refund</h2>
+            <p className="text-textMuted leading-relaxed mb-4">
+              To request a refund, email us at <a href="mailto:support@voicory.com" className="text-primary hover:underline">support@voicory.com</a> with:
             </p>
-            <ul className="list-disc list-inside text-textMuted space-y-2 ml-4 mt-3">
-              <li>Your registered email address</li>
-              <li>Reason for refund request</li>
-              <li>Order/Transaction ID (if available)</li>
-            </ul>
-
-            <h3 className="text-xl font-medium mb-3 mt-6">5.2 Processing Time</h3>
             <ul className="list-disc list-inside text-textMuted space-y-2 ml-4">
-              <li>Refund requests are reviewed within 3 business days</li>
-              <li>Approved refunds are processed within 5-7 business days</li>
-              <li>Credit card refunds may take 5-10 additional days to appear</li>
-              <li>UPI/Net banking refunds are typically faster (2-3 days)</li>
-            </ul>
-
-            <h3 className="text-xl font-medium mb-3 mt-6">5.3 Refund Method</h3>
-            <p className="text-textMuted leading-relaxed">
-              Refunds are issued to the original payment method used for the purchase. 
-              We cannot refund to a different payment method or account.
-            </p>
-          </section>
-
-          <section>
-            <h2 className="text-2xl font-semibold mb-4">6. Service Credits</h2>
-            <p className="text-textMuted leading-relaxed">
-              In some cases, we may offer service credits instead of monetary refunds. 
-              Service credits:
-            </p>
-            <ul className="list-disc list-inside text-textMuted space-y-2 ml-4 mt-3">
-              <li>Are applied to your account immediately</li>
-              <li>Can be used for future subscription payments or add-ons</li>
-              <li>Expire after 12 months if unused</li>
-              <li>Are non-transferable and non-refundable</li>
-            </ul>
-          </section>
-
-          <section>
-            <h2 className="text-2xl font-semibold mb-4">7. Downgrade Policy</h2>
-            <p className="text-textMuted leading-relaxed">
-              You may downgrade your plan at any time:
-            </p>
-            <ul className="list-disc list-inside text-textMuted space-y-2 ml-4 mt-3">
-              <li>Downgrade takes effect at the next billing cycle</li>
-              <li>No prorated refunds for the current cycle</li>
-              <li>Unused minutes do not carry over to lower plans</li>
-              <li>Features not included in the lower plan will be disabled</li>
-            </ul>
-          </section>
-
-          <section>
-            <h2 className="text-2xl font-semibold mb-4">8. Upgrade Policy</h2>
-            <p className="text-textMuted leading-relaxed">
-              When upgrading your plan:
-            </p>
-            <ul className="list-disc list-inside text-textMuted space-y-2 ml-4 mt-3">
-              <li>Upgrade takes effect immediately</li>
-              <li>You are charged the prorated difference for the current cycle</li>
-              <li>New features are available immediately</li>
-            </ul>
-          </section>
-
-          <section>
-            <h2 className="text-2xl font-semibold mb-4">9. Disputed Charges</h2>
-            <p className="text-textMuted leading-relaxed">
-              If you believe you were incorrectly charged:
-            </p>
-            <ul className="list-disc list-inside text-textMuted space-y-2 ml-4 mt-3">
-              <li>Contact us at billing@voicory.com within 30 days</li>
-              <li>Provide transaction details and reason for dispute</li>
-              <li>We will investigate and respond within 5 business days</li>
+              <li>Your registered email address</li>
+              <li>Order/Transaction ID (found in your billing history)</li>
+              <li>Reason for refund request</li>
             </ul>
             <p className="text-textMuted leading-relaxed mt-4">
-              Please contact us before initiating a chargeback with your bank. 
-              Chargebacks may result in account suspension and additional fees.
+              We will review your request and respond within <strong>2 business days</strong>.
             </p>
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold mb-4">10. Special Circumstances</h2>
-            <p className="text-textMuted leading-relaxed">
-              We may offer refunds outside of this policy in special circumstances:
-            </p>
-            <ul className="list-disc list-inside text-textMuted space-y-2 ml-4 mt-3">
-              <li>Extended service outages (beyond SLA guarantees)</li>
-              <li>Critical bugs affecting core functionality</li>
-              <li>Billing errors on our part</li>
-              <li>Death of the account holder (with documentation)</li>
+            <h2 className="text-2xl font-semibold mb-4">5. Refund Processing</h2>
+            <ul className="list-disc list-inside text-textMuted space-y-3 ml-4">
+              <li>
+                <strong>Processing Time:</strong> Approved refunds are processed within 
+                5-10 business days
+              </li>
+              <li>
+                <strong>Refund Method:</strong> Refunds are issued to the original payment 
+                method used for the purchase
+              </li>
+              <li>
+                <strong>Payment Processor:</strong> All refunds are processed by 
+                <strong> Paddle</strong>, our merchant of record. You will receive a 
+                confirmation email from Paddle when the refund is initiated
+              </li>
+              <li>
+                <strong>Currency:</strong> Refunds are issued in the same currency as 
+                the original purchase
+              </li>
             </ul>
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold mb-4">11. Contact Us</h2>
-            <p className="text-textMuted leading-relaxed mb-4">
-              For billing inquiries, refund requests, or questions about this policy:
+            <h2 className="text-2xl font-semibold mb-4">6. Technical Issues</h2>
+            <p className="text-textMuted leading-relaxed">
+              If you experience technical issues that prevent you from using your credits:
             </p>
-            <div className="bg-surface border border-border rounded-xl p-6">
-              <p className="text-textMuted">
-                <strong className="text-textMain">Email:</strong> billing@voicory.com
-              </p>
-              <p className="text-textMuted mt-2">
-                <strong className="text-textMain">Response Time:</strong> Within 24 hours (business days)
-              </p>
-              <p className="text-textMuted mt-2">
-                <strong className="text-textMain">Address:</strong> Voicory Technologies Pvt. Ltd.<br />
-                Bengaluru, Karnataka, India
-              </p>
-            </div>
+            <ul className="list-disc list-inside text-textMuted space-y-2 ml-4 mt-3">
+              <li>Contact <a href="mailto:support@voicory.com" className="text-primary hover:underline">support@voicory.com</a> immediately</li>
+              <li>We will investigate the issue within 24 hours</li>
+              <li>If the issue is on our end, we may offer bonus credits or a refund at our discretion</li>
+              <li>Service credits for documented downtime may be offered instead of cash refunds</li>
+            </ul>
+          </section>
+
+          <section>
+            <h2 className="text-2xl font-semibold mb-4">7. Chargebacks & Disputes</h2>
+            <p className="text-textMuted leading-relaxed">
+              If you have a concern about a charge:
+            </p>
+            <ul className="list-disc list-inside text-textMuted space-y-2 ml-4 mt-3">
+              <li><strong>Contact us first</strong> at support@voicory.com</li>
+              <li>We aim to resolve all disputes within 5 business days</li>
+              <li>If unresolved, you may contact Paddle&apos;s support</li>
+            </ul>
+            <p className="text-textMuted leading-relaxed mt-4 p-4 bg-red-500/10 border border-red-500/20 rounded-xl">
+              <strong>⚠️ Warning:</strong> Initiating a chargeback with your bank without 
+              first contacting us will result in <strong>immediate account suspension</strong> 
+              and forfeiture of all remaining credits. Please work with us to resolve any issues.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-2xl font-semibold mb-4">8. Account Closure</h2>
+            <p className="text-textMuted leading-relaxed">
+              If you close your Voicory account:
+            </p>
+            <ul className="list-disc list-inside text-textMuted space-y-2 ml-4 mt-3">
+              <li>Any remaining credits will be forfeited</li>
+              <li>Unused credits are not refundable after account closure</li>
+              <li>We recommend using your credits before closing your account</li>
+            </ul>
+          </section>
+
+          <section>
+            <h2 className="text-2xl font-semibold mb-4">9. Contact Us</h2>
+            <p className="text-textMuted leading-relaxed">
+              For refund requests or billing questions:
+            </p>
+            <ul className="list-disc list-inside text-textMuted space-y-2 ml-4 mt-3">
+              <li>Email: <a href="mailto:support@voicory.com" className="text-primary hover:underline">support@voicory.com</a></li>
+              <li>Response time: Within 2 business days</li>
+            </ul>
+          </section>
+
+          <section className="pt-8 border-t border-white/10">
+            <p className="text-textMuted text-sm">
+              This refund policy is part of our <Link href="/terms" className="text-primary hover:underline">Terms of Service</Link>. 
+              By purchasing credits, you acknowledge that you have read and agree to this policy.
+            </p>
           </section>
         </div>
       </div>
     </main>
+    <Footer />
+    </>
   )
 }

@@ -5,7 +5,7 @@ import {
     Microphone,
     SpeakerHigh,
     Brain,
-    CurrencyInr,
+    CurrencyDollar,
     Clock,
     ArrowsClockwise,
     Export,
@@ -202,7 +202,7 @@ const UsageAnalytics: React.FC = () => {
         );
     };
 
-    const formatCurrency = (value: number) => `₹${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const formatCurrency = (value: number) => `$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
     const exportLogs = () => {
         const csv = [
@@ -342,7 +342,7 @@ const UsageAnalytics: React.FC = () => {
                         <StatsCard
                             title="Total Cost"
                             value={formatCurrency(metrics?.totalCost || 0)}
-                            icon={<CurrencyInr size={20} weight="bold" />}
+                            icon={<CurrencyDollar size={20} weight="bold" />}
                             color="amber"
                             loading={loading}
                         />

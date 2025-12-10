@@ -334,7 +334,8 @@ router.post('/message', validateApiKey, validateDomain, rateLimit(120, 60000), a
     }
     
     // Build system prompt with variables
-    let systemPrompt = assistant.messaging_system_prompt || assistant.system_prompt || 'You are a helpful assistant.';
+    // Now using unified 'instruction' field
+    let systemPrompt = assistant.instruction || 'You are a helpful assistant.';
     
     // Replace variables in prompt
     const allVariables = { ...variables, ...customer };

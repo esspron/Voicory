@@ -1,4 +1,6 @@
 import type { Metadata } from 'next'
+import { Navbar } from '@/components/Navbar'
+import { Footer } from '@/components/Footer'
 
 export const metadata: Metadata = {
   title: 'Terms of Service | Voicory',
@@ -7,6 +9,8 @@ export const metadata: Metadata = {
 
 export default function TermsOfServicePage() {
   return (
+    <>
+    <Navbar />
     <main className="min-h-screen bg-background text-textMain py-24">
       <div className="max-w-4xl mx-auto px-6 md:px-8">
         <h1 className="text-4xl md:text-5xl font-bold mb-8">Terms of Service</h1>
@@ -88,38 +92,51 @@ export default function TermsOfServicePage() {
 
           <section>
             <h2 className="text-2xl font-semibold mb-4">6. Pricing and Payment</h2>
-            <h3 className="text-xl font-medium mb-3">6.1 Subscription Plans</h3>
+            <h3 className="text-xl font-medium mb-3">6.1 Prepaid Credits Model</h3>
             <p className="text-textMuted leading-relaxed">
-              We offer monthly and annual subscription plans. Prices are displayed in 
-              Indian Rupees (INR) and are subject to applicable taxes (GST at 18%).
+              Voicory operates on a <strong>prepaid credits</strong> (pay-per-usage) model. 
+              You must purchase credits before using our services. Credits are deducted 
+              as you use AI voice calls, chat messages, and other features. There are no 
+              subscriptions or recurring charges — you only pay when you buy credits.
             </p>
+            <ul className="list-disc list-inside text-textMuted space-y-2 ml-4 mt-3">
+              <li>Credits must be purchased in advance to use the Service</li>
+              <li>Credits are non-transferable between accounts</li>
+              <li>Credits do not expire</li>
+              <li>Usage rates are displayed in your dashboard and on our pricing page</li>
+            </ul>
 
             <h3 className="text-xl font-medium mb-3 mt-6">6.2 Payment Processing</h3>
             <p className="text-textMuted leading-relaxed">
-              Payments are processed securely through Razorpay and Stripe. We accept 
-              credit cards, debit cards, UPI, net banking, and international cards.
+              All payments are processed securely by <strong>Paddle.com Market Limited 
+              (&quot;Paddle&quot;)</strong>, our Merchant of Record. Paddle handles payment 
+              processing, tax collection (GST/VAT), invoicing, and compliance on our behalf. 
+              We accept credit cards, debit cards, UPI, net banking, and international cards.
+            </p>
+            <p className="text-textMuted leading-relaxed mt-3">
+              By making a purchase, you agree to Paddle&apos;s Terms of Service and Privacy Policy.
             </p>
 
-            <h3 className="text-xl font-medium mb-3 mt-6">6.3 Billing Cycle</h3>
+            <h3 className="text-xl font-medium mb-3 mt-6">6.3 Taxes</h3>
             <p className="text-textMuted leading-relaxed">
-              Subscriptions are billed in advance on a monthly or annual basis. 
-              Usage-based charges (extra minutes) are billed at the end of each cycle.
+              All applicable taxes (GST, VAT, sales tax) are calculated and collected by 
+              Paddle based on your location. Tax amounts will be shown at checkout.
             </p>
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold mb-4">7. Free Trial</h2>
+            <h2 className="text-2xl font-semibold mb-4">7. Free Credits</h2>
             <p className="text-textMuted leading-relaxed">
-              We offer a 14-day free trial for new users. The trial includes:
+              New users receive complimentary credits to test our services:
             </p>
             <ul className="list-disc list-inside text-textMuted space-y-2 ml-4 mt-3">
-              <li>100 minutes of call time</li>
+              <li>50 free credits upon account creation</li>
               <li>Access to all features</li>
-              <li>No credit card required</li>
+              <li>No credit card required to start</li>
             </ul>
             <p className="text-textMuted leading-relaxed mt-4">
-              At the end of the trial, you must upgrade to a paid plan to continue using 
-              the Service. Trial abuse (creating multiple accounts) is prohibited.
+              Free credits are for evaluation purposes only. Abuse (creating multiple 
+              accounts to obtain free credits) will result in account termination.
             </p>
           </section>
 
@@ -234,5 +251,7 @@ export default function TermsOfServicePage() {
         </div>
       </div>
     </main>
+    <Footer />
+    </>
   )
 }

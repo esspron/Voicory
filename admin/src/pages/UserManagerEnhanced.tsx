@@ -3,7 +3,7 @@ import {
     Users, 
     MagnifyingGlass, 
     ArrowsClockwise,
-    CurrencyInr,
+    CurrencyDollar,
     EnvelopeSimple,
     CalendarBlank,
     CaretDown,
@@ -176,10 +176,10 @@ const UserManagerEnhanced: React.FC = () => {
                 amount: finalAmount,
                 balance_before: currentBalance,
                 balance_after: newBalance,
-                description: creditNote || `Admin ${creditAction}: ₹${creditAmount}`,
+                description: creditNote || `Admin ${creditAction}: $${creditAmount}`,
             });
 
-            setSuccess(`Successfully ${creditAction === 'add' ? 'added' : 'deducted'} ₹${creditAmount} ${creditAction === 'add' ? 'to' : 'from'} ${selectedUser.email}`);
+            setSuccess(`Successfully ${creditAction === 'add' ? 'added' : 'deducted'} $${creditAmount} ${creditAction === 'add' ? 'to' : 'from'} ${selectedUser.email}`);
             setShowCreditModal(false);
             setCreditAmount(0);
             setCreditNote('');
@@ -263,7 +263,7 @@ const UserManagerEnhanced: React.FC = () => {
             sortable: true,
             render: (value: number) => (
                 <span className="flex items-center gap-1 text-emerald-400 font-medium">
-                    <CurrencyInr size={14} />
+                    <CurrencyDollar size={14} />
                     {value.toLocaleString()}
                 </span>
             ),
@@ -274,7 +274,7 @@ const UserManagerEnhanced: React.FC = () => {
             sortable: true,
             render: (value: number) => (
                 <span className="flex items-center gap-1 text-amber-400 font-medium">
-                    <CurrencyInr size={14} />
+                    <CurrencyDollar size={14} />
                     {value.toLocaleString()}
                 </span>
             ),
@@ -377,20 +377,20 @@ const UserManagerEnhanced: React.FC = () => {
                 />
                 <StatsCard
                     title="Total Balance"
-                    value={`₹${users.reduce((sum, u) => sum + u.credits_balance, 0).toLocaleString()}`}
-                    icon={<CurrencyInr size={20} weight="bold" />}
+                    value={`$${users.reduce((sum, u) => sum + u.credits_balance, 0).toLocaleString()}`}
+                    icon={<CurrencyDollar size={20} weight="bold" />}
                     color="emerald"
                 />
                 <StatsCard
                     title="Total Spent"
-                    value={`₹${users.reduce((sum, u) => sum + u.total_spent, 0).toLocaleString()}`}
-                    icon={<CurrencyInr size={20} weight="bold" />}
+                    value={`$${users.reduce((sum, u) => sum + u.total_spent, 0).toLocaleString()}`}
+                    icon={<CurrencyDollar size={20} weight="bold" />}
                     color="amber"
                 />
                 <StatsCard
                     title="Avg Balance"
-                    value={`₹${users.length ? Math.round(users.reduce((sum, u) => sum + u.credits_balance, 0) / users.length).toLocaleString() : 0}`}
-                    icon={<CurrencyInr size={20} weight="bold" />}
+                    value={`$${users.length ? Math.round(users.reduce((sum, u) => sum + u.credits_balance, 0) / users.length).toLocaleString() : 0}`}
+                    icon={<CurrencyDollar size={20} weight="bold" />}
                     color="primary"
                 />
             </div>
@@ -469,11 +469,11 @@ const UserManagerEnhanced: React.FC = () => {
                             </div>
                             <div className="p-4 bg-surface rounded-xl border border-white/10">
                                 <p className="text-xs text-textMuted mb-1">Credits Balance</p>
-                                <p className="text-lg font-semibold text-emerald-400">₹{selectedUser.credits_balance.toLocaleString()}</p>
+                                <p className="text-lg font-semibold text-emerald-400">${selectedUser.credits_balance.toLocaleString()}</p>
                             </div>
                             <div className="p-4 bg-surface rounded-xl border border-white/10">
                                 <p className="text-xs text-textMuted mb-1">Total Spent</p>
-                                <p className="text-lg font-semibold text-amber-400">₹{selectedUser.total_spent.toLocaleString()}</p>
+                                <p className="text-lg font-semibold text-amber-400">${selectedUser.total_spent.toLocaleString()}</p>
                             </div>
                             <div className="p-4 bg-surface rounded-xl border border-white/10">
                                 <p className="text-xs text-textMuted mb-1">Country</p>
@@ -557,7 +557,7 @@ const UserManagerEnhanced: React.FC = () => {
                     <div className="p-4 bg-surface rounded-xl border border-white/10">
                         <p className="text-sm text-textMuted mb-1">Current Balance</p>
                         <p className="text-2xl font-bold text-emerald-400">
-                            ₹{(selectedUser?.credits_balance || 0).toLocaleString()}
+                            ${(selectedUser?.credits_balance || 0).toLocaleString()}
                         </p>
                     </div>
 
@@ -587,12 +587,12 @@ const UserManagerEnhanced: React.FC = () => {
                     </div>
 
                     <Input
-                        label="Amount (₹)"
+                        label="Amount ($)"
                         type="number"
                         value={creditAmount || ''}
                         onChange={(e) => setCreditAmount(Number(e.target.value))}
                         placeholder="Enter amount"
-                        icon={<CurrencyInr size={18} />}
+                        icon={<CurrencyDollar size={18} />}
                     />
 
                     <Input
@@ -606,7 +606,7 @@ const UserManagerEnhanced: React.FC = () => {
                         <div className="p-4 bg-white/5 rounded-xl">
                             <p className="text-sm text-textMuted">New Balance</p>
                             <p className={`text-xl font-bold ${creditAction === 'add' ? 'text-emerald-400' : 'text-rose-400'}`}>
-                                ₹{((selectedUser?.credits_balance || 0) + (creditAction === 'add' ? creditAmount : -creditAmount)).toLocaleString()}
+                                ${((selectedUser?.credits_balance || 0) + (creditAction === 'add' ? creditAmount : -creditAmount)).toLocaleString()}
                             </p>
                         </div>
                     )}

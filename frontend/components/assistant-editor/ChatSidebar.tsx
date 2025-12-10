@@ -3,6 +3,7 @@ import {
 } from '@phosphor-icons/react';
 import React, { useState, useRef, useEffect } from 'react';
 
+import { useAuth } from '../../contexts/AuthContext';
 import { authFetch } from '../../lib/api';
 import { Voice, LanguageSettings, StyleSettings } from '../../types';
 
@@ -57,6 +58,9 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ assistantId, formData, select
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
 
+    // Get user for billing
+    const { user } = useAuth();
+
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     };
@@ -90,6 +94,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ assistantId, formData, select
                 message: userMessage,
                 conversationHistory,
                 assistantId,
+                userId: user?.id,
                 channel: isMessaging ? 'messaging' : 'calls',
                 assistantConfig: {
                     name: formData.name,

@@ -1,14 +1,12 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 
 import Sidebar from './components/Sidebar';
 import { AuthProvider } from './contexts/AuthContext';
 import { CurrencyProvider } from './contexts/CurrencyContext';
 import { SidebarProvider, useSidebar } from './contexts/SidebarContext';
 import ApiKeys from './pages/ApiKeys';
-import AssistantEditor from './pages/AssistantEditor';
 import Assistants from './pages/Assistants';
-import Billing from './pages/Billing';
 import CallLogs from './pages/CallLogs';
 import Customers from './pages/Customers';
 import KnowledgeBase from './pages/KnowledgeBase';
@@ -63,9 +61,6 @@ import ProtectedRoute from './components/ProtectedRoute';
 import { CommandPalette } from './components/CommandPalette';
 
 const AppRoutes: React.FC = () => {
-    const location = useLocation();
-    const isEditor = location.pathname.startsWith('/assistants/');
-
     return (
         <>
             <CommandPalette />

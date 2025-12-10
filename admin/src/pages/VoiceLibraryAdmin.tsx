@@ -7,7 +7,7 @@ import {
     PencilSimple,
     Star,
     StarHalf,
-    CurrencyInr,
+    CurrencyDollar,
     Play,
     Pause,
     Export,
@@ -242,7 +242,7 @@ const VoiceLibraryAdmin: React.FC = () => {
             sortable: true,
             render: (value: number) => (
                 <span className="flex items-center gap-1 text-emerald-400 font-medium">
-                    <CurrencyInr size={14} />
+                    <CurrencyDollar size={14} />
                     {value}
                 </span>
             ),
@@ -344,7 +344,7 @@ const VoiceLibraryAdmin: React.FC = () => {
                 <StatsCard
                     title="Premium"
                     value={voices.filter(v => v.is_premium).length.toString()}
-                    icon={<CurrencyInr size={20} weight="bold" />}
+                    icon={<CurrencyDollar size={20} weight="bold" />}
                     color="primary"
                     loading={loading}
                 />
@@ -458,7 +458,7 @@ const VoiceLibraryAdmin: React.FC = () => {
 
                     <div className="grid grid-cols-2 gap-4">
                         <Input
-                            label="Cost per Minute (₹)"
+                            label="Cost per Minute ($)"
                             type="number"
                             value={editForm.cost_per_min}
                             onChange={(e) => setEditForm({ ...editForm, cost_per_min: Number(e.target.value) })}

@@ -20,7 +20,7 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
 // Helper function to check connection
 export const checkSupabaseConnection = async () => {
     try {
-        const { data, error } = await supabase.from('voices').select('count').limit(1);
+        const { error } = await supabase.from('voices').select('count').limit(1);
         if (error) throw error;
         return { connected: true, error: null };
     } catch (error) {

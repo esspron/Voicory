@@ -15,7 +15,6 @@ import { Button } from '../components/ui/Button';
 import { FadeIn } from '../components/ui/FadeIn';
 import Select, { type SelectOption } from '../components/ui/Select';
 import WelcomeBonusBanner from '../components/WelcomeBonusBanner';
-import { useCurrency } from '../contexts/CurrencyContext';
 import { getUsageSummary } from '../services/billingService';
 import { supabase } from '../services/supabase';
 import { getCallLogs } from '../services/voicoryService';
@@ -200,7 +199,9 @@ const Overview: React.FC = () => {
     const [callLogs, setCallLogs] = useState<CallLog[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const { formatAmount } = useCurrency();
+    
+    // Format USD amount
+    const formatUSD = (amount: number): string => `$${amount.toFixed(2)}`;
 
     // Usage metrics from billing
     const [totalLLMCost, setTotalLLMCost] = useState(0);
@@ -400,7 +401,7 @@ const Overview: React.FC = () => {
                 <FadeIn delay={0.1}>
                     <StatCard
                         title="Total Cost"
-                        value={formatAmount(displayStats.totalCost)}
+                        value={formatUSD(displayStats.totalCost)}
                         change={displayStats.costChange}
                         trend={displayStats.costTrend}
                         icon={CurrencyDollar}

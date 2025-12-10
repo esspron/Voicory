@@ -3,9 +3,13 @@ import React, { useEffect, useState } from 'react';
 
 import Select, { type SelectOption } from '../../components/ui/Select';
 import { useAuth } from '../../contexts/AuthContext';
-import { useCurrency } from '../../contexts/CurrencyContext';
 import { getUserProfile, updateUserProfile } from '../../services/voicoryService';
 import { UserProfile } from '../../types';
+
+// Simple formatAmount function (USD only)
+const formatAmount = (amount: number): string => {
+    return `$${amount.toFixed(2)}`;
+};
 
 const channelOptions: SelectOption[] = [
     { value: 'daily', label: 'Daily' },
@@ -14,19 +18,18 @@ const channelOptions: SelectOption[] = [
 ];
 
 const countryOptions: SelectOption[] = [
-    { value: 'IN', label: '🇮🇳 India (₹ INR)' },
-    { value: 'US', label: '🇺🇸 United States ($ USD)' },
-    { value: 'GB', label: '🇬🇧 United Kingdom ($ USD)' },
-    { value: 'AU', label: '🇦🇺 Australia ($ USD)' },
-    { value: 'CA', label: '🇨🇦 Canada ($ USD)' },
-    { value: 'SG', label: '🇸🇬 Singapore ($ USD)' },
-    { value: 'AE', label: '🇦🇪 UAE ($ USD)' },
-    { value: 'OTHER', label: '🌍 Other ($ USD)' },
+    { value: 'US', label: '🇺🇸 United States' },
+    { value: 'IN', label: '🇮🇳 India' },
+    { value: 'GB', label: '🇬🇧 United Kingdom' },
+    { value: 'AU', label: '🇦🇺 Australia' },
+    { value: 'CA', label: '🇨🇦 Canada' },
+    { value: 'SG', label: '🇸🇬 Singapore' },
+    { value: 'AE', label: '🇦🇪 UAE' },
+    { value: 'OTHER', label: '🌍 Other' },
 ];
 
 const OrgSettings: React.FC = () => {
     const { user } = useAuth();
-    const { country, currency, currencySymbol, formatAmount, updateCurrency } = useCurrency();
     const [theme, setTheme] = useState<'dark' | 'light'>('dark');
     const [profile, setProfile] = useState<UserProfile | null>(null);
     const [loading, setLoading] = useState(true);
@@ -99,13 +102,9 @@ const OrgSettings: React.FC = () => {
                 organizationName,
                 organizationEmail,
                 channel: channel.value,
-                callConcurrencyLimit
+                callConcurrencyLimit,
+                country: selectedCountry.value
             });
-
-            // Also update currency if country changed
-            if (selectedCountry.value !== (profile?.country || 'IN')) {
-                await updateCurrency(selectedCountry.value);
-            }
 
             if (success) {
                 // Refresh profile
@@ -323,7 +322,7 @@ const OrgSettings: React.FC = () => {
                             options={countryOptions}
                         />
                         <p className="text-xs text-textMuted/60 mt-2">
-                            Currency will be {selectedCountry.value === 'IN' ? '₹ INR' : '$ USD'} for all billing displays
+                            Currency is $ USD for all billing displays
                         </p>
                     </div>
                 </div>

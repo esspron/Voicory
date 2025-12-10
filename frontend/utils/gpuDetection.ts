@@ -44,7 +44,7 @@ export function detectGPUCapabilities(): GPUCapabilities {
   };
 
   // Log for debugging (remove in production)
-  if (process.env.NODE_ENV === 'development') {
+  if (import.meta.env.DEV) {
     console.log('[GPU Detection]', cachedCapabilities);
   }
 

@@ -3,11 +3,10 @@ import React, { useState, useEffect } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 import ApplyCouponModal from '../../components/billing/ApplyCouponModal';
-import BuyCreditsModal from '../../components/billing/BuyCreditsModal';
+import AddFundsModal from '../../components/billing/AddFundsModal';
 import { useAuth } from '../../contexts/AuthContext';
-import { useCurrency } from '../../contexts/CurrencyContext';
 import { getUsageSummary, getCreditTransactions, checkBalance, CreditTransaction, UsageSummary } from '../../services/billingService';
-import { Coupon, PaymentResult } from '../../services/paymentService';
+import { Coupon, PaymentResult } from '../../services/paddleService';
 import { getUserProfile } from '../../services/voicoryService';
 import { UserProfile } from '../../types';
 
@@ -35,13 +34,26 @@ const modelDisplayNames: Record<string, string> = {
     'mixtral-8x7b': 'Mixtral 8x7B',
 };
 
+// Format USD amount
+const formatUSD = (amount: number): string => {
+    return `$${amount.toFixed(2)}`;
+};
+
+// Simple formatAmount function (USD only)
+const formatAmount = (amount: number): string => {
+    return `$${amount.toFixed(2)}`;
+};
+
+// Currency symbol (USD only)
+const currencySymbol = '$';
+
 const BillingAndAddons: React.FC = () => {
     const [hipaaEnabled, setHipaaEnabled] = useState(false);
     const [autoReloadEnabled, setAutoReloadEnabled] = useState(false);
     const [dataRetentionEnabled, setDataRetentionEnabled] = useState(false);
 
     // Modal State
-    const [showBuyCreditsModal, setShowBuyCreditsModal] = useState(false);
+    const [showAddFundsModal, setShowAddFundsModal] = useState(false);
     const [showCouponModal, setShowCouponModal] = useState(false);
     const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
 
@@ -51,7 +63,6 @@ const BillingAndAddons: React.FC = () => {
     const [transactions, setTransactions] = useState<CreditTransaction[]>([]);
     const [loading, setLoading] = useState(true);
     const { user } = useAuth();
-    const { formatAmount, currencySymbol } = useCurrency();
 
     // Fetch data on mount
     useEffect(() => {
@@ -122,7 +133,7 @@ const BillingAndAddons: React.FC = () => {
     const handleCouponApply = (coupon: Coupon) => {
         setAppliedCoupon(coupon);
         setShowCouponModal(false);
-        setShowBuyCreditsModal(true);
+        setShowAddFundsModal(true);
     };
 
     // Handle credits redeemed from promo coupons
@@ -174,17 +185,16 @@ const BillingAndAddons: React.FC = () => {
                             </div>
                             <p className="text-sm text-textMuted mb-2">Credit Balance</p>
                             <div className="flex items-baseline gap-2">
-                                <span className="text-primary text-3xl font-bold">{currencySymbol}</span>
-                                <span className="text-5xl font-bold text-textMain">{formatAmount(creditsBalance).replace(currencySymbol, '')}</span>
+                                <span className="text-5xl font-bold text-textMain">{formatUSD(creditsBalance)}</span>
                             </div>
                         </div>
                         <div className="flex flex-wrap gap-3">
                             <button 
-                                onClick={() => setShowBuyCreditsModal(true)}
+                                onClick={() => setShowAddFundsModal(true)}
                                 className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-primary to-primary/80 text-black font-semibold rounded-xl hover:shadow-lg hover:shadow-primary/25 transition-all hover:-translate-y-0.5"
                             >
                                 <Plus size={18} weight="bold" />
-                                Buy Credits
+                                Add Funds
                             </button>
                             <button 
                                 onClick={() => setShowCouponModal(true)}
@@ -210,7 +220,7 @@ const BillingAndAddons: React.FC = () => {
                             </div>
                         </div>
                         <div className="text-right">
-                            <span className="text-2xl font-bold text-primary">{formatAmount(totalCost)}</span>
+                            <span className="text-2xl font-bold text-primary">{formatUSD(totalCost)}</span>
                             <p className="text-xs text-textMuted mt-1">spent this period</p>
                         </div>
                     </div>
@@ -713,7 +723,7 @@ const BillingAndAddons: React.FC = () => {
                                                     <td className="py-3 px-2 text-textMain font-medium">{modelName}</td>
                                                     <td className="py-3 px-2 text-right text-textMain">{item.count.toLocaleString()}</td>
                                                     <td className="py-3 px-2 text-right text-textMain">{item.tokens.toLocaleString()}</td>
-                                                    <td className="py-3 px-2 text-right text-primary font-bold">{formatAmount(item.cost)}</td>
+                                                    <td className="py-3 px-2 text-right text-primary font-bold">{formatUSD(item.cost)}</td>
                                                 </tr>
                                             );
                                         })}
@@ -722,7 +732,7 @@ const BillingAndAddons: React.FC = () => {
                                         <tr className="bg-background/50">
                                             <td colSpan={4} className="py-3 px-2 text-right text-textMuted font-medium">Total</td>
                                             <td className="py-3 px-2 text-right text-textMain font-bold">{usageSummary.totalTokens.toLocaleString()}</td>
-                                            <td className="py-3 px-2 text-right text-primary font-bold text-base">{formatAmount(totalCost)}</td>
+                                            <td className="py-3 px-2 text-right text-primary font-bold text-base">{formatUSD(totalCost)}</td>
                                         </tr>
                                     </tfoot>
                                 </table>
@@ -736,7 +746,7 @@ const BillingAndAddons: React.FC = () => {
                         <h3 className="text-lg font-semibold text-textMain">Add-Ons History</h3>
                     </div>
                     <div className="p-6">
-                        <p className="text-xs text-textMuted mb-4">Add-ons are charged to your Callyy credits on the first day of each month.</p>
+                        <p className="text-xs text-textMuted mb-4">Add-ons are charged to your Voicory credits on the first day of each month.</p>
                         <div className="text-center py-8 text-textMuted text-sm">
                             No data available
                         </div>
@@ -745,10 +755,10 @@ const BillingAndAddons: React.FC = () => {
             </div>
 
             {/* Modals */}
-            <BuyCreditsModal
-                isOpen={showBuyCreditsModal}
+            <AddFundsModal
+                isOpen={showAddFundsModal}
                 onClose={() => {
-                    setShowBuyCreditsModal(false);
+                    setShowAddFundsModal(false);
                     setAppliedCoupon(null);
                 }}
                 onSuccess={handlePaymentSuccess}

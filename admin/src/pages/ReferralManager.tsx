@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
     UsersThree,
     Gift,
-    CurrencyInr,
+    CurrencyDollar,
     ArrowsClockwise,
     Export,
     Copy,
@@ -197,7 +197,7 @@ const ReferralManager: React.FC = () => {
             sortable: true,
             render: (value: number) => (
                 <span className="text-emerald-400 font-medium flex items-center gap-1">
-                    <CurrencyInr size={14} />
+                    <CurrencyDollar size={14} />
                     {value.toLocaleString()}
                 </span>
             ),
@@ -250,7 +250,7 @@ const ReferralManager: React.FC = () => {
             sortable: true,
             render: (value: number, row: ReferralReward) => (
                 <span className="text-emerald-400 font-medium flex items-center gap-1">
-                    <CurrencyInr size={14} />
+                    <CurrencyDollar size={14} />
                     {value.toLocaleString()}
                     <span className="text-textMuted text-xs">({row.reward_type})</span>
                 </span>
@@ -261,7 +261,7 @@ const ReferralManager: React.FC = () => {
             header: 'Qualifying Purchase',
             render: (value: number) => (
                 value ? (
-                    <span className="text-textMain">₹{value.toLocaleString()}</span>
+                    <span className="text-textMain">${value.toLocaleString()}</span>
                 ) : (
                     <span className="text-textMuted">-</span>
                 )
@@ -328,14 +328,14 @@ const ReferralManager: React.FC = () => {
                 />
                 <StatsCard
                     title="Rewards Paid"
-                    value={`₹${totalRewardAmount.toLocaleString()}`}
-                    icon={<CurrencyInr size={20} weight="bold" />}
+                    value={`$${totalRewardAmount.toLocaleString()}`}
+                    icon={<CurrencyDollar size={20} weight="bold" />}
                     color="emerald"
                     loading={loading}
                 />
                 <StatsCard
                     title="Avg Reward"
-                    value={`₹${Math.round(totalRewardAmount / (totalRewards || 1)).toLocaleString()}`}
+                    value={`$${Math.round(totalRewardAmount / (totalRewards || 1)).toLocaleString()}`}
                     icon={<Gift size={20} weight="bold" />}
                     color="amber"
                     loading={loading}

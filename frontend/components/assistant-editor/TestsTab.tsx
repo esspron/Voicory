@@ -5,8 +5,7 @@ import { Voice } from '../../types';
 
 interface AssistantFormData {
     name: string;
-    systemPrompt: string;
-    firstMessage: string;
+    instruction: string;
 }
 
 interface TestsTabProps {

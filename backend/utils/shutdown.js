@@ -3,7 +3,14 @@
 // ============================================
 const { getRedis } = require('../services/cache');
 
-function setupGracefulShutdown(app, supabase, port) {
+// Optional cleanup callback for WebSocket server
+let wsCleanupCallback = null;
+
+function setWebSocketCleanup(callback) {
+    wsCleanupCallback = callback;
+}
+
+function setupGracefulShutdown(app, supabase, port, onServerReady) {
     let isShuttingDown = false;
     const activeConnections = new Set();
 
@@ -12,6 +19,11 @@ function setupGracefulShutdown(app, supabase, port) {
         console.log(`✅ Server running on 0.0.0.0:${port}`);
         console.log(`   Environment: ${process.env.NODE_ENV || 'development'}`);
         console.log(`   Redis: ${getRedis() ? 'connected' : 'not configured'}`);
+        
+        // Call the onServerReady callback with the server instance
+        if (onServerReady && typeof onServerReady === 'function') {
+            onServerReady(server);
+        }
     });
 
     server.on('connection', (connection) => {
@@ -24,6 +36,16 @@ function setupGracefulShutdown(app, supabase, port) {
         isShuttingDown = true;
         
         console.log(`\n⚠️ ${signal} received. Starting graceful shutdown...`);
+        
+        // Close WebSocket server first if configured
+        if (wsCleanupCallback) {
+            try {
+                await wsCleanupCallback();
+                console.log('✅ WebSocket server closed');
+            } catch (err) {
+                console.error('Error closing WebSocket server:', err.message);
+            }
+        }
         
         server.close(async (err) => {
             if (err) {
@@ -88,4 +110,4 @@ function setupGracefulShutdown(app, supabase, port) {
     return server;
 }
 
-module.exports = { setupGracefulShutdown };
+module.exports = { setupGracefulShutdown, setWebSocketCleanup };

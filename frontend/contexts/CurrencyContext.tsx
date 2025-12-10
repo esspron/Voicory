@@ -1,132 +1,54 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useCallback } from 'react';
 
-import { getUserProfile, updateUserProfile } from '../services/voicoryService';
-
-import { useAuth } from './AuthContext';
-
-// Exchange rate: 1 USD = 83 INR (approximate)
-const USD_TO_INR_RATE = 83;
+export type Currency = 'USD' | 'INR';
 
 interface CurrencyContextType {
-    country: string;
-    currency: string;
+    currency: Currency;
+    setCurrency: (currency: Currency) => void;
     currencySymbol: string;
-    isLoading: boolean;
-    // Format amount in user's currency
-    formatAmount: (amountInINR: number) => string;
-    // Get raw converted amount
-    convertFromINR: (amountInINR: number) => number;
-    // Update user's currency preference
-    updateCurrency: (country: string) => Promise<void>;
+    formatAmount: (amount: number, options?: FormatOptions) => string;
+    convertToDisplay: (amountInUSD: number) => number;
 }
+
+interface FormatOptions {
+    decimals?: number;
+    showSymbol?: boolean;
+}
+
+const CURRENCY_CONFIG: Record<Currency, { symbol: string; exchangeRate: number; locale: string }> = {
+    USD: { symbol: '$', exchangeRate: 1, locale: 'en-US' },
+    INR: { symbol: '₹', exchangeRate: 83, locale: 'en-IN' }, // Approximate exchange rate
+};
 
 const CurrencyContext = createContext<CurrencyContextType | undefined>(undefined);
 
-interface CurrencyProviderProps {
-    children: ReactNode;
-}
+export const CurrencyProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+    // Default to USD, can be extended to persist in localStorage or user profile
+    const [currency, setCurrency] = useState<Currency>('USD');
 
-export const CurrencyProvider: React.FC<CurrencyProviderProps> = ({ children }) => {
-    const { user } = useAuth();
-    const [country, setCountry] = useState<string>('IN');
-    const [currency, setCurrency] = useState<string>('INR');
-    const [currencySymbol, setCurrencySymbol] = useState<string>('₹');
-    const [isLoading, setIsLoading] = useState(true);
+    const currencyConfig = CURRENCY_CONFIG[currency];
+    const currencySymbol = currencyConfig.symbol;
 
-    // Load user's currency preference
-    useEffect(() => {
-        const loadCurrencyPreference = async () => {
-            if (!user) {
-                setIsLoading(false);
-                return;
-            }
+    const convertToDisplay = useCallback((amountInUSD: number): number => {
+        return amountInUSD * currencyConfig.exchangeRate;
+    }, [currencyConfig.exchangeRate]);
 
-            try {
-                const profile = await getUserProfile();
-                if (profile) {
-                    setCountry(profile.country || 'IN');
-                    setCurrency(profile.currency || 'INR');
-                    setCurrencySymbol(profile.currencySymbol || '₹');
-                }
-            } catch (error) {
-                console.error('Error loading currency preference:', error);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-
-        loadCurrencyPreference();
-    }, [user]);
-
-    // Convert amount from INR to user's currency
-    const convertFromINR = useCallback((amountInINR: number): number => {
-        if (currency === 'INR') {
-            return amountInINR;
-        }
-        // Convert to USD
-        return amountInINR / USD_TO_INR_RATE;
-    }, [currency]);
-
-    // Format amount with currency symbol
-    const formatAmount = useCallback((amountInINR: number): string => {
-        const convertedAmount = convertFromINR(amountInINR);
+    const formatAmount = useCallback((amount: number, options?: FormatOptions): string => {
+        const { decimals = 2, showSymbol = true } = options || {};
+        const displayAmount = convertToDisplay(amount);
+        const formattedNumber = displayAmount.toFixed(decimals);
         
-        if (currency === 'INR') {
-            // Indian format: ₹1,23,456.78
-            return `₹${convertedAmount.toLocaleString('en-IN', { 
-                minimumFractionDigits: 2, 
-                maximumFractionDigits: 2 
-            })}`;
-        }
-        
-        // USD format: $1,234.56
-        return `$${convertedAmount.toLocaleString('en-US', { 
-            minimumFractionDigits: 2, 
-            maximumFractionDigits: 2 
-        })}`;
-    }, [currency, convertFromINR]);
-
-    // Update user's currency preference
-    const updateCurrency = useCallback(async (newCountry: string): Promise<void> => {
-        const isIndia = newCountry === 'IN' || newCountry.toLowerCase() === 'india';
-        
-        const newCurrency = isIndia ? 'INR' : 'USD';
-        const newSymbol = isIndia ? '₹' : '$';
-        const countryCode = isIndia ? 'IN' : newCountry;
-
-        // Update local state immediately
-        setCountry(countryCode);
-        setCurrency(newCurrency);
-        setCurrencySymbol(newSymbol);
-
-        // Persist to database
-        try {
-            await updateUserProfile({
-                country: countryCode,
-                currency: newCurrency,
-                currencySymbol: newSymbol
-            } as any);
-        } catch (error) {
-            console.error('Error updating currency preference:', error);
-            // Revert on error
-            setCountry(country);
-            setCurrency(currency);
-            setCurrencySymbol(currencySymbol);
-        }
-    }, [country, currency, currencySymbol]);
-
-    const value: CurrencyContextType = {
-        country,
-        currency,
-        currencySymbol,
-        isLoading,
-        formatAmount,
-        convertFromINR,
-        updateCurrency
-    };
+        return showSymbol ? `${currencySymbol}${formattedNumber}` : formattedNumber;
+    }, [convertToDisplay, currencySymbol]);
 
     return (
-        <CurrencyContext.Provider value={value}>
+        <CurrencyContext.Provider value={{
+            currency,
+            setCurrency,
+            currencySymbol,
+            formatAmount,
+            convertToDisplay,
+        }}>
             {children}
         </CurrencyContext.Provider>
     );
@@ -139,5 +61,3 @@ export const useCurrency = (): CurrencyContextType => {
     }
     return context;
 };
-
-export default CurrencyContext;

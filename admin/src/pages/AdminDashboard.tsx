@@ -10,6 +10,7 @@ import {
     Robot,
     SpeakerHigh,
     Brain,
+    CurrencyDollar,
     UsersThree,
     WhatsappLogo,
     Phone,
@@ -50,6 +51,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                 { to: '/assistants', icon: Robot, label: 'Assistants' },
                 { to: '/voices', icon: SpeakerHigh, label: 'Voice Library' },
                 { to: '/llm-pricing', icon: Brain, label: 'LLM Pricing' },
+                { to: '/service-pricing', icon: CurrencyDollar, label: 'Service Pricing' },
             ],
         },
         {

@@ -3,7 +3,7 @@ import {
     Users, 
     MagnifyingGlass, 
     ArrowsClockwise,
-    CurrencyInr,
+    CurrencyDollar,
     EnvelopeSimple,
     CalendarBlank,
     CaretDown,
@@ -171,7 +171,7 @@ const UserManager: React.FC = () => {
                     <div className="relative">
                         <p className="text-textMuted text-xs font-medium mb-1">Total Balance</p>
                         <p className="text-2xl font-bold text-emerald-400">
-                            ₹{totalBalance.toLocaleString()}
+                            ${totalBalance.toLocaleString()}
                         </p>
                     </div>
                 </div>
@@ -180,7 +180,7 @@ const UserManager: React.FC = () => {
                     <div className="relative">
                         <p className="text-textMuted text-xs font-medium mb-1">Total Spent</p>
                         <p className="text-2xl font-bold text-amber-400">
-                            ₹{totalSpent.toLocaleString()}
+                            ${totalSpent.toLocaleString()}
                         </p>
                     </div>
                 </div>
@@ -189,7 +189,7 @@ const UserManager: React.FC = () => {
                     <div className="relative">
                         <p className="text-textMuted text-xs font-medium mb-1">Avg Balance</p>
                         <p className="text-2xl font-bold text-primary">
-                            ₹{users.length ? Math.round(totalBalance / users.length).toLocaleString() : 0}
+                            ${users.length ? Math.round(totalBalance / users.length).toLocaleString() : 0}
                         </p>
                     </div>
                 </div>
@@ -290,13 +290,13 @@ const UserManager: React.FC = () => {
                                         </td>
                                         <td className="px-6 py-4">
                                             <span className="flex items-center gap-1 text-emerald-400 font-medium">
-                                                <CurrencyInr size={14} />
+                                                <CurrencyDollar size={14} />
                                                 {(user.balance || 0).toLocaleString()}
                                             </span>
                                         </td>
                                         <td className="px-6 py-4">
                                             <span className="flex items-center gap-1 text-amber-400 font-medium">
-                                                <CurrencyInr size={14} />
+                                                <CurrencyDollar size={14} />
                                                 {(user.total_spent || 0).toLocaleString()}
                                             </span>
                                         </td>

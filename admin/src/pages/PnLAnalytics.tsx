@@ -11,7 +11,7 @@ import {
     CaretDown,
     Warning,
     CheckCircle,
-    CurrencyInr,
+    CurrencyDollar,
     Buildings,
     CreditCard,
     Phone,
@@ -330,7 +330,7 @@ const PnLAnalytics: React.FC = () => {
         fetchData();
     }, [fetchData]);
 
-    const formatCurrency = (value: number) => `₹${value.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+    const formatCurrency = (value: number) => `$${value.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
     const formatPercent = (value: number) => `${value.toFixed(1)}%`;
 
     // Generate month options (last 12 months)
@@ -606,7 +606,7 @@ const PnLAnalytics: React.FC = () => {
             <div className="bg-surface/80 backdrop-blur-xl border border-white/5 rounded-2xl overflow-hidden">
                 <div className="p-4 border-b border-white/5 flex items-center justify-between">
                     <h2 className="font-semibold text-textMain flex items-center gap-2">
-                        <CurrencyInr size={18} className="text-amber-400" />
+                        <CurrencyDollar size={18} className="text-amber-400" />
                         Provider Costs (Your Expenses)
                     </h2>
                     <button
@@ -652,7 +652,7 @@ const PnLAnalytics: React.FC = () => {
                             </select>
                             <input
                                 type="number"
-                                placeholder="Amount (₹)"
+                                placeholder="Amount ($)"
                                 value={newCost.amount}
                                 onChange={(e) => setNewCost({ ...newCost, amount: e.target.value })}
                                 className="px-3 py-2 bg-surface border border-white/10 rounded-lg text-textMain text-sm"

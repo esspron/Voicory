@@ -6,7 +6,7 @@ import {
     Eye,
     Phone,
     ChatsCircle,
-    CurrencyInr,
+    CurrencyDollar,
     Brain,
     SpeakerHigh,
     CalendarBlank,
@@ -175,7 +175,7 @@ const AssistantManager: React.FC = () => {
             sortable: true,
             render: (value: number) => (
                 <span className="text-amber-400 font-medium">
-                    ₹{value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    ${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
             ),
         },
@@ -246,8 +246,8 @@ const AssistantManager: React.FC = () => {
                 />
                 <StatsCard
                     title="Total Usage Cost"
-                    value={`₹${assistants.reduce((sum, a) => sum + a.total_cost, 0).toLocaleString()}`}
-                    icon={<CurrencyInr size={20} weight="bold" />}
+                    value={`$${assistants.reduce((sum, a) => sum + a.total_cost, 0).toLocaleString()}`}
+                    icon={<CurrencyDollar size={20} weight="bold" />}
                     color="amber"
                     loading={loading}
                 />
@@ -348,7 +348,7 @@ const AssistantManager: React.FC = () => {
                             <div className="p-4 bg-surface rounded-xl border border-white/10">
                                 <p className="text-xs text-textMuted mb-1">Total Cost</p>
                                 <p className="text-lg font-semibold text-amber-400">
-                                    ₹{selectedAssistant.total_cost.toLocaleString()}
+                                    ${selectedAssistant.total_cost.toLocaleString()}
                                 </p>
                             </div>
                             <div className="p-4 bg-surface rounded-xl border border-white/10">

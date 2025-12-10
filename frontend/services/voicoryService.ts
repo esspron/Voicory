@@ -84,8 +84,16 @@ const mapVoiceFromDB = (v: any): Voice => ({
     name: v.name,
     description: v.description || undefined,
     gender: v.gender as Voice['gender'],
+    
+    // TTS Provider fields (NEW)
+    ttsProvider: v.tts_provider || 'elevenlabs',
+    providerVoiceId: v.provider_voice_id || undefined,
+    providerModel: v.provider_model || undefined,
+    
+    // Legacy ElevenLabs fields
     elevenlabsVoiceId: v.elevenlabs_voice_id,
     elevenlabsModelId: v.elevenlabs_model_id || 'eleven_multilingual_v2',
+    
     accent: v.accent,
     primaryLanguage: v.primary_language,
     supportedLanguages: v.supported_languages || [],
@@ -98,6 +106,13 @@ const mapVoiceFromDB = (v: any): Voice => ({
     isFeatured: v.is_featured,
     isPremium: v.is_premium || false,
     displayOrder: v.display_order || 0,
+    
+    // Performance tiers
+    pricingTier: v.pricing_tier || 'fusion',
+    latencyTier: v.latency_tier || 'low',
+    qualityTier: v.quality_tier || 'premium',
+    supportsStreaming: v.supports_streaming ?? true,
+    
     previewUrl: v.preview_url || undefined,
     createdAt: v.created_at,
     updatedAt: v.updated_at
@@ -287,8 +302,8 @@ const mapAssistantFromDB = (a: any): Assistant => ({
     createdAt: a.created_at,
     updatedAt: a.updated_at,
     status: a.status as Assistant['status'],
-    systemPrompt: a.system_prompt || undefined,
-    firstMessage: a.first_message || undefined,
+    // Unified instruction (like Vapi, Retell, LiveKit)
+    instruction: a.instruction || undefined,
     elevenlabsModelId: a.elevenlabs_model_id || 'eleven_multilingual_v2',
     language: a.language || 'en',
     // Language & Style Settings (NEW)
@@ -392,8 +407,7 @@ export const createAssistant = async (input: AssistantInput): Promise<Assistant 
         };
 
         // Optional fields
-        if (input.systemPrompt) insertData.system_prompt = input.systemPrompt;
-        if (input.firstMessage) insertData.first_message = input.firstMessage;
+        if (input.instruction) insertData.instruction = input.instruction;
         if (input.voiceId) insertData.voice_id = input.voiceId;
         if (input.elevenlabsModelId) insertData.elevenlabs_model_id = input.elevenlabsModelId;
         if (input.language) insertData.language = input.language;
@@ -442,8 +456,7 @@ export const updateAssistant = async (id: string, input: Partial<AssistantInput>
 
         // Map fields to database column names
         if (input.name !== undefined) updateData.name = input.name;
-        if (input.systemPrompt !== undefined) updateData.system_prompt = input.systemPrompt;
-        if (input.firstMessage !== undefined) updateData.first_message = input.firstMessage;
+        if (input.instruction !== undefined) updateData.instruction = input.instruction;
         if (input.voiceId !== undefined) updateData.voice_id = input.voiceId || null;
         if (input.elevenlabsModelId !== undefined) updateData.elevenlabs_model_id = input.elevenlabsModelId;
         if (input.language !== undefined) updateData.language = input.language;
@@ -516,10 +529,10 @@ export const duplicateAssistant = async (id: string): Promise<Assistant | null> 
         if (!existing) throw new Error('Assistant not found');
 
         // Create a copy with a new name
+        // Use unified instruction field instead of legacy systemPrompt/firstMessage
         const newAssistant = await createAssistant({
             name: `${existing.name} (Copy)`,
-            systemPrompt: existing.systemPrompt,
-            firstMessage: existing.firstMessage,
+            instruction: existing.instruction,
             voiceId: existing.voiceId,
             elevenlabsModelId: existing.elevenlabsModelId,
             language: existing.language,

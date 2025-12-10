@@ -356,9 +356,9 @@ router.post('/:userId/voice', async (req, res) => {
             name: assistant.name
         });
 
-        // Get the first message or use a default greeting
-        const firstMessage = assistant.first_message || 
-            `Hello! Thank you for calling. I'm ${assistant.name || 'your AI assistant'}. How can I help you today?`;
+        // Generate a first message for voice calls
+        // Since we use unified instruction, generate a basic greeting with assistant name
+        const firstMessage = `Hello! Thank you for calling. I'm ${assistant.name || 'your AI assistant'}. How can I help you today?`;
 
         // Log the incoming call to the database
         const { data: callLog, error: logError } = await supabase

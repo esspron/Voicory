@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-    CurrencyInr,
+    CurrencyDollar,
     TrendUp,
     TrendDown,
     ArrowsClockwise,
@@ -209,7 +209,7 @@ const RevenueAnalytics: React.FC = () => {
             case 'bonus': return <Sparkle size={16} className="text-violet-400" />;
             case 'refund': return <ArrowUUpLeft size={16} className="text-rose-400" />;
             case 'referral': return <Users size={16} className="text-blue-400" />;
-            default: return <CurrencyInr size={16} className="text-textMuted" />;
+            default: return <CurrencyDollar size={16} className="text-textMuted" />;
         }
     };
 
@@ -228,7 +228,7 @@ const RevenueAnalytics: React.FC = () => {
         );
     };
 
-    const formatCurrency = (value: number) => `₹${value.toLocaleString()}`;
+    const formatCurrency = (value: number) => `$${value.toLocaleString()}`;
 
     const exportTransactions = () => {
         const csv = [
@@ -281,7 +281,7 @@ const RevenueAnalytics: React.FC = () => {
             sortable: true,
             render: (value: number) => (
                 <span className={`font-semibold flex items-center gap-1 ${value >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                    <CurrencyInr size={14} />
+                    <CurrencyDollar size={14} />
                     {value >= 0 ? '+' : ''}{value.toLocaleString()}
                 </span>
             ),
@@ -290,14 +290,14 @@ const RevenueAnalytics: React.FC = () => {
             key: 'balance_before',
             header: 'Before',
             render: (value: number) => (
-                <span className="text-textMuted">₹{value.toLocaleString()}</span>
+                <span className="text-textMuted">${value.toLocaleString()}</span>
             ),
         },
         {
             key: 'balance_after',
             header: 'After',
             render: (value: number) => (
-                <span className="text-textMain font-medium">₹{value.toLocaleString()}</span>
+                <span className="text-textMain font-medium">${value.toLocaleString()}</span>
             ),
         },
         {
@@ -313,7 +313,7 @@ const RevenueAnalytics: React.FC = () => {
 
     const tabs = [
         { id: 'overview', label: 'Overview', icon: <ChartLine size={18} /> },
-        { id: 'transactions', label: 'Transactions', icon: <CurrencyInr size={18} />, count: totalTransactions },
+        { id: 'transactions', label: 'Transactions', icon: <CurrencyDollar size={18} />, count: totalTransactions },
     ];
 
     return (
@@ -322,7 +322,7 @@ const RevenueAnalytics: React.FC = () => {
             <div className="flex items-start justify-between">
                 <div className="flex items-center gap-4">
                     <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500/20 to-emerald-500/5 flex items-center justify-center border border-white/10">
-                        <CurrencyInr size={28} weight="duotone" className="text-emerald-400" />
+                        <CurrencyDollar size={28} weight="duotone" className="text-emerald-400" />
                     </div>
                     <div>
                         <h1 className="text-2xl font-bold text-textMain">Revenue Analytics</h1>
@@ -351,7 +351,7 @@ const RevenueAnalytics: React.FC = () => {
                         <StatsCard
                             title="Total Revenue"
                             value={formatCurrency(metrics?.totalRevenue || 0)}
-                            icon={<CurrencyInr size={20} weight="bold" />}
+                            icon={<CurrencyDollar size={20} weight="bold" />}
                             color="emerald"
                             loading={loading}
                         />
@@ -527,7 +527,7 @@ const RevenueAnalytics: React.FC = () => {
                         onRefresh={fetchTransactions}
                         onExport={exportTransactions}
                         emptyMessage="No transactions found"
-                        emptyIcon={<CurrencyInr size={32} className="text-textMuted/50" />}
+                        emptyIcon={<CurrencyDollar size={32} className="text-textMuted/50" />}
                     />
                 </>
             )}

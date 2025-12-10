@@ -1,16 +1,15 @@
-import { MagnifyingGlass, House, User, Gear, SignOut, Phone, BookOpen, Users } from '@phosphor-icons/react';
+import { MagnifyingGlass, House, Gear, SignOut, Phone, BookOpen, Users } from '@phosphor-icons/react';
 import { Command } from 'cmdk';
 import { motion, AnimatePresence } from 'framer-motion';
 import * as React from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { useAuth } from '@/contexts/AuthContext';
-import { cn } from '@/lib/utils';
 
 export function CommandPalette() {
     const [open, setOpen] = React.useState(false);
     const navigate = useNavigate();
-    const { logout } = useAuth();
+    const { signOut } = useAuth();
 
     React.useEffect(() => {
         const down = (e: KeyboardEvent) => {
@@ -105,7 +104,7 @@ export function CommandPalette() {
                                 <Command.Separator className="my-1 h-px bg-white/10" />
                                 <Command.Group heading="System" className="text-xs font-medium text-textMuted px-2 py-1.5 mb-1">
                                     <Command.Item
-                                        onSelect={() => runCommand(() => logout())}
+                                        onSelect={() => runCommand(() => signOut())}
                                         className="relative flex cursor-pointer select-none items-center rounded-lg px-2 py-2 text-sm outline-none aria-selected:bg-red-500/10 aria-selected:text-red-400 data-[disabled]:pointer-events-none data-[disabled]:opacity-50 transition-colors group"
                                     >
                                         <SignOut className="mr-2 h-4 w-4 text-textMuted group-aria-selected:text-red-400" />

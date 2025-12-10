@@ -365,10 +365,10 @@ async function processWithAI(config, message, contact) {
 
         // === USE CENTRALIZED PROCESSOR FOR AI LOGIC ===
         // Convert database assistant format to assistantConfig format
+        // Now using unified 'instruction' field
         const assistantConfig = {
             name: assistant.name,
-            systemPrompt: assistant.messaging_system_prompt || assistant.system_prompt,
-            firstMessage: assistant.messaging_first_message || assistant.first_message,
+            instruction: assistant.instruction,
             llmModel: assistant.llm_model,
             llmProvider: assistant.llm_provider,
             temperature: assistant.temperature,

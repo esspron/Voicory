@@ -32,6 +32,17 @@ const VoiceCardSkeleton = () => (
     </div>
 );
 
+// TTS Provider display names
+const TTS_PROVIDER_LABELS: Record<string, string> = {
+    'All': 'All Providers',
+    'elevenlabs': 'ElevenLabs',
+    'openai': 'OpenAI',
+    'deepgram': 'Deepgram',
+    'cartesia': 'Cartesia',
+    'google': 'Google',
+    'azure': 'Azure'
+};
+
 const VoiceLibrary: React.FC = () => {
     const [voices, setVoices] = useState<Voice[]>([]);
     const [loading, setLoading] = useState(true);
@@ -42,6 +53,7 @@ const VoiceLibrary: React.FC = () => {
     const [selectedLanguage, setSelectedLanguage] = useState<SelectOption>({ value: 'All', label: 'All Languages' });
     const [selectedGender, setSelectedGender] = useState<SelectOption>({ value: 'All', label: 'All Genders' });
     const [selectedTag, setSelectedTag] = useState<SelectOption>({ value: 'All', label: 'All Tags' });
+    const [selectedProvider, setSelectedProvider] = useState<SelectOption>({ value: 'All', label: 'All Providers' });
 
     useEffect(() => {
         loadVoices();
@@ -65,16 +77,19 @@ const VoiceLibrary: React.FC = () => {
     const filterOptions = useMemo(() => {
         const languages = new Set<string>();
         const tags = new Set<string>();
+        const providers = new Set<string>();
 
         voices.forEach(voice => {
             voice.supportedLanguages.forEach(lang => languages.add(lang));
             voice.tags.forEach(tag => tags.add(tag));
+            if (voice.ttsProvider) providers.add(voice.ttsProvider);
         });
 
         return {
             languages: ['All', ...Array.from(languages).sort()],
-            genders: ['All', 'Male', 'Female'],
-            tags: ['All', ...Array.from(tags).sort()]
+            genders: ['All', 'Male', 'Female', 'Neutral'],
+            tags: ['All', ...Array.from(tags).sort()],
+            providers: ['All', ...Array.from(providers).sort()]
         };
     }, [voices]);
 
@@ -88,7 +103,8 @@ const VoiceLibrary: React.FC = () => {
                     voice.name.toLowerCase().includes(query) ||
                     voice.description?.toLowerCase().includes(query) ||
                     voice.tags.some(tag => tag.toLowerCase().includes(query)) ||
-                    voice.supportedLanguages.some(lang => lang.toLowerCase().includes(query));
+                    voice.supportedLanguages.some(lang => lang.toLowerCase().includes(query)) ||
+                    (voice.ttsProvider && voice.ttsProvider.toLowerCase().includes(query));
                 if (!matchesSearch) return false;
             }
 
@@ -107,9 +123,14 @@ const VoiceLibrary: React.FC = () => {
                 return false;
             }
 
+            // Provider filter
+            if (selectedProvider.value !== 'All' && voice.ttsProvider !== selectedProvider.value) {
+                return false;
+            }
+
             return true;
         });
-    }, [voices, searchQuery, selectedLanguage, selectedGender, selectedTag]);
+    }, [voices, searchQuery, selectedLanguage, selectedGender, selectedTag, selectedProvider]);
 
     // Separate featured and regular voices
     const featuredVoices = filteredVoices.filter(v => v.isFeatured);
@@ -124,9 +145,10 @@ const VoiceLibrary: React.FC = () => {
         setSelectedLanguage({ value: 'All', label: 'All Languages' });
         setSelectedGender({ value: 'All', label: 'All Genders' });
         setSelectedTag({ value: 'All', label: 'All Tags' });
+        setSelectedProvider({ value: 'All', label: 'All Providers' });
     };
 
-    const hasActiveFilters = searchQuery || selectedLanguage.value !== 'All' || selectedGender.value !== 'All' || selectedTag.value !== 'All';
+    const hasActiveFilters = searchQuery || selectedLanguage.value !== 'All' || selectedGender.value !== 'All' || selectedTag.value !== 'All' || selectedProvider.value !== 'All';
 
     return (
         <div className="min-h-screen bg-background relative">
@@ -193,6 +215,17 @@ const VoiceLibrary: React.FC = () => {
                                 options={filterOptions.genders.map(gender => ({
                                     value: gender,
                                     label: gender === 'All' ? 'All Genders' : gender
+                                }))}
+                                className="w-40"
+                            />
+
+                            {/* Provider Filter */}
+                            <Select
+                                value={selectedProvider}
+                                onChange={setSelectedProvider}
+                                options={filterOptions.providers.map(provider => ({
+                                    value: provider,
+                                    label: TTS_PROVIDER_LABELS[provider] || provider
                                 }))}
                                 className="w-40"
                             />

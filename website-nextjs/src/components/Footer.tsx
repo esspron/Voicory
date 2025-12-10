@@ -19,7 +19,7 @@ export function Footer() {
       { label: 'Voice Calls', href: '#demo' },
       { label: 'WhatsApp Chatbot', href: '#demo' },
       { label: 'Knowledge Base', href: '#customization' },
-      { label: 'Pricing', href: '#pricing' },
+      { label: 'Pricing', href: '/pricing' },
     ],
     features: [
       { label: 'Customer Memory', href: '#customization' },

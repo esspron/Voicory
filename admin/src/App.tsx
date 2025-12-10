@@ -12,6 +12,7 @@ import UsageAnalytics from './pages/UsageAnalytics';
 import AssistantManager from './pages/AssistantManager';
 import VoiceLibraryAdmin from './pages/VoiceLibraryAdmin';
 import LLMPricingManager from './pages/LLMPricingManager';
+import ServicePricingManager from './pages/ServicePricingManager';
 import ReferralManager from './pages/ReferralManager';
 import WhatsAppManager from './pages/WhatsAppManager';
 import PhoneNumberManager from './pages/PhoneNumberManager';
@@ -244,6 +245,7 @@ const App: React.FC = () => {
                     <Route path="assistants" element={<AssistantManager />} />
                     <Route path="voices" element={<VoiceLibraryAdmin />} />
                     <Route path="llm-pricing" element={<LLMPricingManager />} />
+                    <Route path="service-pricing" element={<ServicePricingManager />} />
                     <Route path="referrals" element={<ReferralManager />} />
                     <Route path="whatsapp" element={<WhatsAppManager />} />
                     <Route path="phone-numbers" element={<PhoneNumberManager />} />

@@ -1,41 +1,42 @@
 import {
     FloppyDisk, Play, BookOpen,
     Globe, X, Check, ChatCircle, Phone, CircleNotch,
-    Brain, Trash, Translate, SquaresFour, TestTube, Lightning, PhoneCall, ChatTeardrop, Copy
+    Brain, Trash, Translate, SquaresFour, TestTube, Lightning, Copy, Waveform
 } from '@phosphor-icons/react';
 import React, { useEffect, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useParams, useNavigate } from 'react-router-dom';
 
-import CallsTab from '../components/assistant-editor/CallsTab';
+import AgentTab from '../components/assistant-editor/AgentTab';
 import TestsTab from '../components/assistant-editor/TestsTab';
 import ChatSidebar from '../components/assistant-editor/ChatSidebar';
 import KnowledgeBaseTab from '../components/assistant-editor/KnowledgeBaseTab';
 import LLMSelectorModal from '../components/assistant-editor/LLMSelectorModal';
 import MemoryTab from '../components/assistant-editor/MemoryTab';
-import MessagesTab from '../components/assistant-editor/MessagesTab';
-import PlaceholderTab from '../components/assistant-editor/PlaceholderTab';
 import PromptGeneratorModal from '../components/assistant-editor/PromptGeneratorModal';
 import VoiceSelectorModal from '../components/assistant-editor/VoiceSelectorModal';
+import VoiceAgentTab, { type VoiceAgentConfig, DEFAULT_VOICE_AGENT_CONFIG } from '../components/assistant-editor/VoiceAgentTab';
+import VoiceCallPreview from '../components/VoiceCallPreview';
 import WidgetTab from '../components/assistant-editor/WidgetTab';
 import { FadeIn } from '../components/ui/FadeIn';
-import Select from '../components/ui/Select';
 import { useAuth } from '../contexts/AuthContext';
 import { useClipboard } from '../hooks';
+import { supabase } from '../services/supabase';
+import { logger } from '../lib/logger';
 import { getAssistant, getVoices, createAssistant, updateAssistant, deleteAssistant } from '../services/voicoryService';
 import {
     Assistant, Voice, AssistantInput, MemoryConfig,
     LanguageSettings, StyleSettings, StyleMode,
-    DynamicVariable, DynamicVariablesConfig,
-    SUPPORTED_LANGUAGES, STYLE_OPTIONS,
+    DynamicVariablesConfig,
+    SUPPORTED_LANGUAGES,
     DEFAULT_LANGUAGE_SETTINGS, DEFAULT_STYLE_SETTINGS,
     DEFAULT_DYNAMIC_VARIABLES_CONFIG
 } from '../types';
 
-// Tab definitions - Calls and Messages replace Agent
+// Tab definitions - Agent tab with unified instruction for both calls and messages
 const TABS = [
-    { id: 'calls', label: 'Calls', icon: PhoneCall, isNew: false },
-    { id: 'messages', label: 'Messages', icon: ChatTeardrop, isNew: false },
+    { id: 'agent', label: 'Agent', icon: Brain, isNew: false },
+    { id: 'voice-agent', label: 'Voice Config', icon: Waveform, isNew: true, highlight: true },
     { id: 'memory', label: 'Memory', icon: Brain, isNew: true, highlight: true },
     { id: 'knowledge-base', label: 'Knowledge Base', icon: BookOpen, isNew: false },
     { id: 'tests', label: 'Tests', icon: TestTube, isNew: true },
@@ -72,15 +73,8 @@ const TIMEZONES = [
 
 interface AssistantFormData {
     name: string;
-    // Inbound Call Configuration
-    systemPrompt: string;
-    firstMessage: string;
-    // Outbound Call Configuration
-    outboundSystemPrompt: string;
-    outboundFirstMessage: string;
-    // Messaging Configuration
-    messagingSystemPrompt: string;
-    messagingFirstMessage: string;
+    // Unified instruction (like Vapi, Retell, LiveKit)
+    instruction: string;
     // Voice Settings
     voiceId: string | null;
     elevenlabsModelId: string;
@@ -105,6 +99,8 @@ interface AssistantFormData {
     // Memory settings
     memoryEnabled: boolean;
     memoryConfig: MemoryConfig;
+    // Voice Agent Config (real-time voice settings)
+    voiceAgentConfig: VoiceAgentConfig;
     status: 'active' | 'inactive' | 'draft';
 }
 
@@ -121,41 +117,18 @@ const DEFAULT_MEMORY_CONFIG: MemoryConfig = {
 
 const DEFAULT_FORM_DATA: AssistantFormData = {
     name: 'New Assistant',
-    // Inbound Call Configuration
-    systemPrompt: `You are a helpful, friendly AI voice assistant. Your role is to assist callers with their questions and needs in a professional yet conversational manner.
+    // Unified instruction (like Vapi, Retell, LiveKit)
+    instruction: `You are a helpful, friendly AI assistant. Your role is to assist users with their questions and needs in a professional yet conversational manner.
 
 Guidelines:
-- Be warm, patient, and attentive to the caller's needs
+- Be warm, patient, and attentive to the user's needs
 - Listen carefully and ask clarifying questions when needed
 - Provide clear, concise, and accurate information
 - If you don't know something, be honest and offer to help find the answer
-- Keep responses conversational and natural for voice
-- Be respectful of the caller's time
+- Keep responses conversational and natural
+- Be respectful of the user's time
 
 You can be customized with specific knowledge, personality traits, and capabilities based on the business needs.`,
-    firstMessage: 'Hello! Thanks for calling. How can I help you today?',
-    // Outbound Call Configuration
-    outboundSystemPrompt: `You are a professional AI assistant making an outbound call. Your goal is to deliver your message efficiently while being respectful of the customer's time.
-
-Guidelines:
-- Introduce yourself and your company clearly at the start
-- Confirm you're speaking with the right person
-- State the purpose of your call early
-- Be concise and get to the point
-- If it's not a good time, offer to call back later
-- Thank them for their time at the end`,
-    outboundFirstMessage: 'Hi {{customer_name}}, this is {{assistant_name}} calling from {{company_name}}. Do you have a moment to talk?',
-    // Messaging Configuration
-    messagingSystemPrompt: `You are a helpful assistant responding via WhatsApp/SMS messaging.
-
-Guidelines for messaging:
-- Keep responses concise and mobile-friendly
-- Use appropriate emojis when it fits the context 😊
-- Share links when helpful (they're clickable!)
-- Remember conversations are asynchronous - customers may reply hours later
-- Be conversational but efficient
-- You can share images, documents, and location when relevant`,
-    messagingFirstMessage: 'Hey! 👋 Thanks for reaching out. How can I help you today?',
     // Voice Settings
     voiceId: null,
     elevenlabsModelId: 'eleven_turbo_v2_5',
@@ -176,13 +149,14 @@ Guidelines for messaging:
     knowledgeBaseIds: [],
     memoryEnabled: false,
     memoryConfig: DEFAULT_MEMORY_CONFIG,
+    voiceAgentConfig: { ...DEFAULT_VOICE_AGENT_CONFIG },
     status: 'draft',
 };
 
 const AssistantEditor: React.FC = () => {
     const { id } = useParams();
     const navigate = useNavigate();
-    const [activeTab, setActiveTab] = useState<TabId>('calls');
+    const [activeTab, setActiveTab] = useState<TabId>('agent');
     const [formData, setFormData] = useState<AssistantFormData>(DEFAULT_FORM_DATA);
     const [voices, setVoices] = useState<Voice[]>([]);
     const [selectedVoice, setSelectedVoice] = useState<Voice | null>(null);
@@ -201,23 +175,19 @@ const AssistantEditor: React.FC = () => {
     const [showPromptGenerator, setShowPromptGenerator] = useState(false);
     const [deleting, setDeleting] = useState(false);
     const [showChatSidebar, setShowChatSidebar] = useState(false);
+    const [showVoiceCallPreview, setShowVoiceCallPreview] = useState(false);
+    
+    // Get user from auth context
+    const { user } = useAuth();
     
     // Clipboard for assistant ID
-    const { copy: copyId, copied: copiedId } = useClipboard({ timeout: 2000 });
+    const { copy: copyId, copied: copiedId } = useClipboard(2000);
 
     // Helper to create a comparable string from form data (only key user-editable fields)
     const getFormDataFingerprint = (data: AssistantFormData) => {
         return JSON.stringify({
             name: data.name,
-            // Inbound
-            systemPrompt: data.systemPrompt,
-            firstMessage: data.firstMessage,
-            // Outbound
-            outboundSystemPrompt: data.outboundSystemPrompt,
-            outboundFirstMessage: data.outboundFirstMessage,
-            // Messaging
-            messagingSystemPrompt: data.messagingSystemPrompt,
-            messagingFirstMessage: data.messagingFirstMessage,
+            instruction: data.instruction,
             // Settings
             voiceId: data.voiceId,
             llmProvider: data.llmProvider,
@@ -230,6 +200,8 @@ const AssistantEditor: React.FC = () => {
             languageDefault: data.languageSettings?.default,
             languageAutoDetect: data.languageSettings?.autoDetect,
             styleMode: data.styleSettings?.mode,
+            // Voice Agent Config (for change detection)
+            voiceAgentConfig: data.voiceAgentConfig,
         });
     };
 
@@ -256,23 +228,34 @@ const AssistantEditor: React.FC = () => {
                 setVoices(voicesData);
 
                 let loadedFormData: AssistantFormData;
+                let loadedVoiceAgentConfig: VoiceAgentConfig = { ...DEFAULT_VOICE_AGENT_CONFIG };
 
                 // If editing existing assistant, fetch it
                 if (id && id !== 'new') {
                     const assistant = await getAssistant(id);
                     if (assistant) {
                         setAssistantId(assistant.id);
+                        
+                        // Fetch voice agent config for this assistant
+                        try {
+                            const { data: voiceConfigData } = await supabase
+                                .from('voice_agent_config')
+                                .select('*')
+                                .eq('assistant_id', assistant.id)
+                                .single();
+                            
+                            if (voiceConfigData && typeof voiceConfigData === 'object') {
+                                loadedVoiceAgentConfig = { ...DEFAULT_VOICE_AGENT_CONFIG, ...(voiceConfigData as Partial<VoiceAgentConfig>) };
+                            }
+                        } catch {
+                            // Voice agent config not found, use defaults
+                            logger.debug('No voice agent config found, using defaults');
+                        }
+                        
                         loadedFormData = {
                             name: assistant.name,
-                            // Inbound Call Configuration
-                            systemPrompt: assistant.systemPrompt || DEFAULT_FORM_DATA.systemPrompt,
-                            firstMessage: assistant.firstMessage || DEFAULT_FORM_DATA.firstMessage,
-                            // Outbound Call Configuration
-                            outboundSystemPrompt: assistant.outboundSystemPrompt || DEFAULT_FORM_DATA.outboundSystemPrompt,
-                            outboundFirstMessage: assistant.outboundFirstMessage || DEFAULT_FORM_DATA.outboundFirstMessage,
-                            // Messaging Configuration
-                            messagingSystemPrompt: assistant.messagingSystemPrompt || DEFAULT_FORM_DATA.messagingSystemPrompt,
-                            messagingFirstMessage: assistant.messagingFirstMessage || DEFAULT_FORM_DATA.messagingFirstMessage,
+                            // Unified instruction (like Vapi, Retell, LiveKit)
+                            instruction: assistant.instruction || DEFAULT_FORM_DATA.instruction,
                             // Voice & Settings
                             voiceId: assistant.voiceId || null,
                             elevenlabsModelId: assistant.elevenlabsModelId || 'eleven_turbo_v2_5',
@@ -293,6 +276,7 @@ const AssistantEditor: React.FC = () => {
                             knowledgeBaseIds: assistant.knowledgeBaseIds || [],
                             memoryEnabled: assistant.memoryEnabled ?? false,
                             memoryConfig: assistant.memoryConfig || DEFAULT_MEMORY_CONFIG,
+                            voiceAgentConfig: loadedVoiceAgentConfig,
                             status: assistant.status,
                         };
                         setFormData(loadedFormData);
@@ -330,15 +314,8 @@ const AssistantEditor: React.FC = () => {
         try {
             const inputData: AssistantInput = {
                 name: formData.name,
-                // Inbound Call Configuration
-                systemPrompt: formData.systemPrompt,
-                firstMessage: formData.firstMessage,
-                // Outbound Call Configuration
-                outboundSystemPrompt: formData.outboundSystemPrompt,
-                outboundFirstMessage: formData.outboundFirstMessage,
-                // Messaging Configuration
-                messagingSystemPrompt: formData.messagingSystemPrompt,
-                messagingFirstMessage: formData.messagingFirstMessage,
+                // Unified instruction (like Vapi, Retell, LiveKit)
+                instruction: formData.instruction,
                 // Voice & Settings
                 voiceId: formData.voiceId || undefined,
                 elevenlabsModelId: formData.elevenlabsModelId,
@@ -376,6 +353,27 @@ const AssistantEditor: React.FC = () => {
                 setAssistantId(savedAssistant.id);
                 const updatedFormData = { ...formData, status: savedAssistant.status };
                 setFormData(updatedFormData);
+                
+                // Save voice agent config to database
+                try {
+                    const voiceConfigData = {
+                        assistant_id: savedAssistant.id,
+                        user_id: user?.id || '',
+                        ...formData.voiceAgentConfig,
+                    };
+                    
+                    // Use type assertion for table not in generated types
+                    await (supabase as unknown as { from: (table: string) => { upsert: (data: Record<string, unknown>, options?: { onConflict?: string }) => Promise<{ error: Error | null }> } })
+                        .from('voice_agent_config')
+                        .upsert(voiceConfigData as Record<string, unknown>, {
+                            onConflict: 'assistant_id',
+                        });
+                    logger.info('Voice agent config saved');
+                } catch (voiceConfigError) {
+                    const errorMessage = voiceConfigError instanceof Error ? voiceConfigError.message : 'Unknown error';
+                    logger.error('Failed to save voice agent config: ' + errorMessage);
+                }
+                
                 // Update the fingerprint to match new saved state
                 originalFormDataRef.current = getFormDataFingerprint(updatedFormData);
                 setHasChanges(false);
@@ -494,12 +492,8 @@ const AssistantEditor: React.FC = () => {
             
             const inputData: AssistantInput = {
                 name: formData.name,
-                systemPrompt: formData.systemPrompt,
-                firstMessage: formData.firstMessage,
-                outboundSystemPrompt: formData.outboundSystemPrompt,
-                outboundFirstMessage: formData.outboundFirstMessage,
-                messagingSystemPrompt: formData.messagingSystemPrompt,
-                messagingFirstMessage: formData.messagingFirstMessage,
+                // Unified instruction (like Vapi, Retell, LiveKit)
+                instruction: formData.instruction,
                 voiceId: formData.voiceId || undefined,
                 elevenlabsModelId: formData.elevenlabsModelId,
                 languageSettings: formData.languageSettings,
@@ -527,14 +521,14 @@ const AssistantEditor: React.FC = () => {
             const savedAssistant = await updateAssistant(assistantId, inputData);
 
             if (savedAssistant) {
-                const updatedFormData = { 
+                const updatedFormData: AssistantFormData = { 
                     ...formData, 
                     knowledgeBaseIds: updatedKnowledgeBaseIds,
                     ragEnabled: updatedKnowledgeBaseIds.length > 0,
                     // Also update RAG settings in local state
-                    ragSimilarityThreshold: inputData.ragSimilarityThreshold,
-                    ragMaxResults: inputData.ragMaxResults,
-                    ragInstructions: inputData.ragInstructions,
+                    ragSimilarityThreshold: inputData.ragSimilarityThreshold ?? formData.ragSimilarityThreshold,
+                    ragMaxResults: inputData.ragMaxResults ?? formData.ragMaxResults,
+                    ragInstructions: inputData.ragInstructions ?? formData.ragInstructions,
                     status: savedAssistant.status 
                 };
                 setFormData(updatedFormData);
@@ -551,34 +545,16 @@ const AssistantEditor: React.FC = () => {
 
     // Handle applying generated prompt from AI
     const handleApplyGeneratedPrompt = (data: {
-        systemPrompt: string;
-        firstMessage: string;
-        messagingSystemPrompt?: string;
-        messagingFirstMessage?: string;
+        instruction: string;
         suggestedVariables?: Array<{ name: string; description: string; example?: string }>;
         suggestedAgentName?: string;
     }) => {
         setFormData(prev => {
             const newData = { ...prev };
             
-            // Apply voice system prompt
-            if (data.systemPrompt) {
-                newData.systemPrompt = data.systemPrompt;
-            }
-            
-            // Apply voice first message
-            if (data.firstMessage) {
-                newData.firstMessage = data.firstMessage;
-            }
-
-            // Apply messaging system prompt if provided
-            if (data.messagingSystemPrompt) {
-                newData.messagingSystemPrompt = data.messagingSystemPrompt;
-            }
-
-            // Apply messaging first message if provided
-            if (data.messagingFirstMessage) {
-                newData.messagingFirstMessage = data.messagingFirstMessage;
+            // Apply instruction
+            if (data.instruction) {
+                newData.instruction = data.instruction;
             }
             
             // Apply suggested agent name if current name is default
@@ -610,13 +586,16 @@ const AssistantEditor: React.FC = () => {
         });
     };
 
-    const currentLanguage = SUPPORTED_LANGUAGES.find(l => l.code === formData.languageSettings.default) || SUPPORTED_LANGUAGES[0];
+    // Handler for voice agent config changes
+    const handleVoiceAgentConfigChange = (newConfig: VoiceAgentConfig) => {
+        setFormData(prev => ({ ...prev, voiceAgentConfig: newConfig }));
+    };
 
     const renderTabContent = () => {
         switch (activeTab) {
-            case 'calls':
+            case 'agent':
                 return (
-                    <CallsTab
+                    <AgentTab
                         formData={formData}
                         setFormData={setFormData}
                         selectedVoice={selectedVoice}
@@ -632,14 +611,14 @@ const AssistantEditor: React.FC = () => {
                         onOpenPromptGenerator={() => setShowPromptGenerator(true)}
                     />
                 );
-            case 'messages':
+            case 'voice-agent':
                 return (
-                    <MessagesTab
-                        formData={formData}
-                        setFormData={setFormData}
-                        onOpenLLMModal={() => setShowLLMModal(true)}
-                        onOpenPromptGenerator={() => setShowPromptGenerator(true)}
-                    />
+                    <div className="h-full overflow-y-auto p-6">
+                        <VoiceAgentTab 
+                            config={formData.voiceAgentConfig}
+                            onConfigChange={handleVoiceAgentConfigChange}
+                        />
+                    </div>
                 );
             case 'memory':
                 return (
@@ -653,7 +632,7 @@ const AssistantEditor: React.FC = () => {
             case 'tests':
                 return <TestsTab assistantId={assistantId} formData={formData} selectedVoice={selectedVoice} />;
             case 'widget':
-                return <WidgetTab assistantId={assistantId} assistantName={formData.name} />;
+                return <WidgetTab assistantId={assistantId || undefined} assistantName={formData.name} />;
             default:
                 return null;
         }
@@ -739,13 +718,14 @@ const AssistantEditor: React.FC = () => {
                         <ChatCircle size={16} weight="fill" className="group-hover:scale-110 transition-transform" />
                         Chat
                     </button>
-                    {/* Talk to Assistant - Voice call (coming soon) */}
+                    {/* Talk to Assistant - Voice call */}
                     <button
-                        className="group flex items-center gap-2 px-4 py-2.5 bg-primary/10 border border-primary/30 rounded-xl text-sm text-primary hover:bg-primary/20 transition-all cursor-not-allowed opacity-70"
-                        disabled
-                        title="Voice calling coming soon"
+                        onClick={() => setShowVoiceCallPreview(true)}
+                        className="group flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-primary/20 to-primary/10 border border-primary/30 rounded-xl text-sm text-primary hover:from-primary/30 hover:to-primary/20 hover:border-primary/40 transition-all"
+                        disabled={saving || !assistantId}
+                        title={!assistantId ? "Save assistant first to test voice" : "Talk to this assistant"}
                     >
-                        <Phone size={16} weight="fill" />
+                        <Phone size={16} weight="fill" className="group-hover:scale-110 transition-transform" />
                         Talk to Assistant
                     </button>
                     <button
@@ -1015,6 +995,20 @@ const AssistantEditor: React.FC = () => {
                     onClose={() => setShowPromptGenerator(false)}
                     onApply={handleApplyGeneratedPrompt}
                     currentAgentName={formData.name}
+                />
+            )}
+
+            {/* Voice Call Preview Modal */}
+            {showVoiceCallPreview && assistantId && user && (
+                <VoiceCallPreview
+                    assistantId={assistantId}
+                    userId={user.id}
+                    assistantName={formData.name}
+                    isOpen={showVoiceCallPreview}
+                    onClose={() => setShowVoiceCallPreview(false)}
+                    onConversationEnd={(transcript) => {
+                        console.log('Voice conversation ended:', transcript.length, 'messages');
+                    }}
                 />
             )}
         </FadeIn>

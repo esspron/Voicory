@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
     Users,
-    CurrencyInr,
+    CurrencyDollar,
     Phone,
     ChatsCircle,
     Robot,
@@ -340,7 +340,7 @@ const DashboardHome: React.FC = () => {
         return () => clearInterval(interval);
     }, [fetchDashboardData]);
 
-    const formatCurrency = (value: number) => `₹${value.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+    const formatCurrency = (value: number) => `$${value.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
     const formatNumber = (value: number) => value.toLocaleString();
 
     const dateRangeOptions: { value: DateRange; label: string }[] = [
@@ -493,7 +493,7 @@ const DashboardHome: React.FC = () => {
                 <StatsCard
                     title="Monthly Revenue"
                     value={formatCurrency(stats?.revenueThisMonth || 0)}
-                    icon={<CurrencyInr size={20} weight="bold" />}
+                    icon={<CurrencyDollar size={20} weight="bold" />}
                     color="emerald"
                     trend={stats?.revenueGrowthRate !== undefined ? { 
                         value: stats.revenueGrowthRate, 
@@ -578,7 +578,7 @@ const DashboardHome: React.FC = () => {
                         ) : (
                             <div className="h-[200px] flex items-center justify-center text-textMuted">
                                 <div className="text-center">
-                                    <CurrencyInr size={32} className="mx-auto mb-2 opacity-30" />
+                                    <CurrencyDollar size={32} className="mx-auto mb-2 opacity-30" />
                                     <p>No revenue data yet</p>
                                     <p className="text-xs">Revenue will appear here when users make purchases</p>
                                 </div>
@@ -667,7 +667,7 @@ const DashboardHome: React.FC = () => {
                 <div className="bg-surface/80 backdrop-blur-xl border border-white/5 rounded-2xl overflow-hidden">
                     <div className="p-4 border-b border-white/5 flex items-center justify-between">
                         <h3 className="font-semibold text-textMain flex items-center gap-2">
-                            <CurrencyInr size={18} className="text-emerald-400" />
+                            <CurrencyDollar size={18} className="text-emerald-400" />
                             Recent Transactions
                         </h3>
                         <a href="#/revenue" className="text-sm text-primary hover:underline flex items-center gap-1">
@@ -696,7 +696,7 @@ const DashboardHome: React.FC = () => {
                                         txn.transaction_type === 'bonus' ? 'bg-violet-500/20' :
                                         'bg-white/10'
                                     }`}>
-                                        {txn.transaction_type === 'purchase' && <CurrencyInr size={18} className="text-emerald-400" />}
+                                        {txn.transaction_type === 'purchase' && <CurrencyDollar size={18} className="text-emerald-400" />}
                                         {txn.transaction_type === 'usage' && <Lightning size={18} className="text-amber-400" />}
                                         {txn.transaction_type === 'bonus' && <Sparkle size={18} className="text-violet-400" />}
                                         {txn.transaction_type === 'refund' && <TrendDown size={18} className="text-rose-400" />}
@@ -711,7 +711,7 @@ const DashboardHome: React.FC = () => {
                                     </div>
                                     <div className="text-right">
                                         <p className={`font-semibold ${txn.amount >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                                            {txn.amount >= 0 ? '+' : ''}₹{Math.abs(txn.amount).toLocaleString()}
+                                            {txn.amount >= 0 ? '+' : ''}${Math.abs(txn.amount).toLocaleString()}
                                         </p>
                                         <p className="text-xs text-textMuted">
                                             {new Date(txn.created_at).toLocaleDateString()}

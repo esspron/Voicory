@@ -4,18 +4,19 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 
 import { useAuth } from '../contexts/AuthContext';
-import { useCurrency } from '../contexts/CurrencyContext';
 import { getUserProfile } from '../services/voicoryService';
 
 
 import { Button } from './ui/Button';
+
+// Format USD amount
+const formatUSD = (amount: number): string => `$${amount.toFixed(2)}`;
 
 const Topbar: React.FC = () => {
     const [creditsBalance, setCreditsBalance] = useState<number | null>(null);
     const [planType, setPlanType] = useState<string>('PAYG');
     const [loading, setLoading] = useState(true);
     const { user } = useAuth();
-    const { formatAmount } = useCurrency();
 
     // Fetch user profile for credits balance
     useEffect(() => {
@@ -111,7 +112,7 @@ const Topbar: React.FC = () => {
                         ) : (
                             <>
                                 <span className="text-sm font-semibold text-textMain group-hover:text-white transition-colors">
-                                    {formatAmount(creditsBalance ?? 0)}
+                                    {formatUSD(creditsBalance ?? 0)}
                                 </span>
                                 <span className="text-[10px] text-textMuted/60 uppercase tracking-wider">
                                     {planType} Credits

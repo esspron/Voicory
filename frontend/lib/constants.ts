@@ -6,11 +6,55 @@
  */
 
 /**
+ * Backend URLs by region for geo-routing
+ */
+const BACKEND_URLS = {
+  INDIA: 'https://backendvoicory-732127099858.asia-south1.run.app',
+  USA: 'https://backendvoicory-us-732127099858.us-central1.run.app',
+  EUROPE: 'https://backendvoicory-eu-732127099858.europe-west1.run.app',
+} as const;
+
+/**
+ * Get the nearest backend URL based on user's timezone
+ */
+const getGeoBackendUrl = (): string => {
+  // Allow override via env var
+  const envUrl = import.meta.env['VITE_BACKEND_URL'] as string | undefined;
+  if (envUrl && envUrl !== 'auto') return envUrl;
+
+  try {
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    
+    // India/Asia timezones
+    if (timezone.startsWith('Asia/') || timezone.startsWith('Indian/')) {
+      return BACKEND_URLS.INDIA;
+    }
+    
+    // Americas timezones
+    if (timezone.startsWith('America/') || timezone.startsWith('US/') || timezone.startsWith('Canada/')) {
+      return BACKEND_URLS.USA;
+    }
+    
+    // Europe/Africa timezones
+    if (timezone.startsWith('Europe/') || timezone.startsWith('Africa/')) {
+      return BACKEND_URLS.EUROPE;
+    }
+    
+    // Default to India for unknown
+    return BACKEND_URLS.INDIA;
+  } catch {
+    return BACKEND_URLS.INDIA;
+  }
+};
+
+/**
  * API endpoints and URLs
  */
 export const API = {
-  /** Backend service URL */
-  BACKEND_URL: (import.meta.env['VITE_BACKEND_URL'] as string | undefined) ?? 'https://api.voicory.com',
+  /** Backend service URL - auto-selected based on user location */
+  BACKEND_URL: getGeoBackendUrl(),
+  /** All backend URLs for manual selection */
+  BACKEND_URLS,
   /** Supabase project URL */
   SUPABASE_URL: import.meta.env['VITE_SUPABASE_URL'],
   /** Supabase anonymous key */

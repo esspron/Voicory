@@ -25,3 +25,22 @@ export { useBreakpoint, useIsMobile } from './useBreakpoint';
 
 // Intersection Observer for lazy loading and scroll animations
 export { useIntersectionObserver, useScrollProgress } from './useIntersectionObserver';
+
+// Voice Agent for real-time voice conversations
+export { useVoiceAgent } from './useVoiceAgent';
+export type { 
+    VoiceConnectionState, 
+    VoiceAgentState, 
+    VoiceTranscript, 
+    UseVoiceAgentOptions, 
+    UseVoiceAgentReturn 
+} from './useVoiceAgent';
+
+// Audio utilities for voice visualization and recording
+export { 
+    useAudioLevel, 
+    useAudioVisualizer, 
+    useVAD, 
+    useAudioRecorder, 
+    useAudioPlayer 
+} from './useAudio';

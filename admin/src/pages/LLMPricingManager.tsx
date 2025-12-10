@@ -3,7 +3,7 @@ import {
     Brain,
     PencilSimple,
     ArrowsClockwise,
-    CurrencyInr,
+    CurrencyDollar,
     ToggleRight,
     ToggleLeft,
     Lightning,
@@ -143,7 +143,7 @@ const LLMPricingManager: React.FC = () => {
         return colors[provider.toLowerCase()] || 'text-textMain';
     };
 
-    const formatCost = (cost: number) => `₹${cost.toFixed(2)}`;
+    const formatCost = (cost: number) => `$${cost.toFixed(2)}`;
 
     // Clear messages after delay
     useEffect(() => {
@@ -377,14 +377,14 @@ const LLMPricingManager: React.FC = () => {
                         <h4 className="text-sm font-medium text-textMain mb-4">Provider Cost (per million tokens)</h4>
                         <div className="grid grid-cols-2 gap-4">
                             <Input
-                                label="Input Cost (₹)"
+                                label="Input Cost ($)"
                                 type="number"
                                 step="0.01"
                                 value={editForm.provider_input_cost_per_million}
                                 onChange={(e) => setEditForm({ ...editForm, provider_input_cost_per_million: Number(e.target.value) })}
                             />
                             <Input
-                                label="Output Cost (₹)"
+                                label="Output Cost ($)"
                                 type="number"
                                 step="0.01"
                                 value={editForm.provider_output_cost_per_million}
@@ -397,14 +397,14 @@ const LLMPricingManager: React.FC = () => {
                         <h4 className="text-sm font-medium text-primary mb-4">Your Price (per million tokens)</h4>
                         <div className="grid grid-cols-2 gap-4">
                             <Input
-                                label="Input Cost (₹)"
+                                label="Input Cost ($)"
                                 type="number"
                                 step="0.01"
                                 value={editForm.callyy_input_cost_per_million}
                                 onChange={(e) => setEditForm({ ...editForm, callyy_input_cost_per_million: Number(e.target.value) })}
                             />
                             <Input
-                                label="Output Cost (₹)"
+                                label="Output Cost ($)"
                                 type="number"
                                 step="0.01"
                                 value={editForm.callyy_output_cost_per_million}

@@ -11,7 +11,7 @@ import {
     Users,
     Lightning,
     CalendarBlank,
-    CurrencyInr,
+    CurrencyDollar,
     ArrowsClockwise,
     Export,
     Sparkle,
@@ -340,7 +340,7 @@ const CouponManager: React.FC = () => {
                     <div className="relative">
                         <p className="text-textMuted text-xs font-medium mb-1">Credits Given</p>
                         <p className="text-2xl font-bold text-amber-400">
-                            ₹{coupons.reduce((sum, c) => sum + (c.credit_amount * c.current_uses), 0).toLocaleString()}
+                            ${coupons.reduce((sum, c) => sum + (c.credit_amount * c.current_uses), 0).toLocaleString()}
                         </p>
                     </div>
                 </div>
@@ -464,7 +464,7 @@ const CouponManager: React.FC = () => {
                                         <td className="px-6 py-4">
                                             {coupon.credit_amount > 0 ? (
                                                 <span className="flex items-center gap-1 text-emerald-400 font-medium">
-                                                    <CurrencyInr size={14} />
+                                                    <CurrencyDollar size={14} />
                                                     {coupon.credit_amount.toLocaleString()}
                                                 </span>
                                             ) : coupon.discount_percent > 0 ? (
@@ -567,7 +567,7 @@ const CouponManager: React.FC = () => {
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-textMain mb-2">Credits (₹)</label>
+                                    <label className="block text-sm font-medium text-textMain mb-2">Credits ($)</label>
                                     <input
                                         type="number"
                                         value={createForm.creditAmount}
@@ -680,7 +680,7 @@ const CouponManager: React.FC = () => {
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-textMain mb-2">Credits per Code (₹)</label>
+                                    <label className="block text-sm font-medium text-textMain mb-2">Credits per Code ($)</label>
                                     <input
                                         type="number"
                                         value={bulkForm.creditAmount}

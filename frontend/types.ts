@@ -11,13 +11,23 @@ export interface Metric {
 // VOICE TYPES
 // ============================================
 
+export type TTSProvider = 'elevenlabs' | 'openai' | 'deepgram' | 'cartesia' | 'azure' | 'google';
+export type LatencyTier = 'ultra-low' | 'low' | 'medium' | 'high';
+export type QualityTier = 'standard' | 'premium' | 'ultra';
+export type PricingTier = 'spark' | 'boost' | 'fusion';
+
 export interface Voice {
     id: string;
     name: string;
     description?: string;
     gender: 'Male' | 'Female' | 'Neutral';
     
-    // Voice provider reference (for actual TTS during calls)
+    // TTS Provider info (NEW - supports multiple providers)
+    ttsProvider: TTSProvider;
+    providerVoiceId?: string;    // Voice ID for the specific provider
+    providerModel?: string;      // Model for the specific provider
+    
+    // Legacy ElevenLabs fields (kept for backward compatibility)
     elevenlabsVoiceId: string;
     elevenlabsModelId: string;
     
@@ -40,6 +50,12 @@ export interface Voice {
     isFeatured: boolean;
     isPremium: boolean;
     displayOrder: number;
+    
+    // Performance tiers
+    pricingTier?: PricingTier;
+    latencyTier?: LatencyTier;
+    qualityTier?: QualityTier;
+    supportsStreaming?: boolean;
     
     // Audio preview URL
     previewUrl?: string;
@@ -77,17 +93,8 @@ export interface Assistant {
     updatedAt?: string;
     status: 'active' | 'inactive' | 'draft';
     
-    // Inbound Call Configuration
-    systemPrompt?: string;
-    firstMessage?: string;
-    
-    // Outbound Call Configuration
-    outboundSystemPrompt?: string;
-    outboundFirstMessage?: string;
-    
-    // Messaging Configuration (WhatsApp, Web Chat, etc.)
-    messagingSystemPrompt?: string;
-    messagingFirstMessage?: string;
+    // Unified instruction (like Vapi, Retell, LiveKit)
+    instruction?: string;
     
     // Voice Settings
     elevenlabsModelId?: string;  // 'eleven_multilingual_v2' | 'eleven_turbo_v2_5' | 'eleven_flash_v2_5'
@@ -126,15 +133,8 @@ export interface Assistant {
 // Input type for creating/updating assistants
 export interface AssistantInput {
     name: string;
-    // Inbound Call Configuration
-    systemPrompt?: string;
-    firstMessage?: string;
-    // Outbound Call Configuration
-    outboundSystemPrompt?: string;
-    outboundFirstMessage?: string;
-    // Messaging Configuration
-    messagingSystemPrompt?: string;
-    messagingFirstMessage?: string;
+    // Unified instruction (like Vapi, Retell, LiveKit)
+    instruction?: string;
     // Voice & Settings
     voiceId?: string;
     elevenlabsModelId?: string;

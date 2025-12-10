@@ -113,7 +113,8 @@ async function processMessage(options) {
         systemPrompt = resolveDynamicVariables(systemPrompt, assistant, customer);
 
         // ===== STEP 8: Build Messages Array =====
-        const messages = buildMessagesArray(systemPrompt, assistant.first_message, conversationHistory, message);
+        // NOTE: We no longer use first_message - unified instruction includes all greeting behavior
+        const messages = buildMessagesArray(systemPrompt, null, conversationHistory, message);
 
         // ===== STEP 9: Call LLM =====
         const model = assistant.llm_model || DEFAULTS.LLM_MODEL;
@@ -164,16 +165,10 @@ async function processMessage(options) {
 async function resolveAssistantConfig(assistantId, assistantConfig, channel) {
     if (assistantConfig) {
         // Use live config (converts frontend format to DB format)
-        const isMessaging = ['messaging', 'whatsapp', 'sms', 'web'].includes(channel);
-        
+        // Now using unified 'instruction' field instead of separate prompts
         return {
             name: assistantConfig.name,
-            system_prompt: isMessaging 
-                ? (assistantConfig.messagingSystemPrompt || assistantConfig.systemPrompt)
-                : assistantConfig.systemPrompt,
-            first_message: isMessaging
-                ? (assistantConfig.messagingFirstMessage || assistantConfig.firstMessage)
-                : assistantConfig.firstMessage,
+            instruction: assistantConfig.instruction || assistantConfig.systemPrompt,
             language_settings: assistantConfig.languageSettings || { default: 'en', autoDetect: false },
             style_settings: assistantConfig.styleSettings || { mode: 'friendly' },
             llm_model: assistantConfig.llmModel || DEFAULTS.LLM_MODEL,
@@ -198,13 +193,8 @@ async function resolveAssistantConfig(assistantId, assistantConfig, channel) {
         const assistant = await getCachedAssistant(assistantId);
         if (!assistant) return null;
 
-        // Apply channel-specific system prompt
-        const isMessaging = ['messaging', 'whatsapp', 'sms', 'web'].includes(channel);
-        if (isMessaging) {
-            assistant.system_prompt = assistant.messaging_system_prompt || assistant.system_prompt;
-            assistant.first_message = assistant.messaging_first_message || assistant.first_message;
-        }
-
+        // Database now uses unified 'instruction' field
+        // No need for channel-specific prompts anymore
         return assistant;
     }
 
@@ -213,9 +203,11 @@ async function resolveAssistantConfig(assistantId, assistantConfig, channel) {
 
 /**
  * Build the base system prompt with assistant identity
+ * Now uses unified 'instruction' field instead of separate system_prompt/first_message
  */
 function buildBaseSystemPrompt(assistant) {
-    let systemPrompt = assistant.system_prompt || 
+    // Use unified 'instruction' field (fall back to legacy system_prompt for migration)
+    let systemPrompt = assistant.instruction || assistant.system_prompt || 
         'You are a helpful, friendly AI assistant. Be conversational and helpful.';
     
     // Prepend assistant identity
