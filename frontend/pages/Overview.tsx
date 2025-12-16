@@ -14,7 +14,6 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { Button } from '../components/ui/Button';
 import { FadeIn } from '../components/ui/FadeIn';
 import Select, { type SelectOption } from '../components/ui/Select';
-import WelcomeBonusBanner from '../components/WelcomeBonusBanner';
 import { getUsageSummary } from '../services/billingService';
 import { supabase } from '../services/supabase';
 import { getCallLogs } from '../services/voicoryService';
@@ -368,9 +367,6 @@ const Overview: React.FC = () => {
 
     return (
         <div className="p-8 space-y-8 max-w-7xl mx-auto">
-            {/* Welcome Bonus Banner for new users */}
-            <WelcomeBonusBanner />
-
             {/* Header */}
             <div className="flex justify-between items-start">
                 <div className="space-y-1">

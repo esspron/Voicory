@@ -1,16 +1,15 @@
 import type { User } from '@supabase/supabase-js';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 
-import AuthService, { WelcomeBonusResult } from '../services/authService';
+import AuthService from '../services/authService';
 
 interface AuthContextType {
     user: User | null;
     loading: boolean;
     signIn: (email: string, password: string) => Promise<{ error: any }>;
-    signUp: (email: string, password: string) => Promise<{ error: any; welcomeBonus?: WelcomeBonusResult }>;
+    signUp: (email: string, password: string) => Promise<{ error: any }>;
     signOut: () => Promise<void>;
     isAuthenticated: boolean;
-    applyWelcomeBonus: () => Promise<WelcomeBonusResult | null>;
     redeemCoupon: (couponCode: string) => Promise<{ success: boolean; message?: string; error?: string; credit_amount?: number }>;
 }
 
@@ -58,16 +57,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const { user, error } = await AuthService.signUp(email, password);
         if (!error && user) {
             setUser(user);
-            
-            // Auto-apply welcome bonus for new users
-            try {
-                const welcomeBonus = await AuthService.applyWelcomeBonus(user.id);
-                console.log('Welcome bonus result:', welcomeBonus);
-                return { error, welcomeBonus };
-            } catch (bonusError) {
-                console.error('Welcome bonus error:', bonusError);
-                return { error };
-            }
+            // Note: $20 signup credits are automatically added via database trigger
         }
         return { error };
     };
@@ -75,11 +65,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const signOut = async () => {
         await AuthService.signOut();
         setUser(null);
-    };
-
-    const applyWelcomeBonus = async (): Promise<WelcomeBonusResult | null> => {
-        if (!user) return null;
-        return AuthService.applyWelcomeBonus(user.id);
     };
 
     const redeemCoupon = async (couponCode: string) => {
@@ -94,7 +79,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         signUp,
         signOut,
         isAuthenticated: !!user,
-        applyWelcomeBonus,
         redeemCoupon,
     };
 

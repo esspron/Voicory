@@ -9,16 +9,6 @@ export interface AuthResponse {
     error: AuthError | null;
 }
 
-export interface WelcomeBonusResult {
-    success: boolean;
-    coupon_code?: string;
-    credit_amount?: number;
-    new_balance?: number;
-    message?: string;
-    error?: string;
-    already_claimed?: boolean;
-}
-
 /**
  * Authentication Service
  * Handles user authentication using Supabase Auth
@@ -148,49 +138,6 @@ export class AuthService {
     static async isAuthenticated(): Promise<boolean> {
         const session = await this.getSession();
         return session !== null;
-    }
-
-    /**
-     * Apply welcome bonus for new users
-     * Gives $20 free credits on signup
-     */
-    static async applyWelcomeBonus(userId: string): Promise<WelcomeBonusResult> {
-        try {
-            const response = await authFetch('/api/coupons/welcome-bonus', {
-                method: 'POST',
-                body: JSON.stringify({
-                    userId,
-                    userAgent: navigator.userAgent
-                })
-            });
-
-            const data = await response.json();
-            return data;
-        } catch (error) {
-            console.error('Apply welcome bonus error:', error);
-            return {
-                success: false,
-                error: 'Failed to apply welcome bonus'
-            };
-        }
-    }
-
-    /**
-     * Check welcome bonus status for a user
-     */
-    static async getWelcomeBonusStatus(userId: string): Promise<{
-        claimed: boolean;
-        claimDetails?: any;
-        availableBonus?: { code: string; credit_amount: number; description: string } | null;
-    }> {
-        try {
-            const response = await authFetch(`/api/coupons/welcome-bonus/${userId}`);
-            const data = await response.json();
-            return data;
-        } catch (error) {
-            console.error('Get welcome bonus status error:', error);
-            return { claimed: false, availableBonus: null };
-        }
     }
 
     /**
