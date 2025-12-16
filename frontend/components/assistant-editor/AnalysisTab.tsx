@@ -94,7 +94,7 @@ const AnalysisTab: React.FC = () => {
                                     </span>
                                 </div>
                                 <div className="text-right">
-                                    <span className="text-sm text-textMain font-mono">₹{log.cost.toFixed(2)}</span>
+                                    <span className="text-sm text-textMain font-mono">${log.cost.toFixed(2)}</span>
                                 </div>
                             </div>
                         ))}

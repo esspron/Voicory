@@ -88,9 +88,9 @@ router.post('/test-chat', verifySupabaseAuth, async (req, res) => {
                 if (usageError) {
                     console.error('Failed to log test chat LLM usage:', usageError);
                 } else {
-                    cost = usageResult?.cost_inr;
+                    cost = usageResult?.cost_usd;
                     balance = usageResult?.balance;
-                    console.log(`Test chat billing: ${usage.totalTokens} tokens, cost: ${cost}`);
+                    console.log(`Test chat billing: ${usage.totalTokens} tokens, cost: $${cost}`);
                 }
             } catch (billingError) {
                 console.error('Billing error (non-blocking):', billingError.message);

@@ -376,7 +376,7 @@ export const validateReferralCode = async (code: string): Promise<{ valid: boole
 // CREDIT TOP-UP & REFERRAL COMPLETION
 // ============================================
 
-export const MINIMUM_REFERRAL_PURCHASE = 500; // ₹500 minimum
+export const MINIMUM_REFERRAL_PURCHASE = 10; // $10 minimum
 
 export interface CreditTopupResult {
     success: boolean;

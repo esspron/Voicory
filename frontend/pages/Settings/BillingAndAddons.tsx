@@ -1,4 +1,4 @@
-import { CreditCard, Check, Warning, DownloadSimple, Plus, Info, PencilSimple, CircleNotch, Cpu, ChatCircle, Microphone, SpeakerHigh, Sparkle, CurrencyDollar, Lightning, ShieldCheck, Phone, Clock, Ticket } from '@phosphor-icons/react';
+import { CreditCard, Check, Warning, DownloadSimple, Plus, Info, PencilSimple, CircleNotch, Cpu, ChatCircle, Microphone, SpeakerHigh, Lightning, Phone, Ticket, CaretDown, ArrowsClockwise, CalendarBlank, Receipt } from '@phosphor-icons/react';
 import React, { useState, useEffect } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
@@ -6,7 +6,18 @@ import ApplyCouponModal from '../../components/billing/ApplyCouponModal';
 import AddFundsModal from '../../components/billing/AddFundsModal';
 import { useAuth } from '../../contexts/AuthContext';
 import { getUsageSummary, getCreditTransactions, checkBalance, CreditTransaction, UsageSummary } from '../../services/billingService';
-import { Coupon, PaymentResult } from '../../services/paddleService';
+import { 
+    Coupon, 
+    PaymentResult, 
+    getBillingStatus, 
+    switchBillingMode, 
+    startSubscriptionCheckout,
+    formatCurrency,
+    formatBillingDate,
+    getBillingPeriodText,
+    BillingStatus,
+    initializePaddle
+} from '../../services/paddleService';
 import { getUserProfile } from '../../services/voicoryService';
 import { UserProfile } from '../../types';
 
@@ -51,11 +62,19 @@ const BillingAndAddons: React.FC = () => {
     const [hipaaEnabled, setHipaaEnabled] = useState(false);
     const [autoReloadEnabled, setAutoReloadEnabled] = useState(false);
     const [dataRetentionEnabled, setDataRetentionEnabled] = useState(false);
+    const [isTransactionHistoryOpen, setIsTransactionHistoryOpen] = useState(false);
 
     // Modal State
     const [showAddFundsModal, setShowAddFundsModal] = useState(false);
     const [showCouponModal, setShowCouponModal] = useState(false);
-    const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
+    // Coupon from ApplyCouponModal to be used in AddFundsModal (currently stored but not passed through)
+    // TODO: Pass appliedCoupon prop to AddFundsModal to pre-fill discount
+    const [, setAppliedCoupon] = useState<Coupon | null>(null);
+
+    // Billing Mode State
+    const [billingStatus, setBillingStatus] = useState<BillingStatus | null>(null);
+    const [isSwitchingMode, setIsSwitchingMode] = useState(false);
+    const [switchError, setSwitchError] = useState<string | null>(null);
 
     // Real data state
     const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
@@ -72,14 +91,19 @@ const BillingAndAddons: React.FC = () => {
                 return;
             }
             try {
-                const [profile, summary, txns] = await Promise.all([
+                // Initialize Paddle for checkout
+                await initializePaddle();
+                
+                const [profile, summary, txns, billingStatusResult] = await Promise.all([
                     getUserProfile(),
                     getUsageSummary(30),
-                    getCreditTransactions(20)
+                    getCreditTransactions(20),
+                    getBillingStatus()
                 ]);
                 setUserProfile(profile);
                 setUsageSummary(summary);
                 setTransactions(txns);
+                setBillingStatus(billingStatusResult);
                 if (profile) {
                     setHipaaEnabled(profile.hipaaEnabled);
                 }
@@ -112,12 +136,55 @@ const BillingAndAddons: React.FC = () => {
     }, [usageSummary]);
 
     const totalCost = usageSummary?.totalCost || 0;
-    const creditsBalance = userProfile?.creditsBalance || 0;
-    const planType = userProfile?.planType || 'PAYG';
+    const creditsBalance = billingStatus?.creditsBalance ?? userProfile?.creditsBalance ?? 0;
+    const billingMode = billingStatus?.billingMode || 'prepaid';
+    const planType = billingMode === 'postpaid' ? 'Monthly Usage' : 'PAYG';
     const billingEmail = userProfile?.organizationEmail || user?.email || 'No email';
 
+    // Handle billing mode switch
+    const handleBillingModeSwitch = async (newMode: 'prepaid' | 'postpaid') => {
+        if (newMode === billingMode) return;
+        
+        setSwitchError(null);
+        setIsSwitchingMode(true);
+        
+        try {
+            if (newMode === 'postpaid') {
+                // Start subscription checkout for postpaid
+                await startSubscriptionCheckout(
+                    () => {
+                        // On success, refresh billing status
+                        getBillingStatus().then(setBillingStatus);
+                        setIsSwitchingMode(false);
+                    },
+                    (error: string) => {
+                        setSwitchError(error || 'Failed to start subscription');
+                        setIsSwitchingMode(false);
+                    },
+                    () => {
+                        // On close without completing
+                        setIsSwitchingMode(false);
+                    }
+                );
+            } else {
+                // Switch to prepaid
+                const result = await switchBillingMode('prepaid');
+                if (result.success) {
+                    const newStatus = await getBillingStatus();
+                    setBillingStatus(newStatus);
+                } else {
+                    setSwitchError(result.error || 'Failed to switch billing mode');
+                }
+                setIsSwitchingMode(false);
+            }
+        } catch (error) {
+            setSwitchError('An error occurred while switching billing mode');
+            setIsSwitchingMode(false);
+        }
+    };
+
     // Handle payment success
-    const handlePaymentSuccess = async (result: PaymentResult) => {
+    const handlePaymentSuccess = async (_result: PaymentResult) => {
         // Refresh balance and transactions
         const [balanceResult, txns] = await Promise.all([
             checkBalance(0),
@@ -127,6 +194,9 @@ const BillingAndAddons: React.FC = () => {
             setUserProfile({ ...userProfile, creditsBalance: balanceResult.balance });
         }
         setTransactions(txns);
+        // Also refresh billing status
+        const newStatus = await getBillingStatus();
+        setBillingStatus(newStatus);
     };
 
     // Handle coupon apply (for discount coupons)
@@ -137,7 +207,8 @@ const BillingAndAddons: React.FC = () => {
     };
 
     // Handle credits redeemed from promo coupons
-    const handleCreditsRedeemed = async (amount: number) => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const handleCreditsRedeemed = async (_amount: number) => {
         // Refresh balance and transactions
         const [balanceResult, txns] = await Promise.all([
             checkBalance(0),
@@ -174,36 +245,208 @@ const BillingAndAddons: React.FC = () => {
 
                 {/* Balance Card */}
                 <div className="bg-gradient-to-br from-primary/10 via-surface/80 to-violet-500/5 border border-primary/20 rounded-2xl p-8 mb-8">
-                    <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-                        <div>
-                            <div className="flex items-center gap-3 mb-3">
-                                <h2 className="text-3xl font-bold text-textMain">{planType}</h2>
-                                <span className="px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-400 font-medium flex items-center gap-1.5">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                                    Active
-                                </span>
-                            </div>
-                            <p className="text-sm text-textMuted mb-2">Credit Balance</p>
-                            <div className="flex items-baseline gap-2">
-                                <span className="text-5xl font-bold text-textMain">{formatUSD(creditsBalance)}</span>
-                            </div>
-                        </div>
-                        <div className="flex flex-wrap gap-3">
-                            <button 
-                                onClick={() => setShowAddFundsModal(true)}
-                                className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-primary to-primary/80 text-black font-semibold rounded-xl hover:shadow-lg hover:shadow-primary/25 transition-all hover:-translate-y-0.5"
+                    {/* Billing Mode Selector */}
+                    <div className="flex items-center gap-2 mb-6">
+                        <span className="text-sm text-textMuted">Billing Mode:</span>
+                        <div className="flex bg-background/50 rounded-lg p-1 border border-white/10">
+                            <button
+                                onClick={() => handleBillingModeSwitch('prepaid')}
+                                disabled={isSwitchingMode}
+                                className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all ${
+                                    billingMode === 'prepaid'
+                                        ? 'bg-primary text-black'
+                                        : 'text-textMuted hover:text-textMain'
+                                }`}
                             >
-                                <Plus size={18} weight="bold" />
-                                Add Funds
+                                Prepaid Credits
                             </button>
-                            <button 
-                                onClick={() => setShowCouponModal(true)}
-                                className="flex items-center gap-2 px-5 py-3 bg-white/5 border border-white/10 text-textMain font-medium rounded-xl hover:bg-white/10 hover:border-white/20 transition-all"
+                            <button
+                                onClick={() => handleBillingModeSwitch('postpaid')}
+                                disabled={isSwitchingMode}
+                                className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all flex items-center gap-2 ${
+                                    billingMode === 'postpaid'
+                                        ? 'bg-primary text-black'
+                                        : 'text-textMuted hover:text-textMain'
+                                }`}
                             >
-                                <Ticket size={18} weight="bold" />
-                                Apply Coupon
+                                Monthly Usage
+                                {isSwitchingMode && <CircleNotch size={14} className="animate-spin" />}
                             </button>
                         </div>
+                        {switchError && (
+                            <span className="text-xs text-red-400 ml-2">{switchError}</span>
+                        )}
+                    </div>
+
+                    <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
+                        {billingMode === 'prepaid' ? (
+                            // Prepaid Mode Content
+                            <>
+                                <div>
+                                    <div className="flex items-center gap-3 mb-3">
+                                        <h2 className="text-3xl font-bold text-textMain">{planType}</h2>
+                                        <span className="px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-400 font-medium flex items-center gap-1.5">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                                            Active
+                                        </span>
+                                    </div>
+                                    <p className="text-sm text-textMuted mb-2">Credit Balance</p>
+                                    <div className="flex items-baseline gap-2">
+                                        <span className="text-5xl font-bold text-textMain">{formatUSD(creditsBalance)}</span>
+                                    </div>
+                                    <p className="text-xs text-textMuted mt-2">Pay upfront, use anytime. No monthly commitment.</p>
+                                </div>
+                                <div className="flex flex-wrap gap-3">
+                                    <button 
+                                        onClick={() => setShowAddFundsModal(true)}
+                                        className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-primary to-primary/80 text-black font-semibold rounded-xl hover:shadow-lg hover:shadow-primary/25 transition-all hover:-translate-y-0.5"
+                                    >
+                                        <Plus size={18} weight="bold" />
+                                        Add Funds
+                                    </button>
+                                    <button 
+                                        onClick={() => setShowCouponModal(true)}
+                                        className="flex items-center gap-2 px-5 py-3 bg-white/5 border border-white/10 text-textMain font-medium rounded-xl hover:bg-white/10 hover:border-white/20 transition-all"
+                                    >
+                                        <Ticket size={18} weight="bold" />
+                                        Apply Coupon
+                                    </button>
+                                </div>
+                            </>
+                        ) : (
+                            // Postpaid Mode Content
+                            <>
+                                <div className="flex-1">
+                                    <div className="flex items-center gap-3 mb-3">
+                                        <h2 className="text-3xl font-bold text-textMain">{planType}</h2>
+                                        {billingStatus?.subscription ? (
+                                            <span className="px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-400 font-medium flex items-center gap-1.5">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                                                {billingStatus.subscription.status === 'active' ? 'Active' : billingStatus.subscription.status}
+                                            </span>
+                                        ) : (
+                                            <span className="px-3 py-1 rounded-full bg-yellow-500/10 border border-yellow-500/20 text-xs text-yellow-400 font-medium">
+                                                Setup Required
+                                            </span>
+                                        )}
+                                    </div>
+                                    
+                                    {billingStatus?.subscription ? (
+                                        <div className="space-y-4">
+                                            {/* Current Period Usage */}
+                                            <div>
+                                                <p className="text-sm text-textMuted mb-1">Current Period Usage</p>
+                                                <div className="flex items-baseline gap-2">
+                                                    <span className="text-4xl font-bold text-textMain">
+                                                        {formatCurrency(billingStatus.currentUsage?.totalCost || 0)}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            
+                                            {/* Billing Period */}
+                                            <div className="flex items-center gap-4 text-sm">
+                                                <div className="flex items-center gap-2 text-textMuted">
+                                                    <CalendarBlank size={16} weight="bold" />
+                                                    <span>
+                                                        {billingStatus.currentUsage?.periodStart && billingStatus.currentUsage?.periodEnd
+                                                            ? getBillingPeriodText(billingStatus.currentUsage.periodStart, billingStatus.currentUsage.periodEnd)
+                                                            : 'Current period'
+                                                        }
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center gap-2 text-textMuted">
+                                                    <Receipt size={16} weight="bold" />
+                                                    <span>
+                                                        Next billing: {billingStatus.subscription.nextBilledAt 
+                                                            ? formatBillingDate(billingStatus.subscription.nextBilledAt)
+                                                            : 'N/A'
+                                                        }
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            {/* Usage Breakdown */}
+                                            {billingStatus.currentUsage?.breakdown && (
+                                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
+                                                    <div className="bg-background/30 rounded-lg p-3 border border-white/5">
+                                                        <div className="flex items-center gap-2 mb-1">
+                                                            <Cpu size={14} className="text-primary" />
+                                                            <span className="text-xs text-textMuted">LLM</span>
+                                                        </div>
+                                                        <span className="text-lg font-semibold text-textMain">
+                                                            {formatCurrency(billingStatus.currentUsage.breakdown.llm || 0)}
+                                                        </span>
+                                                    </div>
+                                                    <div className="bg-background/30 rounded-lg p-3 border border-white/5">
+                                                        <div className="flex items-center gap-2 mb-1">
+                                                            <SpeakerHigh size={14} className="text-pink-400" />
+                                                            <span className="text-xs text-textMuted">TTS</span>
+                                                        </div>
+                                                        <span className="text-lg font-semibold text-textMain">
+                                                            {formatCurrency(billingStatus.currentUsage.breakdown.tts || 0)}
+                                                        </span>
+                                                    </div>
+                                                    <div className="bg-background/30 rounded-lg p-3 border border-white/5">
+                                                        <div className="flex items-center gap-2 mb-1">
+                                                            <Microphone size={14} className="text-cyan-400" />
+                                                            <span className="text-xs text-textMuted">STT</span>
+                                                        </div>
+                                                        <span className="text-lg font-semibold text-textMain">
+                                                            {formatCurrency(billingStatus.currentUsage.breakdown.stt || 0)}
+                                                        </span>
+                                                    </div>
+                                                    <div className="bg-background/30 rounded-lg p-3 border border-white/5">
+                                                        <div className="flex items-center gap-2 mb-1">
+                                                            <Phone size={14} className="text-emerald-400" />
+                                                            <span className="text-xs text-textMuted">Calls</span>
+                                                        </div>
+                                                        <span className="text-lg font-semibold text-textMain">
+                                                            {formatCurrency(billingStatus.currentUsage.breakdown.calls || 0)}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-3">
+                                            <p className="text-sm text-textMuted">
+                                                Use now, pay monthly. We'll charge your card at the end of each billing cycle for your actual usage.
+                                            </p>
+                                            <div className="flex items-start gap-2 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+                                                <Warning size={18} className="text-yellow-400 mt-0.5 flex-shrink-0" />
+                                                <p className="text-sm text-yellow-200">
+                                                    Complete the subscription setup to enable monthly billing. You'll only be charged for what you use.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                                
+                                <div className="flex flex-col gap-3">
+                                    {!billingStatus?.subscription && (
+                                        <button 
+                                            onClick={() => handleBillingModeSwitch('postpaid')}
+                                            disabled={isSwitchingMode}
+                                            className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-primary to-primary/80 text-black font-semibold rounded-xl hover:shadow-lg hover:shadow-primary/25 transition-all hover:-translate-y-0.5 disabled:opacity-50"
+                                        >
+                                            {isSwitchingMode ? (
+                                                <CircleNotch size={18} className="animate-spin" />
+                                            ) : (
+                                                <ArrowsClockwise size={18} weight="bold" />
+                                            )}
+                                            Setup Subscription
+                                        </button>
+                                    )}
+                                    <button 
+                                        onClick={() => setShowCouponModal(true)}
+                                        className="flex items-center gap-2 px-5 py-3 bg-white/5 border border-white/10 text-textMain font-medium rounded-xl hover:bg-white/10 hover:border-white/20 transition-all"
+                                    >
+                                        <Ticket size={18} weight="bold" />
+                                        Apply Coupon
+                                    </button>
+                                </div>
+                            </>
+                        )}
                     </div>
                 </div>
 
@@ -356,61 +599,129 @@ const BillingAndAddons: React.FC = () => {
 
             {/* Plans Section */}
             <div>
-                <h3 className="text-xl font-semibold text-textMain mb-2">Plans</h3>
+                <h3 className="text-xl font-semibold text-textMain mb-2">Billing Plans</h3>
                 <p className="text-sm text-textMuted mb-6">
-                    Select a plan for your organization. <span className="font-medium text-textMain">Bundled minutes</span> include the cost of every provider used during a call (LLM, TTS, STT, etc.). <span className="font-medium text-textMain">Overage cost</span> applies when you exceed your bundled minutes.
+                    Choose how you want to pay. <span className="font-medium text-textMain">Prepaid</span> - buy credits upfront. <span className="font-medium text-textMain">Monthly Usage</span> - pay at the end of each month for what you used.
                 </p>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {/* Usage Based Card */}
-                    <div className="bg-surface border-2 border-primary/30 rounded-xl p-6 relative flex flex-col">
-                        <h4 className="text-sm text-textMuted font-medium mb-1">Usage Based</h4>
-                        <h3 className="text-2xl font-bold text-textMain mb-6">Pay as you go</h3>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    {/* Prepaid Credits Card */}
+                    <div className={`bg-surface rounded-xl p-6 relative flex flex-col ${billingMode === 'prepaid' ? 'border-2 border-primary/30' : 'border border-border'}`}>
+                        {billingMode === 'prepaid' && (
+                            <div className="absolute -top-3 left-4 px-3 py-1 bg-primary text-black text-xs font-semibold rounded-full">
+                                Current Plan
+                            </div>
+                        )}
+                        <h4 className="text-sm text-textMuted font-medium mb-1">Prepaid</h4>
+                        <h3 className="text-2xl font-bold text-textMain mb-2">Pay as you go</h3>
+                        <p className="text-xs text-textMuted mb-6">Buy credits upfront, use anytime</p>
 
-                        <div className="space-y-4 mb-8 flex-1">
-                            <div className="flex justify-between text-sm border-b border-border/50 pb-2">
-                                <span className="text-textMuted">Bundled minutes:</span>
-                                <span className="text-textMain">-</span>
+                        <div className="space-y-3 mb-6 flex-1">
+                            <div className="flex items-center gap-2 text-sm">
+                                <Check size={16} weight="bold" className="text-emerald-400" />
+                                <span className="text-textMain">No monthly commitment</span>
                             </div>
-                            <div className="flex justify-between text-sm border-b border-border/50 pb-2">
-                                <span className="text-textMuted">Bundled minutes overage cost:</span>
-                                <span className="text-textMain">-</span>
+                            <div className="flex items-center gap-2 text-sm">
+                                <Check size={16} weight="bold" className="text-emerald-400" />
+                                <span className="text-textMain">Credits never expire</span>
                             </div>
-                            <div className="flex justify-between text-sm">
-                                <span className="text-textMuted">Concurrency included:</span>
-                                <span className="text-textMain">10</span>
+                            <div className="flex items-center gap-2 text-sm">
+                                <Check size={16} weight="bold" className="text-emerald-400" />
+                                <span className="text-textMain">Pay only what you need</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-sm">
+                                <Check size={16} weight="bold" className="text-emerald-400" />
+                                <span className="text-textMain">10 concurrent calls</span>
                             </div>
                         </div>
 
-                        <div className="text-center mt-auto pt-4">
-                            <span className="text-primary font-medium text-sm">Current Plan</span>
+                        {billingMode !== 'prepaid' && (
+                            <button 
+                                onClick={() => handleBillingModeSwitch('prepaid')}
+                                disabled={isSwitchingMode}
+                                className="w-full bg-surface border border-white/10 text-textMain font-semibold py-2.5 rounded-lg text-sm hover:bg-surfaceHover transition-colors mt-auto"
+                            >
+                                Switch to Prepaid
+                            </button>
+                        )}
+                    </div>
+
+                    {/* Monthly Usage Card */}
+                    <div className={`bg-surface rounded-xl p-6 relative flex flex-col ${billingMode === 'postpaid' ? 'border-2 border-primary/30' : 'border border-border'}`}>
+                        {billingMode === 'postpaid' && (
+                            <div className="absolute -top-3 left-4 px-3 py-1 bg-primary text-black text-xs font-semibold rounded-full">
+                                Current Plan
+                            </div>
+                        )}
+                        <div className="flex items-center gap-2 mb-1">
+                            <h4 className="text-sm text-textMuted font-medium">Monthly Usage</h4>
+                            <span className="px-2 py-0.5 bg-violet-500/20 text-violet-400 text-[10px] font-semibold rounded">POPULAR</span>
                         </div>
+                        <h3 className="text-2xl font-bold text-textMain mb-2">Use now, pay later</h3>
+                        <p className="text-xs text-textMuted mb-6">Billed at the end of each month</p>
+
+                        <div className="space-y-3 mb-6 flex-1">
+                            <div className="flex items-center gap-2 text-sm">
+                                <Check size={16} weight="bold" className="text-emerald-400" />
+                                <span className="text-textMain">No upfront payment</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-sm">
+                                <Check size={16} weight="bold" className="text-emerald-400" />
+                                <span className="text-textMain">Pay only for actual usage</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-sm">
+                                <Check size={16} weight="bold" className="text-emerald-400" />
+                                <span className="text-textMain">Detailed usage breakdown</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-sm">
+                                <Check size={16} weight="bold" className="text-emerald-400" />
+                                <span className="text-textMain">10 concurrent calls</span>
+                            </div>
+                        </div>
+
+                        {billingMode !== 'postpaid' && (
+                            <button 
+                                onClick={() => handleBillingModeSwitch('postpaid')}
+                                disabled={isSwitchingMode}
+                                className="w-full bg-primary text-black font-semibold py-2.5 rounded-lg text-sm hover:bg-primaryHover transition-colors mt-auto flex items-center justify-center gap-2"
+                            >
+                                {isSwitchingMode ? (
+                                    <CircleNotch size={16} className="animate-spin" />
+                                ) : (
+                                    'Switch to Monthly'
+                                )}
+                            </button>
+                        )}
                     </div>
 
                     {/* Enterprise Card */}
                     <div className="bg-surface border border-border rounded-xl p-6 flex flex-col">
                         <h4 className="text-sm text-textMuted font-medium mb-1">Enterprise</h4>
-                        <div className="flex items-end gap-2 mb-6">
+                        <div className="flex items-end gap-2 mb-2">
                             <h3 className="text-2xl font-bold text-textMain">Custom</h3>
-                            <span className="text-sm text-textMuted mb-1">/annual contract</span>
+                        </div>
+                        <p className="text-xs text-textMuted mb-6">Annual contract with volume discounts</p>
+
+                        <div className="space-y-3 mb-6 flex-1">
+                            <div className="flex items-center gap-2 text-sm">
+                                <Check size={16} weight="bold" className="text-emerald-400" />
+                                <span className="text-textMain">600,000+ mins/year</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-sm">
+                                <Check size={16} weight="bold" className="text-emerald-400" />
+                                <span className="text-textMain">Custom pricing</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-sm">
+                                <Check size={16} weight="bold" className="text-emerald-400" />
+                                <span className="text-textMain">Dedicated support</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-sm">
+                                <Check size={16} weight="bold" className="text-emerald-400" />
+                                <span className="text-textMain">Unlimited concurrency</span>
+                            </div>
                         </div>
 
-                        <div className="space-y-4 mb-8 flex-1">
-                            <div className="flex justify-between text-sm border-b border-border/50 pb-2">
-                                <span className="text-textMuted">Bundled minutes:</span>
-                                <span className="text-textMain">Starting at 600,000/year</span>
-                            </div>
-                            <div className="flex justify-between text-sm border-b border-border/50 pb-2">
-                                <span className="text-textMuted">Bundled minutes overage cost:</span>
-                                <span className="text-textMain">Custom</span>
-                            </div>
-                            <div className="flex justify-between text-sm">
-                                <span className="text-textMuted">Concurrency included:</span>
-                                <span className="text-textMain">Custom</span>
-                            </div>
-                        </div>
-
-                        <button className="w-full bg-primary text-black font-semibold py-2.5 rounded-lg text-sm hover:bg-primaryHover transition-colors mt-auto">
+                        <button className="w-full bg-surface border border-white/10 text-textMain font-semibold py-2.5 rounded-lg text-sm hover:bg-surfaceHover transition-colors mt-auto">
                             Contact Sales
                         </button>
                     </div>
@@ -596,14 +907,27 @@ const BillingAndAddons: React.FC = () => {
             {/* History Tables */}
             <div className="space-y-8 pt-8">
                 <div className="bg-surface border border-border rounded-xl">
-                    <div className="flex justify-between items-center p-6 border-b border-border">
-                        <h3 className="text-lg font-semibold text-textMain">Credit Transaction History</h3>
-                        <button className="flex items-center gap-2 text-xs font-medium text-textMain border border-border hover:bg-surfaceHover px-3 py-1.5 rounded-lg transition-colors">
+                    <button
+                        onClick={() => setIsTransactionHistoryOpen(!isTransactionHistoryOpen)}
+                        className="flex justify-between items-center w-full p-6 border-b border-border hover:bg-surfaceHover/30 transition-colors cursor-pointer"
+                    >
+                        <div className="flex items-center gap-3">
+                            <CaretDown
+                                size={18}
+                                weight="bold"
+                                className={`text-textMuted transition-transform duration-200 ${isTransactionHistoryOpen ? 'rotate-0' : '-rotate-90'}`}
+                            />
+                            <h3 className="text-lg font-semibold text-textMain">Credit Transaction History</h3>
+                        </div>
+                        <div
+                            onClick={(e) => e.stopPropagation()}
+                            className="flex items-center gap-2 text-xs font-medium text-textMain border border-border hover:bg-surfaceHover px-3 py-1.5 rounded-lg transition-colors"
+                        >
                             <DownloadSimple size={14} />
                             Download Monthly Statement
-                        </button>
-                    </div>
-                    <div className="p-6">
+                        </div>
+                    </button>
+                    {isTransactionHistoryOpen && <div className="p-6">
                         <p className="text-xs text-textMuted mb-4">Recent credit transactions including purchases and usage.</p>
                         {transactions.length > 0 ? (
                             <div className="overflow-x-auto">
@@ -679,7 +1003,7 @@ const BillingAndAddons: React.FC = () => {
                                 No transactions yet
                             </div>
                         )}
-                    </div>
+                    </div>}
                 </div>
 
                 {/* Usage by Model - Detailed Table */}

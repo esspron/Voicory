@@ -87,7 +87,7 @@ export interface UsageLog {
     output_tokens?: number;
     total_tokens?: number;
     duration_seconds?: number;
-    cost_inr: number;
+    cost_usd: number;
     created_at: string;
 }
 
@@ -178,8 +178,8 @@ export interface LLMPricing {
     speed: string;
     provider_input_cost_per_million: number;
     provider_output_cost_per_million: number;
-    callyy_input_cost_per_million: number;
-    callyy_output_cost_per_million: number;
+    voicory_input_cost_per_million: number;
+    voicory_output_cost_per_million: number;
     is_active: boolean;
     margin_percent?: number;
 }

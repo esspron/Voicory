@@ -8,7 +8,9 @@ import {
     PaymentResult,
     validateCoupon,
     applyDiscount,
-    Coupon
+    Coupon,
+    PRICING_CONFIG,
+    QUICK_AMOUNTS
 } from '../../services/paddleService';
 
 interface AddFundsModalProps {
@@ -17,9 +19,6 @@ interface AddFundsModalProps {
     onSuccess: (result: PaymentResult) => void;
     currentBalance: number;
 }
-
-// Quick add amounts
-const QUICK_AMOUNTS = [20, 50, 100, 200];
 
 const AddFundsModal: React.FC<AddFundsModalProps> = ({
     isOpen,
@@ -63,13 +62,8 @@ const AddFundsModal: React.FC<AddFundsModalProps> = ({
     }, [isOpen]);
 
     const handleAmountChange = (value: string) => {
-        // Only allow numbers and decimal point
-        const sanitized = value.replace(/[^0-9.]/g, '');
-        // Prevent multiple decimal points
-        const parts = sanitized.split('.');
-        if (parts.length > 2) return;
-        // Limit to 2 decimal places
-        if (parts[1] && parts[1].length > 2) return;
+        // Only allow whole numbers for dynamic pricing
+        const sanitized = value.replace(/[^0-9]/g, '');
         setAmount(sanitized);
         setError(null);
     };
@@ -80,14 +74,14 @@ const AddFundsModal: React.FC<AddFundsModalProps> = ({
     };
 
     const incrementAmount = () => {
-        const current = parseFloat(amount) || 0;
-        setAmount((current + 5).toString());
+        const current = parseInt(amount) || 0;
+        setAmount((current + 10).toString());
     };
 
     const decrementAmount = () => {
-        const current = parseFloat(amount) || 0;
-        if (current > 20) {
-            setAmount((current - 5).toString());
+        const current = parseInt(amount) || 0;
+        if (current > PRICING_CONFIG.minAmount) {
+            setAmount((current - 10).toString());
         }
     };
 
@@ -109,26 +103,31 @@ const AddFundsModal: React.FC<AddFundsModalProps> = ({
     };
 
     const getFinalAmount = (): number => {
-        const baseAmount = parseFloat(amount) || 0;
+        const baseAmount = parseInt(amount) || 0;
         if (!appliedCoupon) return baseAmount;
         return applyDiscount(baseAmount, appliedCoupon);
     };
 
     const getCreditsToAdd = (): number => {
         // $1 = 1 credit
-        return parseFloat(amount) || 0;
+        return parseInt(amount) || 0;
     };
 
     const handleProceedToPayment = async () => {
-        const numAmount = parseFloat(amount);
+        const numAmount = parseInt(amount);
         
-        if (!numAmount || numAmount < 20) {
-            setError('Minimum amount is $20');
+        if (!numAmount || numAmount < PRICING_CONFIG.minAmount) {
+            setError(`Minimum amount is $${PRICING_CONFIG.minAmount}`);
             return;
         }
 
-        if (numAmount > 10000) {
-            setError('Maximum amount is $10,000. Contact sales for larger amounts.');
+        if (numAmount > PRICING_CONFIG.maxAmount) {
+            setError(`Maximum amount is $${PRICING_CONFIG.maxAmount}. Contact sales for larger amounts.`);
+            return;
+        }
+
+        if (!Number.isInteger(numAmount)) {
+            setError('Amount must be a whole number');
             return;
         }
         
@@ -140,10 +139,9 @@ const AddFundsModal: React.FC<AddFundsModalProps> = ({
         setIsLoading(true);
         setError(null);
 
-        // Open Paddle checkout with the amount
+        // Open Paddle checkout with dynamic amount
         await openPaddleCheckout(
-            `custom_${numAmount}`, // Custom package ID based on amount
-            'USD',
+            numAmount, // Just pass the amount - backend handles quantity
             (result) => {
                 setPaymentResult(result);
                 setStep('success');
@@ -157,8 +155,7 @@ const AddFundsModal: React.FC<AddFundsModalProps> = ({
             () => {
                 // User closed checkout without completing
                 setIsLoading(false);
-            },
-            numAmount // Pass the custom amount
+            }
         );
     };
 

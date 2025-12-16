@@ -429,7 +429,7 @@ async function processWithAI(config, message, contact) {
                         model: assistantConfig.llmModel,
                         inputTokens: result.usage.inputTokens,
                         outputTokens: result.usage.outputTokens,
-                        cost: usageResult?.cost_inr,
+                        costUSD: usageResult?.cost_usd,
                         newBalance: usageResult?.balance
                     });
                 }

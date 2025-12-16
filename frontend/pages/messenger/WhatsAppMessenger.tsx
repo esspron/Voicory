@@ -23,10 +23,14 @@ import {
     Key,
     Sparkle,
     Eye,
-    EyeSlash
+    EyeSlash,
+    GlobeHemisphereWest,
+    CaretDown
 } from '@phosphor-icons/react';
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+
+import { API } from '../../lib/constants';
 
 import { FadeIn } from '../../components/ui/FadeIn';
 import Select from '../../components/ui/Select';
@@ -475,10 +479,11 @@ const ConnectWhatsAppModal: React.FC<ConnectModalProps> = ({ onClose, onSuccess 
     const handleOAuthSuccess = async (authResponse: any) => {
         try {
             // Exchange the code for access token and get WABA details
-            // This would typically be done via your backend
-            const response = await fetch('/api/whatsapp/oauth/callback', {
+            // Use authFetch to call authenticated backend endpoint
+            const { authFetch } = await import('../../lib/api');
+            
+            const response = await authFetch('/api/whatsapp/oauth/callback', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     code: authResponse.code,
                     accessToken: authResponse.accessToken
@@ -486,7 +491,8 @@ const ConnectWhatsAppModal: React.FC<ConnectModalProps> = ({ onClose, onSuccess 
             });
 
             if (!response.ok) {
-                throw new Error('Failed to complete OAuth');
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error || errorData.details || 'Failed to complete OAuth');
             }
 
             const data = await response.json();
@@ -991,10 +997,18 @@ interface SettingsModalProps {
     onUpdate: () => void;
 }
 
+// Server region options for webhook URL
+const SERVER_REGIONS = [
+    { id: 'INDIA', label: 'India (Asia South)', flag: '🇮🇳', url: API.BACKEND_URLS.INDIA },
+    { id: 'USA', label: 'USA (US Central)', flag: '🇺🇸', url: API.BACKEND_URLS.USA },
+    { id: 'EUROPE', label: 'Europe (EU West)', flag: '🇪🇺', url: API.BACKEND_URLS.EUROPE },
+] as const;
+
 const WhatsAppSettingsModal: React.FC<SettingsModalProps> = ({ config, assistants, onClose, onUpdate }) => {
     const [activeTab, setActiveTab] = useState<'general' | 'chatbot' | 'calling' | 'webhook'>('general');
     const [loading, setLoading] = useState(false);
     const [showVerifyToken, setShowVerifyToken] = useState(false);
+    const [serverRegion, setServerRegion] = useState<'INDIA' | 'USA' | 'EUROPE'>('INDIA');
     const [settings, setSettings] = useState({
         chatbotEnabled: config.chatbotEnabled,
         assistantId: config.assistantId || '',
@@ -1247,6 +1261,35 @@ const WhatsAppSettingsModal: React.FC<SettingsModalProps> = ({ config, assistant
                                 </p>
                             </div>
 
+                            {/* Server Region Selector */}
+                            <div>
+                                <label className="block text-sm font-medium text-textMain mb-2">
+                                    <div className="flex items-center gap-2">
+                                        <GlobeHemisphereWest size={16} className="text-primary" />
+                                        Server Region
+                                    </div>
+                                </label>
+                                <p className="text-xs text-textMuted mb-3">
+                                    Select the server closest to your WhatsApp number's country for optimal latency.
+                                </p>
+                                <div className="grid grid-cols-3 gap-2">
+                                    {SERVER_REGIONS.map((region) => (
+                                        <button
+                                            key={region.id}
+                                            onClick={() => setServerRegion(region.id as typeof serverRegion)}
+                                            className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border transition-all ${
+                                                serverRegion === region.id
+                                                    ? 'bg-primary/10 border-primary/30 text-textMain'
+                                                    : 'bg-background border-border text-textMuted hover:border-primary/20 hover:bg-white/[0.02]'
+                                            }`}
+                                        >
+                                            <span className="text-lg">{region.flag}</span>
+                                            <span className="text-sm font-medium">{region.id}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
                             <div>
                                 <label className="block text-sm font-medium text-textMain mb-2">
                                     Webhook URL
@@ -1255,22 +1298,19 @@ const WhatsAppSettingsModal: React.FC<SettingsModalProps> = ({ config, assistant
                                     <input
                                         type="text"
                                         readOnly
-                                        value={import.meta.env.VITE_WEBHOOK_BASE_URL
-                                            ? `${import.meta.env.VITE_WEBHOOK_BASE_URL}/api/webhooks/whatsapp`
-                                            : `https://api.voicory.com/api/webhooks/whatsapp`}
+                                        value={`${SERVER_REGIONS.find(r => r.id === serverRegion)?.url}/api/webhooks/whatsapp`}
                                         className="flex-1 px-4 py-2.5 bg-background border border-border rounded-lg text-textMain font-mono text-sm"
                                     />
                                     <button
-                                        onClick={() => copyToClipboard(
-                                            import.meta.env.VITE_WEBHOOK_BASE_URL
-                                                ? `${import.meta.env.VITE_WEBHOOK_BASE_URL}/api/webhooks/whatsapp`
-                                                : `https://api.voicory.com/api/webhooks/whatsapp`
-                                        )}
+                                        onClick={() => copyToClipboard(`${SERVER_REGIONS.find(r => r.id === serverRegion)?.url}/api/webhooks/whatsapp`)}
                                         className="p-2.5 bg-surfaceHover rounded-lg hover:bg-surfaceHover/80 transition-colors"
                                     >
                                         <Copy size={18} className="text-textMuted" />
                                     </button>
                                 </div>
+                                <p className="text-xs text-textMuted mt-2">
+                                    📍 Using <span className="font-medium text-primary">{SERVER_REGIONS.find(r => r.id === serverRegion)?.label}</span> server
+                                </p>
                             </div>
 
                             <div>

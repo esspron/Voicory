@@ -1,4 +1,4 @@
-import { X, Ticket, CircleNotch, Check, Warning, Gift, CurrencyInr } from '@phosphor-icons/react';
+import { X, Ticket, CircleNotch, Check, Warning, Gift, CurrencyDollar } from '@phosphor-icons/react';
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -135,7 +135,7 @@ const ApplyCouponModal: React.FC<ApplyCouponModalProps> = ({
                             </h3>
                             {redemptionResult.creditAmount && (
                                 <p className="text-textMuted">
-                                    ₹{redemptionResult.creditAmount.toLocaleString()} credits added to your account
+                                    ${redemptionResult.creditAmount.toLocaleString()} credits added to your account
                                 </p>
                             )}
                             <button
@@ -206,7 +206,7 @@ const ApplyCouponModal: React.FC<ApplyCouponModalProps> = ({
                                             <div className="flex justify-between text-sm">
                                                 <span className="text-textMuted">Credits</span>
                                                 <span className="text-emerald-400 font-semibold flex items-center gap-1">
-                                                    <CurrencyInr size={14} />
+                                                    <CurrencyDollar size={14} />
                                                     {validatedCoupon.creditAmount.toLocaleString()}
                                                 </span>
                                             </div>
@@ -216,7 +216,7 @@ const ApplyCouponModal: React.FC<ApplyCouponModalProps> = ({
                                                 <span className="text-primary font-semibold">
                                                     {validatedCoupon.discountPercent > 0 
                                                         ? `${validatedCoupon.discountPercent}% off`
-                                                        : `₹${validatedCoupon.discountAmount} off`
+                                                        : `$${validatedCoupon.discountAmount} off`
                                                     }
                                                 </span>
                                             </div>
@@ -238,7 +238,7 @@ const ApplyCouponModal: React.FC<ApplyCouponModalProps> = ({
                                         {!isCreditCoupon && validatedCoupon.minPurchase && (
                                             <div className="flex justify-between text-sm">
                                                 <span className="text-textMuted">Min. Purchase</span>
-                                                <span className="text-textMain">₹{validatedCoupon.minPurchase}</span>
+                                                <span className="text-textMain">${validatedCoupon.minPurchase}</span>
                                             </div>
                                         )}
                                         
@@ -272,7 +272,7 @@ const ApplyCouponModal: React.FC<ApplyCouponModalProps> = ({
                                 ) : (
                                     <>
                                         <Gift size={18} weight="bold" />
-                                        Redeem ₹{validatedCoupon.creditAmount.toLocaleString()} Credits
+                                        Redeem ${validatedCoupon.creditAmount.toLocaleString()} Credits
                                     </>
                                 )}
                             </button>

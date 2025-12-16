@@ -49,7 +49,7 @@ export const fetchDashboardStats = async (): Promise<DashboardStats> => {
         supabase.from('user_profiles').select('*', { count: 'exact', head: true }).gte('created_at', weekStart),
         supabase.from('user_profiles').select('credits_balance'),
         supabase.from('credit_transactions').select('amount, transaction_type, created_at').eq('transaction_type', 'purchase'),
-        supabase.from('usage_logs').select('usage_type, duration_seconds, cost_inr, created_at'),
+        supabase.from('usage_logs').select('usage_type, duration_seconds, cost_usd, created_at'),
         supabase.from('assistants').select('*', { count: 'exact', head: true }),
         supabase.from('assistants').select('*', { count: 'exact', head: true }).eq('status', 'active'),
         supabase.from('phone_numbers').select('*', { count: 'exact', head: true }),
@@ -310,7 +310,7 @@ export const fetchUsageLogs = async ({
         output_tokens: u.output_tokens,
         total_tokens: u.total_tokens,
         duration_seconds: u.duration_seconds,
-        cost_inr: Number(u.cost_inr),
+        cost_usd: Number(u.cost_usd),
         created_at: u.created_at,
     }));
 
@@ -320,7 +320,7 @@ export const fetchUsageLogs = async ({
 export const fetchUsageStats = async () => {
     const { data } = await supabase
         .from('usage_logs')
-        .select('usage_type, cost_inr, input_tokens, output_tokens, duration_seconds');
+        .select('usage_type, cost_usd, input_tokens, output_tokens, duration_seconds');
 
     const stats = {
         llm: { count: 0, cost: 0, tokens: 0 },
@@ -333,7 +333,7 @@ export const fetchUsageStats = async () => {
         const type = u.usage_type as keyof typeof stats;
         if (stats[type]) {
             stats[type].count += 1;
-            stats[type].cost += Number(u.cost_inr) || 0;
+            stats[type].cost += Number(u.cost_usd) || 0;
             if (type === 'llm') {
                 stats.llm.tokens += (u.input_tokens || 0) + (u.output_tokens || 0);
             } else if (type === 'call') {
@@ -387,14 +387,14 @@ export const fetchAssistants = async ({
     const assistantIds = data?.map(a => a.id) || [];
     const { data: usageData } = await supabase
         .from('usage_logs')
-        .select('assistant_id, cost_inr')
+        .select('assistant_id, cost_usd')
         .in('assistant_id', assistantIds);
 
     const usageByAssistant = new Map<string, { calls: number; cost: number }>();
     usageData?.forEach(u => {
         const stats = usageByAssistant.get(u.assistant_id) || { calls: 0, cost: 0 };
         stats.calls += 1;
-        stats.cost += Number(u.cost_inr) || 0;
+        stats.cost += Number(u.cost_usd) || 0;
         usageByAssistant.set(u.assistant_id, stats);
     });
 
@@ -493,8 +493,8 @@ export const fetchLLMPricing = async (): Promise<LLMPricing[]> => {
         speed: p.speed,
         provider_input_cost_per_million: Number(p.provider_input_cost_per_million),
         provider_output_cost_per_million: Number(p.provider_output_cost_per_million),
-        callyy_input_cost_per_million: Number(p.callyy_input_cost_per_million),
-        callyy_output_cost_per_million: Number(p.callyy_output_cost_per_million),
+        voicory_input_cost_per_million: Number(p.voicory_input_cost_per_million),
+        voicory_output_cost_per_million: Number(p.voicory_output_cost_per_million),
         is_active: p.is_active,
     }));
 };

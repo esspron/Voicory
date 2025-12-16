@@ -58,10 +58,10 @@ const UsageAnalytics: React.FC = () => {
             const sttLogs = allLogs?.filter(l => l.usage_type === 'stt') || [];
             const callLogs = allLogs?.filter(l => l.usage_type === 'call') || [];
 
-            const llmCost = llmLogs.reduce((sum, l) => sum + (Number(l.cost_inr) || 0), 0);
-            const ttsCost = ttsLogs.reduce((sum, l) => sum + (Number(l.cost_inr) || 0), 0);
-            const sttCost = sttLogs.reduce((sum, l) => sum + (Number(l.cost_inr) || 0), 0);
-            const callCost = callLogs.reduce((sum, l) => sum + (Number(l.cost_inr) || 0), 0);
+            const llmCost = llmLogs.reduce((sum, l) => sum + (Number(l.cost_usd) || 0), 0);
+            const ttsCost = ttsLogs.reduce((sum, l) => sum + (Number(l.cost_usd) || 0), 0);
+            const sttCost = sttLogs.reduce((sum, l) => sum + (Number(l.cost_usd) || 0), 0);
+            const callCost = callLogs.reduce((sum, l) => sum + (Number(l.cost_usd) || 0), 0);
             const totalCost = llmCost + ttsCost + sttCost + callCost;
 
             const totalTokens = llmLogs.reduce((sum, l) => sum + (l.total_tokens || 0), 0);
@@ -91,7 +91,7 @@ const UsageAnalytics: React.FC = () => {
             const providerCosts: { [key: string]: number } = {};
             allLogs?.forEach(l => {
                 const provider = l.provider || 'Unknown';
-                providerCosts[provider] = (providerCosts[provider] || 0) + (Number(l.cost_inr) || 0);
+                providerCosts[provider] = (providerCosts[provider] || 0) + (Number(l.cost_usd) || 0);
             });
 
             const providerColors: { [key: string]: string } = {
@@ -125,7 +125,7 @@ const UsageAnalytics: React.FC = () => {
             allLogs?.forEach(l => {
                 const date = new Date(l.created_at).toISOString().split('T')[0];
                 if (dailyData[date] !== undefined) {
-                    dailyData[date] += Number(l.cost_inr) || 0;
+                    dailyData[date] += Number(l.cost_usd) || 0;
                 }
             });
 
@@ -168,7 +168,7 @@ const UsageAnalytics: React.FC = () => {
                 output_tokens: l.output_tokens,
                 total_tokens: l.total_tokens,
                 duration_seconds: l.duration_seconds,
-                cost_inr: Number(l.cost_inr) || 0,
+                cost_usd: Number(l.cost_usd) || 0,
                 created_at: l.created_at,
             })) || []);
 
@@ -214,7 +214,7 @@ const UsageAnalytics: React.FC = () => {
                 l.model,
                 l.total_tokens || '',
                 l.duration_seconds || '',
-                l.cost_inr
+                l.cost_usd
             ].join(','))
         ].join('\n');
 
@@ -291,7 +291,7 @@ const UsageAnalytics: React.FC = () => {
             ),
         },
         {
-            key: 'cost_inr',
+            key: 'cost_usd',
             header: 'Cost',
             sortable: true,
             render: (value: number) => (

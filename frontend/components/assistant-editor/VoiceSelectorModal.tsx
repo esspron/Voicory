@@ -328,7 +328,7 @@ const VoiceSelectorModal: React.FC<VoiceSelectorModalProps> = ({
 
                                         {/* Price */}
                                         <div className="absolute bottom-3 right-3 text-xs font-mono text-primary">
-                                            ₹{voice.costPerMin?.toFixed(2)}/min
+                                            ${voice.costPerMin?.toFixed(2)}/min
                                         </div>
                                     </div>
                                 );

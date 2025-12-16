@@ -970,7 +970,7 @@ async function processWithAI(config, message, contact) {
                         model: modelUsed,
                         inputTokens,
                         outputTokens,
-                        cost: usageResult?.cost_inr,
+                        costUSD: usageResult?.cost_usd,
                         newBalance: usageResult?.balance
                     });
                 }

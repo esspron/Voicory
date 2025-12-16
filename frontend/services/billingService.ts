@@ -17,7 +17,7 @@ export interface LLMPricing {
     providerInputCostPerMillion: number;
     providerOutputCostPerMillion: number;
     
-    // Voicory costs (INR per 1M tokens - 2x markup)
+    // Voicory costs (USD per 1M tokens - 2x markup)
     voicoryInputCostPerMillion: number;
     voicoryOutputCostPerMillion: number;
     
@@ -35,7 +35,7 @@ export interface UsageLog {
     outputTokens: number;
     totalTokens: number;
     durationSeconds: number;
-    costInr: number;
+    costUsd: number;
     callLogId?: string;
     conversationId?: string;
     metadata: Record<string, any>;
@@ -85,8 +85,8 @@ interface LLMPricingRow {
     speed: string;
     provider_input_cost_per_million: string;
     provider_output_cost_per_million: string;
-    callyy_input_cost_per_million: string;
-    callyy_output_cost_per_million: string;
+    voicory_input_cost_per_million: string;
+    voicory_output_cost_per_million: string;
     is_active: boolean;
 }
 
@@ -101,7 +101,7 @@ interface UsageLogRow {
     output_tokens: number;
     total_tokens: number;
     duration_seconds: number;
-    cost_inr: string;
+    cost_usd: string;
     call_log_id: string | null;
     conversation_id: string | null;
     metadata: Record<string, any>;
@@ -149,8 +149,8 @@ export const getLLMPricing = async (): Promise<LLMPricing[]> => {
             speed: p.speed,
             providerInputCostPerMillion: Number(p.provider_input_cost_per_million),
             providerOutputCostPerMillion: Number(p.provider_output_cost_per_million),
-            voicoryInputCostPerMillion: Number(p.callyy_input_cost_per_million),
-            voicoryOutputCostPerMillion: Number(p.callyy_output_cost_per_million),
+            voicoryInputCostPerMillion: Number(p.voicory_input_cost_per_million),
+            voicoryOutputCostPerMillion: Number(p.voicory_output_cost_per_million),
             isActive: p.is_active
         }));
     } catch (error) {
@@ -182,8 +182,8 @@ export const getModelPricing = async (model: string): Promise<LLMPricing | null>
             speed: data.speed,
             providerInputCostPerMillion: Number(data.provider_input_cost_per_million),
             providerOutputCostPerMillion: Number(data.provider_output_cost_per_million),
-            voicoryInputCostPerMillion: Number(data.callyy_input_cost_per_million),
-            voicoryOutputCostPerMillion: Number(data.callyy_output_cost_per_million),
+            voicoryInputCostPerMillion: Number(data.voicory_input_cost_per_million),
+            voicoryOutputCostPerMillion: Number(data.voicory_output_cost_per_million),
             isActive: data.is_active
         } : null;
     } catch (error) {
@@ -253,7 +253,7 @@ export const logLLMUsage = async (params: {
 
         return {
             success: data?.success || false,
-            cost: data?.cost_inr,
+            cost: data?.cost_usd,
             balance: data?.balance,
             error: data?.error
         };
@@ -287,7 +287,7 @@ export const getUsageLogs = async (limit: number = 50, offset: number = 0): Prom
             outputTokens: u.output_tokens,
             totalTokens: u.total_tokens,
             durationSeconds: u.duration_seconds,
-            costInr: Number(u.cost_inr),
+            costUsd: Number(u.cost_usd),
             callLogId: u.call_log_id || undefined,
             conversationId: u.conversation_id || undefined,
             metadata: u.metadata,
@@ -359,7 +359,7 @@ export const getUsageSummary = async (days: number = 30): Promise<UsageSummary> 
         const byDayMap = new Map<string, number>();
         
         logs.forEach(log => {
-            const cost = Number(log.cost_inr);
+            const cost = Number(log.cost_usd);
             const tokens = log.total_tokens || 0;
             
             totalCost += cost;
@@ -492,7 +492,7 @@ export const checkBalance = async (requiredAmount: number): Promise<{ sufficient
 };
 
 interface TodayUsageLogRow {
-    cost_inr: string;
+    cost_usd: string;
     total_tokens: number;
     usage_type: string;
 }
@@ -507,7 +507,7 @@ export const getTodayUsage = async (): Promise<{ cost: number; tokens: number; c
         
         const { data, error } = await supabase
             .from('usage_logs')
-            .select('cost_inr, total_tokens, usage_type')
+            .select('cost_usd, total_tokens, usage_type')
             .gte('created_at', today.toISOString()) as { data: TodayUsageLogRow[] | null; error: any };
 
         if (error) throw error;
@@ -517,7 +517,7 @@ export const getTodayUsage = async (): Promise<{ cost: number; tokens: number; c
         let calls = 0;
 
         (data || []).forEach(log => {
-            cost += Number(log.cost_inr);
+            cost += Number(log.cost_usd);
             tokens += log.total_tokens || 0;
             if (log.usage_type === 'call') calls++;
         });

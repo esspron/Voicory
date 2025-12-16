@@ -104,13 +104,13 @@ const UserManagerEnhanced: React.FC = () => {
             // Fetch usage stats per user
             const { data: usageData } = await supabase
                 .from('usage_logs')
-                .select('user_id, cost_inr')
+                .select('user_id, cost_usd')
                 .in('user_id', userIds);
 
             const usageTotals = new Map<string, number>();
             usageData?.forEach(u => {
                 const total = usageTotals.get(u.user_id) || 0;
-                usageTotals.set(u.user_id, total + (Number(u.cost_inr) || 0));
+                usageTotals.set(u.user_id, total + (Number(u.cost_usd) || 0));
             });
 
             const enrichedUsers: AdminUser[] = profiles?.map(p => ({

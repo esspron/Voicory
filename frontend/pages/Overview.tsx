@@ -188,7 +188,7 @@ const CallItem = ({ log }: { log: CallLog }) => (
             </div>
         </div>
         <div className="text-right">
-            <p className="text-sm font-semibold text-textMain font-mono">₹{log.cost}</p>
+            <p className="text-sm font-semibold text-textMain font-mono">${log.cost}</p>
             <p className="text-xs text-textMuted/70">{log.duration}</p>
         </div>
     </div>

@@ -48,9 +48,6 @@ type TabId = typeof TABS[number]['id'];
 // LLM Options
 const LLM_PROVIDERS = [
     { id: 'openai', name: 'OpenAI', models: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-3.5-turbo'] },
-    { id: 'anthropic', name: 'Anthropic', models: ['claude-3.5-sonnet', 'claude-3-opus', 'claude-3-haiku'] },
-    { id: 'groq', name: 'Groq', models: ['llama-3.1-70b', 'llama-3.1-8b', 'mixtral-8x7b'] },
-    { id: 'together', name: 'Together AI', models: ['Qwen3-30B-A3B', 'Llama-3.2-90B'] },
 ];
 
 // Language options - now imported from types.ts as SUPPORTED_LANGUAGES
@@ -73,6 +70,7 @@ const TIMEZONES = [
 
 interface AssistantFormData {
     name: string;
+    title: string;  // Short title/role (e.g., Sales Support, Customer Support)
     // Unified instruction (like Vapi, Retell, LiveKit)
     instruction: string;
     // Voice Settings
@@ -117,6 +115,7 @@ const DEFAULT_MEMORY_CONFIG: MemoryConfig = {
 
 const DEFAULT_FORM_DATA: AssistantFormData = {
     name: 'New Assistant',
+    title: '',  // Short title/role (e.g., Sales Support, Customer Support)
     // Unified instruction (like Vapi, Retell, LiveKit)
     instruction: `You are a helpful, friendly AI assistant. Your role is to assist users with their questions and needs in a professional yet conversational manner.
 
@@ -187,6 +186,7 @@ const AssistantEditor: React.FC = () => {
     const getFormDataFingerprint = (data: AssistantFormData) => {
         return JSON.stringify({
             name: data.name,
+            title: data.title,
             instruction: data.instruction,
             // Settings
             voiceId: data.voiceId,
@@ -254,6 +254,7 @@ const AssistantEditor: React.FC = () => {
                         
                         loadedFormData = {
                             name: assistant.name,
+                            title: assistant.title || '',  // Short title/role
                             // Unified instruction (like Vapi, Retell, LiveKit)
                             instruction: assistant.instruction || DEFAULT_FORM_DATA.instruction,
                             // Voice & Settings
@@ -314,6 +315,7 @@ const AssistantEditor: React.FC = () => {
         try {
             const inputData: AssistantInput = {
                 name: formData.name,
+                title: formData.title || undefined,  // Short title/role
                 // Unified instruction (like Vapi, Retell, LiveKit)
                 instruction: formData.instruction,
                 // Voice & Settings
@@ -648,8 +650,13 @@ const AssistantEditor: React.FC = () => {
                             <input
                                 type="text"
                                 value={formData.name}
-                                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                className="bg-transparent text-textMain font-semibold text-lg outline-none placeholder:text-textMuted focus:underline decoration-primary/50 decoration-dashed underline-offset-4 min-w-0 w-auto max-w-[200px]"
+                                onChange={(e) => {
+                                    const value = e.target.value;
+                                    // Capitalize first letter of each word
+                                    const capitalized = value.replace(/\b\w/g, (char) => char.toUpperCase());
+                                    setFormData({ ...formData, name: capitalized });
+                                }}
+                                className="bg-transparent text-textMain font-semibold text-lg outline-none placeholder:text-textMuted focus:underline decoration-primary/50 decoration-dashed underline-offset-4 min-w-0 w-auto max-w-[200px] capitalize"
                                 placeholder="Assistant Name"
                                 size={formData.name.length || 10}
                             />
@@ -664,7 +671,21 @@ const AssistantEditor: React.FC = () => {
                                 </span>
                             )}
                         </div>
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="text"
+                                value={formData.title}
+                                onChange={(e) => {
+                                    const value = e.target.value;
+                                    // Capitalize first letter of each word
+                                    const capitalized = value.replace(/\b\w/g, (char) => char.toUpperCase());
+                                    setFormData({ ...formData, title: capitalized });
+                                }}
+                                className="bg-transparent text-xs text-textMuted outline-none placeholder:text-textMuted/50 focus:text-primary focus:underline decoration-primary/30 decoration-dashed underline-offset-2 min-w-0 w-auto capitalize"
+                                placeholder="Add title..."
+                                size={formData.title.length || 10}
+                            />
+                            <span className="text-xs text-textMuted/40">•</span>
                             <span className="text-xs text-textMuted flex items-center gap-1.5">
                                 <span className={`w-2 h-2 rounded-full ${formData.status === 'active' ? 'bg-emerald-500 shadow-lg shadow-emerald-500/50' : formData.status === 'draft' ? 'bg-gray-400' : 'bg-yellow-500'}`}></span>
                                 {formData.status === 'active' ? 'Published' : formData.status === 'draft' ? 'Draft' : 'Inactive'}

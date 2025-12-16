@@ -86,6 +86,7 @@ export interface VoiceWithSamples extends Voice {
 export interface Assistant {
     id: string;
     name: string;
+    title?: string;  // Short title/role (e.g., Sales Support, Customer Support)
     model: string;
     voiceId?: string;
     transcriber: string;
@@ -133,6 +134,7 @@ export interface Assistant {
 // Input type for creating/updating assistants
 export interface AssistantInput {
     name: string;
+    title?: string;  // Short title/role (e.g., Sales Support, Customer Support)
     // Unified instruction (like Vapi, Retell, LiveKit)
     instruction?: string;
     // Voice & Settings

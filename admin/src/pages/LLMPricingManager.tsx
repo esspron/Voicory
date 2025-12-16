@@ -33,8 +33,8 @@ const LLMPricingManager: React.FC = () => {
         speed: 'Medium',
         provider_input_cost_per_million: 0,
         provider_output_cost_per_million: 0,
-        callyy_input_cost_per_million: 0,
-        callyy_output_cost_per_million: 0,
+        voicory_input_cost_per_million: 0,
+        voicory_output_cost_per_million: 0,
         is_active: true,
     });
 
@@ -56,8 +56,8 @@ const LLMPricingManager: React.FC = () => {
             // Calculate margin for each model
             const modelsWithMargin = data?.map(m => {
                 const providerCost = Number(m.provider_input_cost_per_million) + Number(m.provider_output_cost_per_million);
-                const callyyPrice = Number(m.callyy_input_cost_per_million) + Number(m.callyy_output_cost_per_million);
-                const margin = providerCost > 0 ? ((callyyPrice - providerCost) / providerCost) * 100 : 0;
+                const voicoryPrice = Number(m.voicory_input_cost_per_million) + Number(m.voicory_output_cost_per_million);
+                const margin = providerCost > 0 ? ((voicoryPrice - providerCost) / providerCost) * 100 : 0;
                 return {
                     ...m,
                     margin_percent: Math.round(margin),
@@ -81,8 +81,8 @@ const LLMPricingManager: React.FC = () => {
             speed: model.speed,
             provider_input_cost_per_million: model.provider_input_cost_per_million,
             provider_output_cost_per_million: model.provider_output_cost_per_million,
-            callyy_input_cost_per_million: model.callyy_input_cost_per_million,
-            callyy_output_cost_per_million: model.callyy_output_cost_per_million,
+            voicory_input_cost_per_million: model.voicory_input_cost_per_million,
+            voicory_output_cost_per_million: model.voicory_output_cost_per_million,
             is_active: model.is_active,
         });
         setShowEditModal(true);
@@ -101,8 +101,8 @@ const LLMPricingManager: React.FC = () => {
                     speed: editForm.speed,
                     provider_input_cost_per_million: editForm.provider_input_cost_per_million,
                     provider_output_cost_per_million: editForm.provider_output_cost_per_million,
-                    callyy_input_cost_per_million: editForm.callyy_input_cost_per_million,
-                    callyy_output_cost_per_million: editForm.callyy_output_cost_per_million,
+                    voicory_input_cost_per_million: editForm.voicory_input_cost_per_million,
+                    voicory_output_cost_per_million: editForm.voicory_output_cost_per_million,
                     is_active: editForm.is_active,
                     updated_at: new Date().toISOString(),
                 })
@@ -200,7 +200,7 @@ const LLMPricingManager: React.FC = () => {
             ),
         },
         {
-            key: 'callyy_input_cost_per_million',
+            key: 'voicory_input_cost_per_million',
             header: 'Input Cost',
             sortable: true,
             render: (value: number) => (
@@ -208,7 +208,7 @@ const LLMPricingManager: React.FC = () => {
             ),
         },
         {
-            key: 'callyy_output_cost_per_million',
+            key: 'voicory_output_cost_per_million',
             header: 'Output Cost',
             sortable: true,
             render: (value: number) => (
@@ -400,15 +400,15 @@ const LLMPricingManager: React.FC = () => {
                                 label="Input Cost ($)"
                                 type="number"
                                 step="0.01"
-                                value={editForm.callyy_input_cost_per_million}
-                                onChange={(e) => setEditForm({ ...editForm, callyy_input_cost_per_million: Number(e.target.value) })}
+                                value={editForm.voicory_input_cost_per_million}
+                                onChange={(e) => setEditForm({ ...editForm, voicory_input_cost_per_million: Number(e.target.value) })}
                             />
                             <Input
                                 label="Output Cost ($)"
                                 type="number"
                                 step="0.01"
-                                value={editForm.callyy_output_cost_per_million}
-                                onChange={(e) => setEditForm({ ...editForm, callyy_output_cost_per_million: Number(e.target.value) })}
+                                value={editForm.voicory_output_cost_per_million}
+                                onChange={(e) => setEditForm({ ...editForm, voicory_output_cost_per_million: Number(e.target.value) })}
                             />
                         </div>
                     </div>
@@ -419,7 +419,7 @@ const LLMPricingManager: React.FC = () => {
                         <p className="text-2xl font-bold text-emerald-400">
                             {(() => {
                                 const providerCost = editForm.provider_input_cost_per_million + editForm.provider_output_cost_per_million;
-                                const yourPrice = editForm.callyy_input_cost_per_million + editForm.callyy_output_cost_per_million;
+                                const yourPrice = editForm.voicory_input_cost_per_million + editForm.voicory_output_cost_per_million;
                                 const margin = providerCost > 0 ? ((yourPrice - providerCost) / providerCost) * 100 : 0;
                                 return `${Math.round(margin)}%`;
                             })()}

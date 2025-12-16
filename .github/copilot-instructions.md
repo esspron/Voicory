@@ -407,7 +407,7 @@ import { Robot, Phone, Sparkle, Lightning } from '@phosphor-icons/react';
 | `Zap` | `Lightning` |
 | `Sparkles` | `Sparkle` |
 | `ChevronRight` | `CaretRight` |
-| `IndianRupee` | `CurrencyInr` |
+| `DollarSign` | `CurrencyDollar` |
 | `Github` | `GithubLogo` |
 | `Mail` | `EnvelopeSimple` |
 | `EyeOff` | `EyeSlash` |
@@ -572,6 +572,53 @@ export const getVoices = async (): Promise<Voice[]> => {
 - **Region**: Mumbai (ap-south-1)
 - **SDK**: `@upstash/redis` (HTTP mode, production recommended)
 
+### Voice Agent Configuration (Real-Time Voice Calls)
+Voice Config is a separate configuration from the main LLM setting. It controls real-time voice call behavior.
+
+#### Provider Configuration (Cleaned Up)
+| Component | Available Providers | Recommended | Notes |
+|-----------|---------------------|-------------|-------|
+| **STT** (Speech-to-Text) | Deepgram, OpenAI Whisper | Deepgram | Lowest latency for real-time |
+| **LLM** (Language Model) | OpenAI only | GPT-4o-mini | Fast response for voice |
+| **TTS** (Text-to-Speech) | ElevenLabs, Google Cloud TTS | ElevenLabs | Natural voice quality |
+
+#### STT Models
+| Provider | Models |
+|----------|--------|
+| Deepgram | `nova-2`, `nova`, `enhanced`, `base` |
+| OpenAI Whisper | `whisper-1` |
+
+#### LLM Models (OpenAI Only)
+- `gpt-4o` - Best quality
+- `gpt-4o-mini` - **Recommended for voice** (fast + cheap)
+- `gpt-4-turbo` - High quality
+- `gpt-3.5-turbo` - Fastest
+
+#### TTS Models
+| Provider | Models/Voices |
+|----------|---------------|
+| ElevenLabs | `eleven_multilingual_v2`, `eleven_turbo_v2`, `eleven_monolingual_v1` |
+| Google Cloud TTS | `en-US-Neural2-A` through `J`, `en-US-Wavenet-*`, `en-US-Standard-*` |
+
+#### Two LLM Configurations
+The app has TWO separate LLM settings:
+1. **Agent Tab LLM** (`AssistantEditor.tsx`) - For chat/WhatsApp interactions
+2. **Voice Config LLM** (`VoiceAgentTab.tsx`) - For real-time voice calls
+
+Both are now OpenAI only. Don't add other providers (Anthropic, Groq, etc.) - they've been intentionally removed.
+
+#### Voice Config Database Table
+```sql
+-- voice_agent_config table
+assistant_id UUID (FK to assistants)
+stt_provider TEXT DEFAULT 'deepgram'
+stt_model TEXT DEFAULT 'nova-2'
+llm_provider TEXT DEFAULT 'openai'
+llm_model TEXT DEFAULT 'gpt-4o-mini'
+tts_provider TEXT DEFAULT 'elevenlabs'
+tts_model TEXT DEFAULT 'eleven_multilingual_v2'
+```
+
 #### Environment Variables (Cloud Run)
 ```env
 NODE_ENV=production
@@ -580,6 +627,9 @@ SUPABASE_SERVICE_ROLE_KEY=<your-service-role-key>
 UPSTASH_REDIS_REST_URL=https://your-redis.upstash.io
 UPSTASH_REDIS_REST_TOKEN=your-token
 OPENAI_API_KEY=<your-openai-key>
+ELEVENLABS_API_KEY=<your-elevenlabs-key>
+GOOGLE_TTS_API_KEY=<your-google-tts-key>
+DEEPGRAM_API_KEY=<your-deepgram-key>
 FACEBOOK_APP_ID=<your-facebook-app-id>
 FACEBOOK_APP_SECRET=<your-facebook-app-secret>
 ```
@@ -624,13 +674,22 @@ curl https://api.voicory.com/health
 - **CallBot**: When voice call delays > 200ms OR 1000+ users
 - **ChatBot**: When WhatsApp queue backing up OR 5000+ users
 
-### Google Cloud Run Multi-Service Setup
+### Google Cloud Run Multi-Region Setup
 ```
-GCP Project: voicory
-├── backendvoicory (main) ← Currently deployed (europe-west1)
-├── callbot ← Deploy when scaling voice
-└── chatbot ← Deploy when scaling WhatsApp
+GCP Project: voicory (ID: 732127099858)
+├── backendvoicory      → asia-south1 (India/Mumbai) - PRIMARY
+├── backendvoicory-us   → us-central1 (USA/Iowa)
+├── backendvoicory-eu   → europe-west1 (Europe/Belgium)
+├── callbot             → Deploy when scaling voice
+└── chatbot             → Deploy when scaling WhatsApp
 ```
+
+### Cloud Run Service Details
+| Service | Region | Min Instances | Max Instances | Memory | CPU |
+|---------|--------|---------------|---------------|--------|-----|
+| backendvoicory | asia-south1 | 1 | 10 | 512Mi | 1 |
+| backendvoicory-us | us-central1 | 0 | 10 | 512Mi | 1 |
+| backendvoicory-eu | europe-west1 | 0 | 10 | 512Mi | 1 |
 
 ## 13. Common Pitfalls to Avoid
 
@@ -642,36 +701,137 @@ GCP Project: voicory
 6. ❌ **Don't skip Redis cache** - Always check cache before DB queries in backend
 7. ❌ **Don't use ioredis in serverless** - Use `@upstash/redis` HTTP SDK
 8. ❌ **Don't forget PORT=8080** - Cloud Run requires port 8080 (set automatically)
+9. ❌ **Don't use `--set-env-vars` in Cloud Build** - Use `--update-env-vars` to preserve existing env vars
+10. ❌ **Don't hardcode backend URLs** - Use `authFetch()` from `lib/api.ts` which auto-selects geo-routed URL
+11. ❌ **Don't use INR (₹) currency** - All pricing is in USD ($). Use `CurrencyDollar` icon, `$` symbol, and `cost_usd` columns
+11. ❌ **Don't add Anthropic/Groq/Together/Fireworks** - LLM providers intentionally limited to OpenAI only
+12. ❌ **Don't confuse Voice Config LLM with Agent LLM** - They're separate configurations for different use cases
 
 ## 13.1 Production URLs
 
-| Service | URL | Platform | Purpose |
+| Service | URL | Platform | Region |
 |---------|-----|----------|--------|
-| **Website** | `https://www.voicory.com` | Vercel | Marketing site (Next.js) |
-| **Dashboard** | `https://app.voicory.com` | Vercel | SaaS Dashboard (React/Vite) |
-| **Backend API** | `https://api.voicory.com` | Google Cloud Run | API, Webhooks, Processing |
-| **Cloud Run Direct** | `https://backendvoicory-732127099858.europe-west1.run.app` | Google Cloud Run | Direct Cloud Run URL |
-| **Supabase** | `https://ssxirklimsdmsnwgtwfs.supabase.co` | Supabase | Database & Auth |
+| **Website** | `https://www.voicory.com` | Vercel | Global CDN |
+| **Dashboard** | `https://app.voicory.com` | Vercel | Global CDN |
+| **Backend India** | `https://backendvoicory-732127099858.asia-south1.run.app` | Cloud Run | asia-south1 (Mumbai) |
+| **Backend USA** | `https://backendvoicory-us-732127099858.us-central1.run.app` | Cloud Run | us-central1 (Iowa) |
+| **Backend Europe** | `https://backendvoicory-eu-732127099858.europe-west1.run.app` | Cloud Run | europe-west1 (Belgium) |
+| **Supabase** | `https://ssxirklimsdmsnwgtwfs.supabase.co` | Supabase | ap-south-1 |
 
-## 13.2 Deployment Commands
+### Frontend Geo-Routing (lib/api.ts)
+The frontend automatically selects the nearest backend based on user's timezone:
+```typescript
+// lib/api.ts - authFetch() handles this automatically
+const BACKEND_URLS = {
+  india: 'https://backendvoicory-732127099858.asia-south1.run.app',
+  usa: 'https://backendvoicory-us-732127099858.us-central1.run.app',
+  europe: 'https://backendvoicory-eu-732127099858.europe-west1.run.app',
+};
+// Use authFetch('/api/endpoint') - it auto-selects region + adds auth header
+```
 
-### 🚀 Backend (Google Cloud Run) - Auto-deploys on git push
+## 13.2 Cloud Run Multi-Region Deployment (CI/CD)
+
+### Architecture
+```
+GitHub (main branch)
+    ↓ push
+Cloud Build Trigger (backendvoicory)
+    ↓ uses backend/cloudbuild.yaml
+    ├── Step 1: Build Docker image (from backend/)
+    ├── Step 2: Push to Artifact Registry
+    ├── Step 3: Deploy to India (asia-south1)
+    ├── Step 4: Deploy to USA (us-central1)
+    └── Step 5: Deploy to Europe (europe-west1)
+```
+
+### Cloud Build Configuration
+- **Trigger Name**: `backendvoicory`
+- **Config File**: `backend/cloudbuild.yaml`
+- **Branch**: `^main$`
+- **Region**: `global`
+
+### cloudbuild.yaml Key Points
+```yaml
+# Located at: backend/cloudbuild.yaml
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    dir: 'backend'  # CRITICAL: Build from backend/ directory
+    args: ['build', '-t', 'IMAGE_NAME', '.']
+  
+  # Deploy steps use --update-env-vars (NOT --set-env-vars)
+  # This preserves existing env vars set on the service
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:slim'
+    args: ['run', 'deploy', 'backendvoicory', '--update-env-vars=NODE_ENV=production', ...]
+```
+
+### ⚠️ CRITICAL: Environment Variables
+Cloud Run services require env vars to be set ONCE via gcloud CLI or Console UI.
+The `cloudbuild.yaml` uses `--update-env-vars` to ADD/UPDATE without overwriting all existing vars.
+
+**Required Backend Env Vars:**
 ```bash
-# Backend auto-deploys when you push to main branch via Cloud Build
+# Set via: gcloud run services update SERVICE --region=REGION --update-env-vars="KEY=VALUE,..."
+SUPABASE_URL=https://ssxirklimsdmsnwgtwfs.supabase.co
+SUPABASE_ANON_KEY=eyJhbGci...  # From backend/.env
+SUPABASE_SERVICE_ROLE_KEY=eyJhbGci...  # From backend/.env
+OPENAI_API_KEY=sk-proj-...  # Full key from backend/.env
+FACEBOOK_APP_ID=1696405601746896
+FACEBOOK_APP_SECRET=d47a1640ed0afeb24a5be814af528b38
+UPSTASH_REDIS_REST_URL=https://definite-sole-15581.upstash.io
+UPSTASH_REDIS_REST_TOKEN=ATzdAAInc...  # From backend/.env
+GOOGLE_TTS_API_KEY=AIzaSy...
+NODE_ENV=production
+```
+
+### Update Env Vars on All Regions
+```bash
+# Read values from backend/.env and update all 3 regions
+# India
+gcloud run services update backendvoicory --region=asia-south1 \
+  --update-env-vars="KEY1=VALUE1,KEY2=VALUE2,..."
+
+# USA
+gcloud run services update backendvoicory-us --region=us-central1 \
+  --update-env-vars="KEY1=VALUE1,KEY2=VALUE2,..."
+
+# Europe
+gcloud run services update backendvoicory-eu --region=europe-west1 \
+  --update-env-vars="KEY1=VALUE1,KEY2=VALUE2,..."
+```
+
+## 13.3 Deployment Commands
+
+### 🚀 Backend (Auto-deploy via Cloud Build)
+```bash
+# Just push to main - Cloud Build handles everything
 cd /home/vishwasverma/vapi-in-dashboard-3/dashboard-app
 git add backend/
 git commit -m "fix: backend changes"
 git push origin main
-# Cloud Build automatically builds Docker image and deploys to Cloud Run
+# Automatically deploys to all 3 regions via cloudbuild.yaml
 ```
 
-### 🔧 Manual Backend Deployment (if needed)
+### 🔧 Manual Backend Deployment (Single Region)
 ```bash
-# Deploy backend manually via gcloud CLI
 gcloud run deploy backendvoicory \
   --source=backend/ \
-  --region=europe-west1 \
+  --region=asia-south1 \
   --allow-unauthenticated
+```
+
+### 📊 Check Deployment Status
+```bash
+# View Cloud Build history
+gcloud builds list --limit=5
+
+# Stream build logs
+gcloud builds log BUILD_ID --stream
+
+# Check service health
+curl https://backendvoicory-732127099858.asia-south1.run.app/health
+curl https://backendvoicory-us-732127099858.us-central1.run.app/health
+curl https://backendvoicory-eu-732127099858.europe-west1.run.app/health
 ```
 
 ### 🌐 Frontend Dashboard (Vercel) - Manual deploy via CLI
@@ -760,6 +920,9 @@ frontend/
 backend/
 ├── index.js             # Clean entry point (134 lines)
 ├── package.json         # Dependencies including @upstash/redis
+├── Dockerfile           # Docker image for Cloud Run
+├── cloudbuild.yaml      # Cloud Build CI/CD config (auto-deploy to 3 regions)
+├── .env                 # Local environment variables (DO NOT COMMIT)
 ├── config/
 │   └── index.js         # Shared dependencies & clients
 ├── lib/                 # Security middleware
@@ -810,18 +973,18 @@ docs/
 
 ### Route Mounting
 ```javascript
-// index.js
-app.use('/', healthRoutes);
-app.use('/api/crawler', crawlerRoutes);
-app.use('/api/knowledge-base', knowledgeBaseRoutes);
-app.use('/api/twilio', twilioRoutes);
-app.use('/api', aiRoutes);
+// index.js - Currently mounted modular routes
+const testChatRoutes = require('./routes/testChat');
+const twilioRoutes = require('./routes/twilio');
+const whatsappOAuthRoutes = require('./routes/whatsappOAuth');
+
 app.use('/api', testChatRoutes);
+app.use('/api/twilio', twilioRoutes);
 app.use('/api/whatsapp', whatsappOAuthRoutes);
-app.use('/api/webhooks/whatsapp', whatsappWebhookRoutes);
-app.use('/api/payments', paymentRoutes);
-app.use('/api/coupons', couponRoutes);
-app.use('/api/admin', adminRoutes);
+
+// WhatsApp webhooks are inline in index.js (not using whatsappWebhook.js route file)
+// GET /api/webhooks/whatsapp - Meta webhook verification
+// POST /api/webhooks/whatsapp - Incoming messages with AI processing
 ```
 
 ### Service Layer Usage
@@ -857,6 +1020,86 @@ async function myFunction(params) {
 
 module.exports = { myFunction };
 ```
+
+## 16. WhatsApp Business Integration
+
+### Architecture Overview
+```
+┌─────────────────────────────────────────────────────────────┐
+│                  WhatsApp Integration                       │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  Connection Methods:                                        │
+│  ─────────────────────                                      │
+│  1. Facebook OAuth (Recommended)                            │
+│     - Uses Facebook Embedded Signup                         │
+│     - Auto-configures WABA & phone number                   │
+│     - Requires VITE_FACEBOOK_APP_ID & CONFIG_ID             │
+│                                                             │
+│  2. Manual Setup                                            │
+│     - User enters WABA ID, Phone Number ID, Access Token    │
+│     - Best for users with existing WhatsApp Business API    │
+│                                                             │
+├─────────────────────────────────────────────────────────────┤
+│  Message Flow (Incoming):                                   │
+│  ─────────────────────────                                  │
+│  Meta Webhook → Backend → AI Processing → WhatsApp Reply    │
+│                                                             │
+│  1. Meta sends POST to /api/webhooks/whatsapp               │
+│  2. Backend looks up whatsapp_configs by waba_id            │
+│  3. If chatbot_enabled && assistant_id:                     │
+│     - Fetch assistant config (cached)                       │
+│     - Get conversation history from whatsapp_messages       │
+│     - Process with OpenAI (uses assistant's instruction)    │
+│     - Send reply via Graph API                              │
+│  4. Store messages in whatsapp_messages table               │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Database Tables
+| Table | Purpose |
+|-------|---------|
+| `whatsapp_configs` | WABA credentials, linked assistant, settings |
+| `whatsapp_messages` | Inbound/outbound message history |
+| `whatsapp_contacts` | Contact profiles, conversation windows |
+| `whatsapp_calls` | WhatsApp call events (future) |
+| `whatsapp_templates` | Message templates (future) |
+
+### Key Files
+| File | Purpose |
+|------|---------|
+| `backend/routes/whatsappOAuth.js` | OAuth callback (authenticated) |
+| `backend/index.js` | Webhook handlers (inline) |
+| `frontend/pages/messenger/WhatsAppMessenger.tsx` | Connection UI |
+| `frontend/services/whatsappService.ts` | CRUD operations |
+
+### Environment Variables
+```bash
+# Backend (.env)
+FACEBOOK_APP_ID=your_app_id
+FACEBOOK_APP_SECRET=your_app_secret
+
+# Frontend (.env)
+VITE_FACEBOOK_APP_ID=your_app_id
+VITE_FACEBOOK_CONFIG_ID=your_embedded_signup_config_id
+```
+
+### Enabling Chatbot for a Config
+```typescript
+// Frontend: Link assistant to WhatsApp config
+await updateWhatsAppConfig(configId, {
+    chatbotEnabled: true,
+    assistantId: 'assistant-uuid'
+});
+```
+
+### Testing WhatsApp Integration
+1. Connect WhatsApp via OAuth or Manual setup
+2. Enable chatbot and link an active assistant
+3. Configure Meta webhook URL: `https://api.voicory.com/api/webhooks/whatsapp`
+4. Send a message to the connected WhatsApp number
+5. Check backend logs for processing
 
 ---
 
@@ -916,6 +1159,7 @@ module.exports = { myFunction };
 | `tailwind.config.js` | Use `app.css` with `@theme` |
 | Hardcoded colors | Use CSS variables |
 | Backend for reads | Use direct Supabase |
+| INR currency (₹) | All pricing in USD ($) |
 
 ---
 

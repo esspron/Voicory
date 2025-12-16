@@ -1,4 +1,4 @@
-import { DotsThree, Copy, Star, Check, CurrencyInr, Lightning, Sparkle } from '@phosphor-icons/react';
+import { DotsThree, Copy, Star, Check, CurrencyDollar, Lightning, Sparkle } from '@phosphor-icons/react';
 import React from 'react';
 
 import { Voice } from '../types';
@@ -106,7 +106,7 @@ const VoiceCard: React.FC<VoiceCardProps> = ({ voice, onSelect }) => {
             {/* Footer */}
             <div className="flex items-center justify-between pt-4 border-t border-white/[0.06]">
                 <div className="flex items-center gap-1">
-                    <CurrencyInr size={16} weight="bold" className="text-primary" />
+                    <CurrencyDollar size={16} weight="bold" className="text-primary" />
                     <span className="text-base font-bold text-primary">
                         {voice.costPerMin.toFixed(2)}
                     </span>

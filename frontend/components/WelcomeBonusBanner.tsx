@@ -124,7 +124,7 @@ const WelcomeBonusBanner: React.FC<WelcomeBonusBannerProps> = ({ onDismiss }) =>
                                 </h3>
                             </div>
                             <p className="text-textMuted">
-                                ₹{bonusAmount.toLocaleString()} credits have been added to your account. Start building amazing voice AI experiences!
+                                ${bonusAmount.toLocaleString()} credits have been added to your account. Start building amazing voice AI experiences!
                             </p>
                         </>
                     ) : status === 'error' ? (
@@ -141,11 +141,11 @@ const WelcomeBonusBanner: React.FC<WelcomeBonusBannerProps> = ({ onDismiss }) =>
                             <div className="flex items-center gap-2 mb-1">
                                 <Sparkle size={18} weight="fill" className="text-primary animate-pulse" />
                                 <h3 className="text-lg font-semibold text-textMain">
-                                    🎉 Welcome! Claim Your Free ₹{bonusAmount.toLocaleString()} Credits
+                                    🎉 Welcome! Claim Your Free ${bonusAmount.toLocaleString()} Credits
                                 </h3>
                             </div>
                             <p className="text-textMuted">
-                                As a new user, you get ₹{bonusAmount.toLocaleString()} (${(bonusAmount / 100).toFixed(0)} USD) free credits to explore our voice AI platform.
+                                As a new user, you get ${bonusAmount.toLocaleString()} free credits to explore our voice AI platform.
                             </p>
                         </>
                     )}

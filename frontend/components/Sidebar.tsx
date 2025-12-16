@@ -138,7 +138,6 @@ const Sidebar: React.FC = () => {
                     )}
                     <nav className="space-y-1">
                         <NavItem to="/logs" icon={Notebook} label="Call Logs" />
-                        <NavItem to="/metrics" icon={ChartBar} label="Metrics" />
                     </nav>
                 </div>
 

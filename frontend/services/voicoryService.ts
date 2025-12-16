@@ -1305,10 +1305,10 @@ export const getUserProfile = async (): Promise<UserProfile | null> => {
             hipaaEnabled: data.hipaa_enabled || false,
             creditsBalance: Number(data.credits_balance) || 0,
             planType: data.plan_type || 'PAYG',
-            // Currency settings - default to India/INR
-            country: data.country || 'IN',
-            currency: data.currency || 'INR',
-            currencySymbol: data.currency_symbol || '₹',
+            // Currency settings - default to USD
+            country: data.country || 'US',
+            currency: data.currency || 'USD',
+            currencySymbol: data.currency_symbol || '$',
             createdAt: data.created_at,
             updatedAt: data.updated_at
         };
@@ -1337,9 +1337,9 @@ export const createUserProfile = async (profile: Partial<Omit<UserProfile, 'id' 
                 hipaa_enabled: profile.hipaaEnabled || false,
                 credits_balance: profile.creditsBalance || 0,
                 plan_type: profile.planType || 'PAYG',
-                country: profile.country || 'IN',
-                currency: profile.currency || 'INR',
-                currency_symbol: profile.currencySymbol || '₹'
+                country: profile.country || 'US',
+                currency: profile.currency || 'USD',
+                currency_symbol: profile.currencySymbol || '$'
             })
             .select()
             .single();
@@ -1357,9 +1357,9 @@ export const createUserProfile = async (profile: Partial<Omit<UserProfile, 'id' 
             hipaaEnabled: data.hipaa_enabled || false,
             creditsBalance: Number(data.credits_balance) || 0,
             planType: data.plan_type || 'PAYG',
-            country: data.country || 'IN',
-            currency: data.currency || 'INR',
-            currencySymbol: data.currency_symbol || '₹',
+            country: data.country || 'US',
+            currency: data.currency || 'USD',
+            currencySymbol: data.currency_symbol || '$',
             createdAt: data.created_at,
             updatedAt: data.updated_at
         };

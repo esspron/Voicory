@@ -152,7 +152,7 @@ export class AuthService {
 
     /**
      * Apply welcome bonus for new users
-     * Gives ₹2000 / $20 free credits on signup
+     * Gives $20 free credits on signup
      */
     static async applyWelcomeBonus(userId: string): Promise<WelcomeBonusResult> {
         try {

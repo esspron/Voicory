@@ -1,4 +1,4 @@
-import { CreditCard, Check, Warning, DownloadSimple, Plus, Info, PencilSimple, Lightning, CurrencyInr, ArrowClockwise, Receipt, CaretRight, Ticket } from '@phosphor-icons/react';
+import { CreditCard, Check, Warning, DownloadSimple, Plus, Info, PencilSimple, Lightning, CurrencyDollar, ArrowClockwise, Receipt, CaretRight, Ticket } from '@phosphor-icons/react';
 import React, { useState, useEffect } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
@@ -140,7 +140,7 @@ const Billing: React.FC = () => {
                     </div>
                     <p className="text-sm text-textMuted mb-4">Credit Balance:</p>
                     <div className="flex items-center gap-2 mb-6">
-                        <CurrencyInr size={28} weight="bold" className="text-primary" />
+                        <CurrencyDollar size={28} weight="bold" className="text-primary" />
                         <span className="text-4xl font-bold text-textMain">
                             {isLoading ? '...' : balance.toFixed(2)}
                         </span>
@@ -342,7 +342,7 @@ const Billing: React.FC = () => {
                                  </div>
                              </div>
                              <div className="flex items-center gap-4">
-                                 <span className="text-sm text-textMuted">+ ₹1000/mo</span>
+                                 <span className="text-sm text-textMuted">+ $12/mo</span>
                                  <button 
                                     onClick={() => setHipaaEnabled(!hipaaEnabled)}
                                     className={`w-11 h-6 rounded-full relative transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary/50 ${hipaaEnabled ? 'bg-primary' : 'bg-surfaceHover border border-white/10'}`}
@@ -388,7 +388,7 @@ const Billing: React.FC = () => {
                                     defaultValue={0} 
                                  />
                              </div>
-                             <span className="text-sm text-textMuted whitespace-nowrap min-w-[80px] text-right">+ ₹10/mo each</span>
+                             <span className="text-sm text-textMuted whitespace-nowrap min-w-[80px] text-right">+ $0.12/mo each</span>
                          </div>
                      </div>
 
@@ -405,7 +405,7 @@ const Billing: React.FC = () => {
                              </div>
                          </div>
                          <div className="flex items-center gap-4">
-                             <span className="text-sm text-textMuted">+ ₹1000/mo</span>
+                             <span className="text-sm text-textMuted">+ $12/mo</span>
                              <button 
                                 onClick={() => setDataRetentionEnabled(!dataRetentionEnabled)}
                                 className={`w-11 h-6 rounded-full relative transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary/50 ${dataRetentionEnabled ? 'bg-primary' : 'bg-surfaceHover border border-white/10'}`}
@@ -483,7 +483,7 @@ const Billing: React.FC = () => {
                         <div className="bg-surface/80 backdrop-blur-xl border border-white/5 rounded-xl p-4">
                             <label className="text-xs font-medium text-textMuted block mb-2">Amount to reload</label>
                             <div className="relative">
-                                <CurrencyInr size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-textMuted" />
+                                <CurrencyDollar size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-textMuted" />
                                 <input 
                                     type="number" 
                                     value={autoReloadSettings?.reloadAmount || 500}
@@ -495,7 +495,7 @@ const Billing: React.FC = () => {
                         <div className="bg-surface/80 backdrop-blur-xl border border-white/5 rounded-xl p-4">
                             <label className="text-xs font-medium text-textMuted block mb-2">When balance falls below</label>
                             <div className="relative">
-                                <CurrencyInr size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-textMuted" />
+                                <CurrencyDollar size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-textMuted" />
                                 <input 
                                     type="number" 
                                     value={autoReloadSettings?.threshold || 100}
@@ -545,7 +545,7 @@ const Billing: React.FC = () => {
                                                     +{payment.credits.toLocaleString()}
                                                 </td>
                                                 <td className="py-3 text-sm text-textMain">
-                                                    {payment.currency === 'INR' ? '₹' : '$'}{payment.amount.toFixed(2)}
+                                                    ${payment.amount.toFixed(2)}
                                                 </td>
                                                 <td className="py-3 text-sm text-textMuted capitalize">
                                                     {payment.provider}
@@ -613,10 +613,10 @@ const Billing: React.FC = () => {
                                                 <td className={`py-3 text-sm font-medium text-right ${
                                                     tx.amount >= 0 ? 'text-emerald-400' : 'text-red-400'
                                                 }`}>
-                                                    {tx.amount >= 0 ? '+' : ''}₹{tx.amount.toFixed(2)}
+                                                    {tx.amount >= 0 ? '+' : ''}${tx.amount.toFixed(2)}
                                                 </td>
                                                 <td className="py-3 text-sm text-textMuted text-right">
-                                                    ₹{tx.balanceAfter.toFixed(2)}
+                                                    ${tx.balanceAfter.toFixed(2)}
                                                 </td>
                                             </tr>
                                         ))}

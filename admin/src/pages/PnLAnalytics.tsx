@@ -237,15 +237,15 @@ const PnLAnalytics: React.FC = () => {
 
         const todayRevenue = todayPurchases?.reduce((sum, p) => sum + Math.abs(Number(p.amount) || 0), 0) || 0;
 
-        // Today's costs - use actual provider_cost_inr if available
+        // Today's costs - use actual provider_cost_usd if available
         const { data: todayUsage } = await supabase
             .from('usage_logs')
-            .select('cost_inr, provider_cost_inr')
+            .select('cost_usd, provider_cost_usd')
             .gte('created_at', today);
 
         const todayCosts = todayUsage?.reduce((sum, u) => {
             // Use actual provider cost if available, otherwise estimate
-            const providerCost = Number(u.provider_cost_inr) || Number(u.cost_inr) * 0.55;
+            const providerCost = Number(u.provider_cost_usd) || Number(u.cost_usd) * 0.55;
             return sum + providerCost;
         }, 0) || 0;
 
@@ -258,15 +258,15 @@ const PnLAnalytics: React.FC = () => {
 
         const mtdRevenue = mtdPurchases?.reduce((sum, p) => sum + Math.abs(Number(p.amount) || 0), 0) || 0;
 
-        // MTD costs - use actual provider_cost_inr if available
+        // MTD costs - use actual provider_cost_usd if available
         const { data: mtdUsage } = await supabase
             .from('usage_logs')
-            .select('cost_inr, provider_cost_inr')
+            .select('cost_usd, provider_cost_usd')
             .gte('created_at', monthStart);
 
         const mtdCosts = mtdUsage?.reduce((sum, u) => {
             // Use actual provider cost if available, otherwise estimate
-            const providerCost = Number(u.provider_cost_inr) || Number(u.cost_inr) * 0.55;
+            const providerCost = Number(u.provider_cost_usd) || Number(u.cost_usd) * 0.55;
             return sum + providerCost;
         }, 0) || 0;
 

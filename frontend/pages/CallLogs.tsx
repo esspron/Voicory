@@ -174,7 +174,7 @@ const CallLogs: React.FC = () => {
                                     {log.duration}
                                 </div>
                                 <div className="col-span-1">
-                                    <span className="text-textMain font-medium">₹{log.cost.toFixed(2)}</span>
+                                    <span className="text-textMain font-medium">${log.cost.toFixed(2)}</span>
                                 </div>
                                 <div className="col-span-2 flex items-center justify-end gap-1">
                                     <Button
@@ -212,7 +212,7 @@ const CallLogs: React.FC = () => {
                             </div>
                         </div>
                         <div className="text-textMuted text-xs">
-                            Total cost: <span className="text-textMain font-medium">₹{callLogs.reduce((acc, l) => acc + l.cost, 0).toFixed(2)}</span>
+                            Total cost: <span className="text-textMain font-medium">${callLogs.reduce((acc, l) => acc + l.cost, 0).toFixed(2)}</span>
                         </div>
                     </div>
                 )}

@@ -1,4 +1,4 @@
-import { X, Check, Lightning, Brain, Cpu, Sparkle, CurrencyInr } from '@phosphor-icons/react';
+import { X, Check, Sparkle, CurrencyDollar } from '@phosphor-icons/react';
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -21,9 +21,6 @@ interface LLMSelectorModalProps {
 // Provider icons and colors
 const PROVIDER_CONFIG: Record<string, { icon: React.ElementType; color: string; bgColor: string }> = {
     openai: { icon: Sparkle, color: 'text-green-400', bgColor: 'bg-green-500/20' },
-    anthropic: { icon: Brain, color: 'text-orange-400', bgColor: 'bg-orange-500/20' },
-    groq: { icon: Lightning, color: 'text-yellow-400', bgColor: 'bg-yellow-500/20' },
-    together: { icon: Cpu, color: 'text-blue-400', bgColor: 'bg-blue-500/20' },
 };
 
 // Fallback model descriptions (will be overridden by DB data)
@@ -32,14 +29,6 @@ const MODEL_INFO: Record<string, { description: string; context: string; speed: 
     'gpt-4o-mini': { description: 'Smaller, faster, cheaper than GPT-4o', context: '128K', speed: 'Fast' },
     'gpt-4-turbo': { description: 'Previous generation, still powerful', context: '128K', speed: 'Medium' },
     'gpt-3.5-turbo': { description: 'Fast and cost-effective', context: '16K', speed: 'Very Fast' },
-    'claude-3.5-sonnet': { description: 'Best Claude model for most tasks', context: '200K', speed: 'Fast' },
-    'claude-3-opus': { description: 'Most powerful Claude, highest quality', context: '200K', speed: 'Slow' },
-    'claude-3-haiku': { description: 'Fastest Claude, great for simple tasks', context: '200K', speed: 'Very Fast' },
-    'llama-3.1-70b': { description: 'Excellent open-source model', context: '128K', speed: 'Fast' },
-    'llama-3.1-8b': { description: 'Smaller Llama, very fast', context: '128K', speed: 'Very Fast' },
-    'mixtral-8x7b': { description: 'Mixture of experts, efficient', context: '32K', speed: 'Fast' },
-    'Qwen3-30B-A3B': { description: 'Multilingual, great for Asian languages', context: '32K', speed: 'Fast' },
-    'Llama-3.2-90B': { description: 'Largest Llama model available', context: '128K', speed: 'Medium' },
 };
 
 const LLMSelectorModal: React.FC<LLMSelectorModalProps> = ({
@@ -194,9 +183,9 @@ const LLMSelectorModal: React.FC<LLMSelectorModalProps> = ({
                                         <div className="flex items-center gap-2">
                                             {costPer1K && (
                                                 <div className="flex items-center gap-1 px-2 py-1 bg-background rounded-lg border border-border">
-                                                    <CurrencyInr size={10} weight="bold" className="text-primary" />
+                                                    <CurrencyDollar size={10} weight="bold" className="text-primary" />
                                                     <span className="text-xs text-textMain font-medium">
-                                                        {costPer1K.average.toFixed(2)}
+                                                        {costPer1K.average.toFixed(4)}
                                                     </span>
                                                     <span className="text-[10px] text-textMuted">/1K tokens</span>
                                                 </div>
@@ -228,11 +217,11 @@ const LLMSelectorModal: React.FC<LLMSelectorModalProps> = ({
                                             <>
                                                 <div className="flex items-center gap-1">
                                                     <span className="text-[10px] text-textMuted">Input:</span>
-                                                    <span className="text-xs text-green-400">₹{costPer1K.input.toFixed(2)}/1K</span>
+                                                    <span className="text-xs text-green-400">${costPer1K.input.toFixed(4)}/1K</span>
                                                 </div>
                                                 <div className="flex items-center gap-1">
                                                     <span className="text-[10px] text-textMuted">Output:</span>
-                                                    <span className="text-xs text-yellow-400">₹{costPer1K.output.toFixed(2)}/1K</span>
+                                                    <span className="text-xs text-yellow-400">${costPer1K.output.toFixed(4)}/1K</span>
                                                 </div>
                                             </>
                                         )}
@@ -251,9 +240,9 @@ const LLMSelectorModal: React.FC<LLMSelectorModalProps> = ({
                         </div>
                         {pricingData.get(tempModel) && (
                             <div className="flex items-center gap-1 text-xs text-textMuted">
-                                <CurrencyInr size={10} weight="bold" className="text-primary" />
+                                <CurrencyDollar size={10} weight="bold" className="text-primary" />
                                 <span className="text-primary font-medium">
-                                    {getCostPer1KTokens(pricingData.get(tempModel)!).average.toFixed(2)}
+                                    {getCostPer1KTokens(pricingData.get(tempModel)!).average.toFixed(4)}
                                 </span>
                                 <span>/1K tokens avg</span>
                             </div>

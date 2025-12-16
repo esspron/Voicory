@@ -65,13 +65,13 @@ const AssistantManager: React.FC = () => {
             const assistantIds = data?.map(a => a.id) || [];
             const { data: usageData } = await supabase
                 .from('usage_logs')
-                .select('assistant_id, cost_inr')
+                .select('assistant_id, cost_usd')
                 .in('assistant_id', assistantIds);
 
             const usageTotals = new Map<string, number>();
             usageData?.forEach(u => {
                 const total = usageTotals.get(u.assistant_id) || 0;
-                usageTotals.set(u.assistant_id, total + (Number(u.cost_inr) || 0));
+                usageTotals.set(u.assistant_id, total + (Number(u.cost_usd) || 0));
             });
 
             const enrichedAssistants: AdminAssistant[] = data?.map(a => ({

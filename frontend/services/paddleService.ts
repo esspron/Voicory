@@ -1,6 +1,7 @@
 // ============================================
-// PADDLE PAYMENT SERVICE - Per-Usage Billing
-// Paddle.js checkout overlay integration
+// PADDLE PAYMENT SERVICE - Hybrid Billing
+// Supports: Prepaid credits + Monthly post-paid usage
+// Uses Paddle.js checkout overlay integration
 // ============================================
 
 import { authFetch } from '../lib/api';
@@ -14,22 +15,78 @@ export interface PaddleConfig {
     clientToken: string;
     environment: 'sandbox' | 'production';
     configured: boolean;
+    subscriptionsEnabled: boolean;
 }
 
-export interface CreditPackage {
-    id: string;
-    name: string;
-    credits: number;
-    price: number;
-    popular?: boolean;
-}
-
-export interface PaddlePackage {
-    id: string;
-    credits: number;
-    price: number;
+export interface BillingConfig {
+    pricingModel: 'hybrid';
+    billingModes: {
+        prepaid: {
+            enabled: boolean;
+            pricePerCredit: number;
+            minAmount: number;
+            maxAmount: number;
+            description: string;
+        };
+        postpaid: {
+            enabled: boolean;
+            description: string;
+            billingCycle: string;
+        };
+    };
     currency: string;
     paddlePriceId: string;
+    paddleConfigured: boolean;
+}
+
+export interface BillingStatus {
+    success: boolean;
+    billingMode: 'prepaid' | 'postpaid';
+    creditsBalance: number;
+    paddleCustomerId: string | null;
+    subscription: {
+        id: string;
+        status: string;
+        currentPeriodStart: string;
+        currentPeriodEnd: string;
+        nextBilledAt: string;
+    } | null;
+    currentUsage: {
+        periodStart: string;
+        periodEnd: string;
+        totalCost: number;
+        breakdown: {
+            llm: number;
+            tts: number;
+            stt: number;
+            calls: number;
+        };
+    };
+}
+
+export interface UsageSummary {
+    success: boolean;
+    summary: {
+        periodStart: string;
+        periodEnd: string;
+        status: string;
+        totals: {
+            llm: { tokens: number; cost: number };
+            tts: { seconds: number; cost: number };
+            stt: { seconds: number; cost: number };
+            calls: { minutes: number; cost: number };
+            total: number;
+        };
+        billedAt: string | null;
+        paidAt: string | null;
+    };
+    recentUsage: Array<{
+        usage_type: string;
+        provider: string;
+        model: string;
+        cost_usd: string;
+        created_at: string;
+    }>;
 }
 
 export interface PaymentResult {
@@ -44,11 +101,11 @@ export interface CreateTransactionResponse {
     success: boolean;
     transactionId: string;
     priceId: string;
+    quantity: number;
     credits: number;
     customData: {
         userId: string;
         transactionId: string;
-        packageId: string;
         credits: number;
     };
     customer: {
@@ -56,47 +113,45 @@ export interface CreateTransactionResponse {
     };
 }
 
-// ============================================\n// CREDIT PACKAGES - $1 = 1 Credit\n// ============================================
+export interface TransactionHistory {
+    success: boolean;
+    transactions: Array<{
+        id: string;
+        paddleId: string;
+        type: string;
+        amount: number;
+        credits: number;
+        status: string;
+        createdAt: string;
+    }>;
+    hasMore: boolean;
+}
 
-export const CREDIT_PACKAGES: CreditPackage[] = [
-    {
-        id: 'starter',
-        name: 'Starter',
-        credits: 1,
-        price: 1,
-    },
-    {
-        id: 'basic',
-        name: 'Basic',
-        credits: 5,
-        price: 5,
-    },
-    {
-        id: 'popular',
-        name: 'Popular',
-        credits: 10,
-        price: 10,
-        popular: true,
-    },
-    {
-        id: 'pro',
-        name: 'Pro',
-        credits: 25,
-        price: 25,
-    },
-    {
-        id: 'business',
-        name: 'Business',
-        credits: 50,
-        price: 50,
-    },
-    {
-        id: 'enterprise',
-        name: 'Enterprise',
-        credits: 100,
-        price: 100,
-    }
-];
+// Legacy type for backward compatibility
+export interface DynamicPricingConfig {
+    pricingModel: string;
+    pricePerCredit: number;
+    minAmount: number;
+    maxAmount: number;
+    currency: string;
+    paddlePriceId: string;
+    paddleConfigured: boolean;
+}
+
+// ============================================
+// DYNAMIC PRICING CONFIG
+// $1 = 1 Credit, min $20, max $10,000
+// ============================================
+
+export const PRICING_CONFIG = {
+    pricePerCredit: 1, // $1 = 1 credit
+    minAmount: 20,
+    maxAmount: 10000,
+    currency: 'USD'
+};
+
+// Quick add amounts for UI
+export const QUICK_AMOUNTS = [20, 50, 100, 200, 500];
 
 // ============================================
 // PADDLE SCRIPT LOADER
@@ -193,15 +248,14 @@ export const initializePaddle = async (): Promise<boolean> => {
 };
 
 // ============================================
-// PADDLE CHECKOUT
+// PADDLE CHECKOUT - DYNAMIC PRICING
 // ============================================
 
 /**
- * Create a transaction on the backend
+ * Create a transaction on the backend with dynamic amount
  */
 export const createPaddleTransaction = async (
-    packageId: string,
-    customAmount?: number
+    amount: number
 ): Promise<CreateTransactionResponse | null> => {
     try {
         const { data: { user } } = await supabase.auth.getUser();
@@ -209,10 +263,7 @@ export const createPaddleTransaction = async (
 
         const response = await authFetch('/api/paddle/create-transaction', {
             method: 'POST',
-            body: JSON.stringify({
-                packageId,
-                customAmount
-            }),
+            body: JSON.stringify({ amount }),
         });
 
         if (!response.ok) {
@@ -221,44 +272,57 @@ export const createPaddleTransaction = async (
         }
 
         return await response.json();
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Error creating Paddle transaction:', error);
-        return null;
+        throw error;
     }
 };
 
 /**
- * Open Paddle checkout overlay
+ * Open Paddle checkout overlay with dynamic pricing
+ * @param amount - Amount in USD (also equals credits since $1 = 1 credit)
  */
 export const openPaddleCheckout = async (
-    packageId: string,
-    _currency: string = 'USD', // Kept for backwards compatibility, always USD
+    amount: number,
     onSuccess: (result: PaymentResult) => void,
     onError: (error: string) => void,
-    onClose?: () => void,
-    customAmount?: number
+    onClose?: () => void
 ): Promise<void> => {
     try {
+        // Validate amount
+        if (amount < PRICING_CONFIG.minAmount) {
+            onError(`Minimum amount is $${PRICING_CONFIG.minAmount}`);
+            return;
+        }
+        if (amount > PRICING_CONFIG.maxAmount) {
+            onError(`Maximum amount is $${PRICING_CONFIG.maxAmount}. Contact sales for larger amounts.`);
+            return;
+        }
+        if (!Number.isInteger(amount)) {
+            onError('Amount must be a whole number');
+            return;
+        }
+
         // Initialize Paddle if not already
         const initialized = await initializePaddle();
         if (!initialized) {
-            onError('Payment system not available');
+            onError('Payment system not available. Please refresh and try again.');
             return;
         }
 
         // Create transaction on backend
-        const transactionData = await createPaddleTransaction(packageId, customAmount);
+        const transactionData = await createPaddleTransaction(amount);
         if (!transactionData) {
-            onError('Failed to initialize payment');
+            onError('Failed to initialize payment. Please try again.');
             return;
         }
 
-        // Open Paddle checkout overlay
+        // Open Paddle checkout overlay with quantity-based pricing
         window.Paddle.Checkout.open({
             items: [
                 {
                     priceId: transactionData.priceId,
-                    quantity: 1
+                    quantity: transactionData.quantity // This determines the total: $1 × quantity
                 }
             ],
             customData: transactionData.customData,
@@ -273,15 +337,18 @@ export const openPaddleCheckout = async (
                 allowLogout: false
             },
             // Callback when checkout completes successfully
-            successCallback: async (data: any) => {
+            successCallback: async (data: unknown) => {
                 console.log('Paddle checkout success:', data);
+                // Type assertion for Paddle callback data
+                const paddleData = data as { transactionId?: string; transaction?: { id: string } };
+                const transactionId = paddleData.transactionId || paddleData.transaction?.id || 'unknown';
                 
                 // Verify transaction with backend (webhook should handle this, but verify as backup)
                 try {
                     const verifyResponse = await authFetch('/api/paddle/verify-transaction', {
                         method: 'POST',
                         body: JSON.stringify({
-                            paddleTransactionId: data.transactionId,
+                            paddleTransactionId: transactionId,
                             internalTransactionId: transactionData.transactionId
                         }),
                     });
@@ -290,14 +357,14 @@ export const openPaddleCheckout = async (
                         const result = await verifyResponse.json();
                         onSuccess({
                             success: true,
-                            transactionId: data.transactionId,
+                            transactionId: transactionId,
                             credits: result.credits || transactionData.credits
                         });
                     } else {
                         // Webhook will handle credit addition, just show success
                         onSuccess({
                             success: true,
-                            transactionId: data.transactionId,
+                            transactionId: transactionId,
                             credits: transactionData.credits
                         });
                     }
@@ -305,7 +372,7 @@ export const openPaddleCheckout = async (
                     // Even if verification fails, show success (webhook will handle it)
                     onSuccess({
                         success: true,
-                        transactionId: data.transactionId,
+                        transactionId: transactionId,
                         credits: transactionData.credits
                     });
                 }
@@ -324,23 +391,22 @@ export const openPaddleCheckout = async (
 };
 
 // ============================================
-// PACKAGE HELPERS
+// PRICING HELPERS
 // ============================================
 
 /**
- * Get available packages with Paddle pricing
+ * Get dynamic pricing configuration from backend
  */
-export const getPaddlePackages = async (): Promise<PaddlePackage[]> => {
+export const getDynamicPricingConfig = async (): Promise<DynamicPricingConfig | null> => {
     try {
         const response = await authFetch('/api/paddle/packages');
         if (!response.ok) {
-            throw new Error('Failed to fetch packages');
+            throw new Error('Failed to fetch pricing config');
         }
-        const data = await response.json();
-        return data.packages || [];
+        return await response.json();
     } catch (error) {
-        console.error('Error fetching Paddle packages:', error);
-        return [];
+        console.error('Error fetching pricing config:', error);
+        return null;
     }
 };
 
@@ -496,4 +562,201 @@ export const getPaymentHistory = async (limit: number = 20): Promise<PaymentHist
         console.error('Error fetching payment history:', error);
         return [];
     }
+};
+// ============================================
+// BILLING MODE MANAGEMENT
+// ============================================
+
+/**
+ * Get user's billing status including mode, credits, and current usage
+ */
+export const getBillingStatus = async (): Promise<BillingStatus | null> => {
+    try {
+        const response = await authFetch('/api/paddle/billing-status');
+        if (!response.ok) {
+            throw new Error('Failed to fetch billing status');
+        }
+        return await response.json();
+    } catch (error) {
+        console.error('Error fetching billing status:', error);
+        return null;
+    }
+};
+
+/**
+ * Get billing configuration (supported billing modes)
+ */
+export const getBillingConfig = async (): Promise<BillingConfig | null> => {
+    try {
+        const response = await authFetch('/api/paddle/packages');
+        if (!response.ok) {
+            throw new Error('Failed to fetch billing config');
+        }
+        return await response.json();
+    } catch (error) {
+        console.error('Error fetching billing config:', error);
+        return null;
+    }
+};
+
+/**
+ * Switch billing mode between prepaid and postpaid
+ */
+export const switchBillingMode = async (mode: 'prepaid' | 'postpaid'): Promise<{ success: boolean; message?: string; error?: string }> => {
+    try {
+        const response = await authFetch('/api/paddle/switch-billing-mode', {
+            method: 'POST',
+            body: JSON.stringify({ mode }),
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+            return { success: false, error: data.error || 'Failed to switch billing mode' };
+        }
+        
+        return { success: true, message: data.message };
+    } catch (error: any) {
+        console.error('Error switching billing mode:', error);
+        return { success: false, error: error.message || 'Failed to switch billing mode' };
+    }
+};
+
+/**
+ * Get usage summary for a billing period
+ */
+export const getUsageSummary = async (period?: string): Promise<UsageSummary | null> => {
+    try {
+        const url = period ? `/api/paddle/usage-summary?period=${period}` : '/api/paddle/usage-summary';
+        const response = await authFetch(url);
+        
+        if (!response.ok) {
+            throw new Error('Failed to fetch usage summary');
+        }
+        
+        return await response.json();
+    } catch (error) {
+        console.error('Error fetching usage summary:', error);
+        return null;
+    }
+};
+
+/**
+ * Get transaction history (both prepaid and postpaid)
+ */
+export const getTransactionHistory = async (limit: number = 20, offset: number = 0): Promise<TransactionHistory | null> => {
+    try {
+        const response = await authFetch(`/api/paddle/transactions?limit=${limit}&offset=${offset}`);
+        
+        if (!response.ok) {
+            throw new Error('Failed to fetch transactions');
+        }
+        
+        return await response.json();
+    } catch (error) {
+        console.error('Error fetching transaction history:', error);
+        return null;
+    }
+};
+
+// ============================================
+// SUBSCRIPTION MANAGEMENT (Post-paid)
+// ============================================
+
+/**
+ * Start subscription checkout for post-paid billing
+ */
+export const startSubscriptionCheckout = async (
+    onSuccess: () => void,
+    onError: (error: string) => void,
+    onClose?: () => void
+): Promise<void> => {
+    try {
+        // Initialize Paddle if not already
+        const initialized = await initializePaddle();
+        if (!initialized) {
+            onError('Payment system not available. Please refresh and try again.');
+            return;
+        }
+
+        // Get subscription setup data from backend
+        const response = await authFetch('/api/paddle/create-subscription', {
+            method: 'POST',
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            onError(errorData.error || 'Failed to start subscription');
+            return;
+        }
+
+        const subscriptionData = await response.json();
+
+        // Open Paddle checkout for subscription
+        window.Paddle.Checkout.open({
+            items: [
+                {
+                    priceId: subscriptionData.priceId,
+                    quantity: 1
+                }
+            ],
+            customData: subscriptionData.customData,
+            customer: {
+                email: subscriptionData.customer.email
+            },
+            settings: {
+                displayMode: 'overlay',
+                theme: 'dark',
+                locale: 'en',
+                successUrl: `${window.location.origin}/settings/billing?subscription=success`,
+                allowLogout: false
+            },
+            successCallback: () => {
+                console.log('Subscription checkout completed');
+                onSuccess();
+            },
+            closeCallback: () => {
+                console.log('Subscription checkout closed');
+                onClose?.();
+            }
+        });
+
+    } catch (error: any) {
+        console.error('Subscription checkout error:', error);
+        onError(error.message || 'Failed to start subscription');
+    }
+};
+
+// ============================================
+// FORMAT HELPERS
+// ============================================
+
+/**
+ * Format currency amount
+ */
+export const formatCurrency = (amount: number, currency: string = 'USD'): string => {
+    return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency,
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    }).format(amount);
+};
+
+/**
+ * Format date for display
+ */
+export const formatBillingDate = (dateString: string): string => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+    });
+};
+
+/**
+ * Get billing period display text
+ */
+export const getBillingPeriodText = (start: string, end: string): string => {
+    return `${formatBillingDate(start)} - ${formatBillingDate(end)}`;
 };

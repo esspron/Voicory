@@ -15,7 +15,7 @@ import {
     Trophy,
     Sparkle,
     ShieldCheck,
-    CurrencyInr
+    CurrencyDollar
 } from '@phosphor-icons/react';
 import React, { useState, useEffect } from 'react';
 
@@ -49,10 +49,10 @@ const ReferralProgram: React.FC = () => {
 
     // Reward tiers configuration
     const rewardTiers = [
-        { referrals: 1, reward: '₹100', description: 'First successful referral' },
-        { referrals: 5, reward: '₹600', description: '5 successful referrals (₹100 + bonus)' },
-        { referrals: 10, reward: '₹1,500', description: '10 successful referrals (₹100 + bonus)' },
-        { referrals: 25, reward: '₹4,000', description: '25 successful referrals (₹100 + bonus)' },
+        { referrals: 1, reward: '$1', description: 'First successful referral' },
+        { referrals: 5, reward: '$7', description: '5 successful referrals ($1 + bonus)' },
+        { referrals: 10, reward: '$18', description: '10 successful referrals ($1 + bonus)' },
+        { referrals: 25, reward: '$50', description: '25 successful referrals ($1 + bonus)' },
     ];
 
     useEffect(() => {
@@ -184,7 +184,7 @@ const ReferralProgram: React.FC = () => {
                             <span className="text-primary font-semibold text-sm">Your Unique Referral Link</span>
                         </div>
                         <p className="text-textMuted text-sm mb-4">
-                            Share this link with friends. When they sign up and top up ₹{MINIMUM_REFERRAL_PURCHASE} or more, you both earn ₹100 in credits!
+                            Share this link with friends. When they sign up and top up ${MINIMUM_REFERRAL_PURCHASE} or more, you both earn $1 in credits!
                         </p>
 
                         {/* Referral Link Display */}
@@ -371,7 +371,7 @@ const ReferralProgram: React.FC = () => {
                         </div>
                         <span className="text-textMuted text-sm">Total Earned</span>
                     </div>
-                    <p className="text-3xl font-bold text-primary">₹{stats?.totalRewardsEarned || 0}</p>
+                    <p className="text-3xl font-bold text-primary">${stats?.totalRewardsEarned || 0}</p>
                 </div>
             </div>
 
@@ -402,11 +402,11 @@ const ReferralProgram: React.FC = () => {
                     </div>
                     <div className="text-center">
                         <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <CurrencyInr size={24} weight="duotone" className="text-primary" />
+                            <CurrencyDollar size={24} weight="duotone" className="text-primary" />
                         </div>
-                        <h4 className="font-semibold text-textMain mb-2">3. ₹{MINIMUM_REFERRAL_PURCHASE} Top-up</h4>
+                        <h4 className="font-semibold text-textMain mb-2">3. ${MINIMUM_REFERRAL_PURCHASE} Top-up</h4>
                         <p className="text-textMuted text-sm">
-                            Your friend tops up their account with at least ₹{MINIMUM_REFERRAL_PURCHASE} to activate the referral.
+                            Your friend tops up their account with at least ${MINIMUM_REFERRAL_PURCHASE} to activate the referral.
                         </p>
                     </div>
                     <div className="text-center">
@@ -415,7 +415,7 @@ const ReferralProgram: React.FC = () => {
                         </div>
                         <h4 className="font-semibold text-textMain mb-2">4. Both Earn Rewards</h4>
                         <p className="text-textMuted text-sm">
-                            Once they top up, you both receive ₹100 in credits automatically!
+                            Once they top up, you both receive $1 in credits automatically!
                         </p>
                     </div>
                 </div>
@@ -424,9 +424,9 @@ const ReferralProgram: React.FC = () => {
                 <div className="mt-6 p-4 bg-background border border-border rounded-lg flex items-start gap-3">
                     <ShieldCheck size={20} className="text-primary flex-shrink-0 mt-0.5" />
                     <div>
-                        <p className="text-sm font-medium text-textMain">Why ₹{MINIMUM_REFERRAL_PURCHASE} minimum?</p>
+                        <p className="text-sm font-medium text-textMain">Why ${MINIMUM_REFERRAL_PURCHASE} minimum?</p>
                         <p className="text-xs text-textMuted mt-1">
-                            To ensure fair use and prevent abuse, referral rewards are activated only after a minimum top-up of ₹{MINIMUM_REFERRAL_PURCHASE}.
+                            To ensure fair use and prevent abuse, referral rewards are activated only after a minimum top-up of ${MINIMUM_REFERRAL_PURCHASE}.
                             This ensures both parties are genuine users who will benefit from the platform.
                         </p>
                     </div>
@@ -524,7 +524,7 @@ const ReferralProgram: React.FC = () => {
                                         </td>
                                         <td className="px-6 py-4">
                                             <span className={`text-sm font-medium ${item.status === 'completed' ? 'text-primary' : 'text-textMuted'}`}>
-                                                ₹{item.rewardAmount}
+                                                ${item.rewardAmount}
                                             </span>
                                         </td>
                                         <td className="px-6 py-4">
@@ -548,13 +548,13 @@ const ReferralProgram: React.FC = () => {
             <div className="bg-background border border-border rounded-xl p-6">
                 <h4 className="text-sm font-semibold text-textMain mb-3">Referral Program Terms</h4>
                 <ul className="text-xs text-textMuted space-y-2 list-disc list-inside">
-                    <li><strong>Minimum top-up requirement:</strong> Referral rewards are credited only after the referred user tops up at least ₹{MINIMUM_REFERRAL_PURCHASE}.</li>
-                    <li>Both the referrer and the referred user receive ₹100 in credits upon successful referral completion.</li>
+                    <li><strong>Minimum top-up requirement:</strong> Referral rewards are credited only after the referred user tops up at least ${MINIMUM_REFERRAL_PURCHASE}.</li>
+                    <li>Both the referrer and the referred user receive $1 in credits upon successful referral completion.</li>
                     <li>Referral links are valid for 30 days from the time the referred user first clicks the link.</li>
                     <li>Self-referrals or fraudulent referrals will result in account suspension and forfeiture of rewards.</li>
-                    <li>Credits cannot be withdrawn as cash and must be used for Callyy services.</li>
+                    <li>Credits cannot be withdrawn as cash and must be used for Voicory services.</li>
                     <li>Multiple accounts from the same device/IP are subject to fraud review.</li>
-                    <li>Callyy reserves the right to modify or terminate the referral program at any time.</li>
+                    <li>Voicory reserves the right to modify or terminate the referral program at any time.</li>
                 </ul>
             </div>
         </div>

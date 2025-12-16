@@ -129,23 +129,19 @@ const Assistants: React.FC = () => {
                             `}
                         >
                             {({ isActive }) => (
-                                <>
-                                    <div className={`relative w-11 h-11 rounded-xl flex items-center justify-center shrink-0 transition-all duration-200 ${isActive
-                                            ? 'bg-gradient-to-br from-primary/20 to-primary/10'
-                                            : 'bg-gradient-to-br from-white/10 to-white/5 group-hover:from-primary/15 group-hover:to-primary/5'
-                                        }`}>
-                                        <Robot size={22} weight={isActive ? "fill" : "duotone"} className={isActive ? 'text-primary' : 'text-textMuted group-hover:text-primary transition-colors'} />
-                                        {assistant.status === 'active' && (
-                                            <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-surface" />
-                                        )}
-                                    </div>
+                                <div className="flex-1 min-w-0 flex items-center gap-2">
+                                    {assistant.status === 'active' && (
+                                        <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                                    )}
                                     <div className="flex-1 min-w-0">
-                                        <h3 className={`text-sm font-medium truncate transition-colors ${isActive ? 'text-textMain' : 'text-textMain/80 group-hover:text-textMain'}`}>
+                                        <h3 className={`text-sm font-medium truncate transition-colors capitalize ${isActive ? 'text-textMain' : 'text-textMain/80 group-hover:text-textMain'}`}>
                                             {assistant.name}
                                         </h3>
-                                        <p className="text-xs text-textMuted/60 truncate mt-0.5">{assistant.model}</p>
+                                        {assistant.title && (
+                                            <p className="text-xs text-textMuted/60 truncate mt-0.5 capitalize">{assistant.title}</p>
+                                        )}
                                     </div>
-                                </>
+                                </div>
                             )}
                         </NavLink>
                     ))}
