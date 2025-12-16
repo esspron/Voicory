@@ -1,4 +1,4 @@
-import { CreditCard, Check, Warning, DownloadSimple, Plus, Info, PencilSimple, CircleNotch, Cpu, ChatCircle, Microphone, SpeakerHigh, Lightning, Phone, Ticket, CaretDown, ArrowsClockwise, CalendarBlank, Receipt } from '@phosphor-icons/react';
+import { CreditCard, Check, Warning, DownloadSimple, Plus, Info, PencilSimple, CircleNotch, Cpu, ChatCircle, Lightning, Ticket, CaretDown } from '@phosphor-icons/react';
 import React, { useState, useEffect } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
@@ -10,11 +10,6 @@ import {
     Coupon, 
     PaymentResult, 
     getBillingStatus, 
-    switchBillingMode, 
-    startSubscriptionCheckout,
-    formatCurrency,
-    formatBillingDate,
-    getBillingPeriodText,
     BillingStatus,
     initializePaddle
 } from '../../services/paddleService';
@@ -70,10 +65,8 @@ const BillingAndAddons: React.FC = () => {
     // Coupon from ApplyCouponModal to be used in BuyCreditsModal (currently stored but not passed through)
     const [, setAppliedCoupon] = useState<Coupon | null>(null);
 
-    // Billing Mode State
+    // Billing State
     const [billingStatus, setBillingStatus] = useState<BillingStatus | null>(null);
-    const [isSwitchingMode, setIsSwitchingMode] = useState(false);
-    const [switchError, setSwitchError] = useState<string | null>(null);
 
     // Real data state
     const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
@@ -136,51 +129,8 @@ const BillingAndAddons: React.FC = () => {
 
     const totalCost = usageSummary?.totalCost || 0;
     const creditsBalance = billingStatus?.creditsBalance ?? userProfile?.creditsBalance ?? 0;
-    const billingMode = billingStatus?.billingMode || 'prepaid';
-    const planType = billingMode === 'postpaid' ? 'Monthly Usage' : 'PAYG';
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const billingEmail = userProfile?.organizationEmail || user?.email || 'No email';
-
-    // Handle billing mode switch
-    const handleBillingModeSwitch = async (newMode: 'prepaid' | 'postpaid') => {
-        if (newMode === billingMode) return;
-        
-        setSwitchError(null);
-        setIsSwitchingMode(true);
-        
-        try {
-            if (newMode === 'postpaid') {
-                // Start subscription checkout for postpaid
-                await startSubscriptionCheckout(
-                    () => {
-                        // On success, refresh billing status
-                        getBillingStatus().then(setBillingStatus);
-                        setIsSwitchingMode(false);
-                    },
-                    (error: string) => {
-                        setSwitchError(error || 'Failed to start subscription');
-                        setIsSwitchingMode(false);
-                    },
-                    () => {
-                        // On close without completing
-                        setIsSwitchingMode(false);
-                    }
-                );
-            } else {
-                // Switch to prepaid
-                const result = await switchBillingMode('prepaid');
-                if (result.success) {
-                    const newStatus = await getBillingStatus();
-                    setBillingStatus(newStatus);
-                } else {
-                    setSwitchError(result.error || 'Failed to switch billing mode');
-                }
-                setIsSwitchingMode(false);
-            }
-        } catch (error) {
-            setSwitchError('An error occurred while switching billing mode');
-            setIsSwitchingMode(false);
-        }
-    };
 
     // Handle payment success
     const handlePaymentSuccess = async (_result: PaymentResult) => {
@@ -238,66 +188,31 @@ const BillingAndAddons: React.FC = () => {
                     </div>
                     <div>
                         <h1 className="text-2xl font-bold text-textMain">Billing & Add-ons</h1>
-                        <p className="text-sm text-textMuted">Manage your credits and subscriptions</p>
+                        <p className="text-sm text-textMuted">Manage your credits</p>
                     </div>
                 </div>
 
                 {/* Balance Card */}
                 <div className="bg-gradient-to-br from-primary/10 via-surface/80 to-violet-500/5 border border-primary/20 rounded-2xl p-8 mb-8">
-                    {/* Billing Mode Selector */}
-                    <div className="flex items-center gap-2 mb-6">
-                        <span className="text-sm text-textMuted">Billing Mode:</span>
-                        <div className="flex bg-background/50 rounded-lg p-1 border border-white/10">
-                            <button
-                                onClick={() => handleBillingModeSwitch('prepaid')}
-                                disabled={isSwitchingMode}
-                                className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all ${
-                                    billingMode === 'prepaid'
-                                        ? 'bg-primary text-black'
-                                        : 'text-textMuted hover:text-textMain'
-                                }`}
-                            >
-                                Prepaid Credits
-                            </button>
-                            <button
-                                onClick={() => handleBillingModeSwitch('postpaid')}
-                                disabled={isSwitchingMode}
-                                className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all flex items-center gap-2 ${
-                                    billingMode === 'postpaid'
-                                        ? 'bg-primary text-black'
-                                        : 'text-textMuted hover:text-textMain'
-                                }`}
-                            >
-                                Monthly Usage
-                                {isSwitchingMode && <CircleNotch size={14} className="animate-spin" />}
-                            </button>
-                        </div>
-                        {switchError && (
-                            <span className="text-xs text-red-400 ml-2">{switchError}</span>
-                        )}
-                    </div>
-
                     <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
-                        {billingMode === 'prepaid' ? (
-                            // Prepaid Mode Content
-                            <>
-                                <div>
-                                    <div className="flex items-center gap-3 mb-3">
-                                        <h2 className="text-3xl font-bold text-textMain">{planType}</h2>
-                                        <span className="px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-400 font-medium flex items-center gap-1.5">
-                                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                                            Active
-                                        </span>
-                                    </div>
-                                    <p className="text-sm text-textMuted mb-2">Credit Balance</p>
-                                    <div className="flex items-baseline gap-2">
-                                        <span className="text-5xl font-bold text-textMain">{formatUSD(creditsBalance)}</span>
-                                    </div>
-                                    <p className="text-xs text-textMuted mt-2">Pay upfront, use anytime. No monthly commitment.</p>
-                                </div>
-                                <div className="flex flex-wrap gap-3">
-                                    <button 
-                                        onClick={() => setShowBuyCreditsModal(true)}
+                        {/* Prepaid Credits Content */}
+                        <div>
+                            <div className="flex items-center gap-3 mb-3">
+                                <h2 className="text-2xl font-bold text-textMain">Pay As You Go</h2>
+                                <span className="px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-400 font-medium flex items-center gap-1.5">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                                    Active
+                                </span>
+                            </div>
+                            <p className="text-sm text-textMuted mb-1">Credit Balance</p>
+                            <div className="flex items-baseline gap-2">
+                                <span className="text-4xl font-bold text-textMain">{formatUSD(creditsBalance)}</span>
+                            </div>
+                            <p className="text-xs text-textMuted mt-1">Buy credits, use anytime. No monthly commitment.</p>
+                        </div>
+                        <div className="flex flex-wrap gap-3">
+                            <button 
+                                onClick={() => setShowBuyCreditsModal(true)}
                                         className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-primary to-primary/80 text-black font-semibold rounded-xl hover:shadow-lg hover:shadow-primary/25 transition-all hover:-translate-y-0.5"
                                     >
                                         <Plus size={18} weight="bold" />
@@ -311,141 +226,6 @@ const BillingAndAddons: React.FC = () => {
                                         Apply Coupon
                                     </button>
                                 </div>
-                            </>
-                        ) : (
-                            // Postpaid Mode Content
-                            <>
-                                <div className="flex-1">
-                                    <div className="flex items-center gap-3 mb-3">
-                                        <h2 className="text-3xl font-bold text-textMain">{planType}</h2>
-                                        {billingStatus?.subscription ? (
-                                            <span className="px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-400 font-medium flex items-center gap-1.5">
-                                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                                                {billingStatus.subscription.status === 'active' ? 'Active' : billingStatus.subscription.status}
-                                            </span>
-                                        ) : (
-                                            <span className="px-3 py-1 rounded-full bg-yellow-500/10 border border-yellow-500/20 text-xs text-yellow-400 font-medium">
-                                                Setup Required
-                                            </span>
-                                        )}
-                                    </div>
-                                    
-                                    {billingStatus?.subscription ? (
-                                        <div className="space-y-4">
-                                            {/* Current Period Usage */}
-                                            <div>
-                                                <p className="text-sm text-textMuted mb-1">Current Period Usage</p>
-                                                <div className="flex items-baseline gap-2">
-                                                    <span className="text-4xl font-bold text-textMain">
-                                                        {formatCurrency(billingStatus.currentUsage?.totalCost || 0)}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                            
-                                            {/* Billing Period */}
-                                            <div className="flex items-center gap-4 text-sm">
-                                                <div className="flex items-center gap-2 text-textMuted">
-                                                    <CalendarBlank size={16} weight="bold" />
-                                                    <span>
-                                                        {billingStatus.currentUsage?.periodStart && billingStatus.currentUsage?.periodEnd
-                                                            ? getBillingPeriodText(billingStatus.currentUsage.periodStart, billingStatus.currentUsage.periodEnd)
-                                                            : 'Current period'
-                                                        }
-                                                    </span>
-                                                </div>
-                                                <div className="flex items-center gap-2 text-textMuted">
-                                                    <Receipt size={16} weight="bold" />
-                                                    <span>
-                                                        Next billing: {billingStatus.subscription.nextBilledAt 
-                                                            ? formatBillingDate(billingStatus.subscription.nextBilledAt)
-                                                            : 'N/A'
-                                                        }
-                                                    </span>
-                                                </div>
-                                            </div>
-
-                                            {/* Usage Breakdown */}
-                                            {billingStatus.currentUsage?.breakdown && (
-                                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
-                                                    <div className="bg-background/30 rounded-lg p-3 border border-white/5">
-                                                        <div className="flex items-center gap-2 mb-1">
-                                                            <Cpu size={14} className="text-primary" />
-                                                            <span className="text-xs text-textMuted">LLM</span>
-                                                        </div>
-                                                        <span className="text-lg font-semibold text-textMain">
-                                                            {formatCurrency(billingStatus.currentUsage.breakdown.llm || 0)}
-                                                        </span>
-                                                    </div>
-                                                    <div className="bg-background/30 rounded-lg p-3 border border-white/5">
-                                                        <div className="flex items-center gap-2 mb-1">
-                                                            <SpeakerHigh size={14} className="text-pink-400" />
-                                                            <span className="text-xs text-textMuted">TTS</span>
-                                                        </div>
-                                                        <span className="text-lg font-semibold text-textMain">
-                                                            {formatCurrency(billingStatus.currentUsage.breakdown.tts || 0)}
-                                                        </span>
-                                                    </div>
-                                                    <div className="bg-background/30 rounded-lg p-3 border border-white/5">
-                                                        <div className="flex items-center gap-2 mb-1">
-                                                            <Microphone size={14} className="text-cyan-400" />
-                                                            <span className="text-xs text-textMuted">STT</span>
-                                                        </div>
-                                                        <span className="text-lg font-semibold text-textMain">
-                                                            {formatCurrency(billingStatus.currentUsage.breakdown.stt || 0)}
-                                                        </span>
-                                                    </div>
-                                                    <div className="bg-background/30 rounded-lg p-3 border border-white/5">
-                                                        <div className="flex items-center gap-2 mb-1">
-                                                            <Phone size={14} className="text-emerald-400" />
-                                                            <span className="text-xs text-textMuted">Calls</span>
-                                                        </div>
-                                                        <span className="text-lg font-semibold text-textMain">
-                                                            {formatCurrency(billingStatus.currentUsage.breakdown.calls || 0)}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    ) : (
-                                        <div className="space-y-3">
-                                            <p className="text-sm text-textMuted">
-                                                Use now, pay monthly. We'll charge your card at the end of each billing cycle for your actual usage.
-                                            </p>
-                                            <div className="flex items-start gap-2 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
-                                                <Warning size={18} className="text-yellow-400 mt-0.5 flex-shrink-0" />
-                                                <p className="text-sm text-yellow-200">
-                                                    Complete the subscription setup to enable monthly billing. You'll only be charged for what you use.
-                                                </p>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                                
-                                <div className="flex flex-col gap-3">
-                                    {!billingStatus?.subscription && (
-                                        <button 
-                                            onClick={() => handleBillingModeSwitch('postpaid')}
-                                            disabled={isSwitchingMode}
-                                            className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-primary to-primary/80 text-black font-semibold rounded-xl hover:shadow-lg hover:shadow-primary/25 transition-all hover:-translate-y-0.5 disabled:opacity-50"
-                                        >
-                                            {isSwitchingMode ? (
-                                                <CircleNotch size={18} className="animate-spin" />
-                                            ) : (
-                                                <ArrowsClockwise size={18} weight="bold" />
-                                            )}
-                                            Setup Subscription
-                                        </button>
-                                    )}
-                                    <button 
-                                        onClick={() => setShowCouponModal(true)}
-                                        className="flex items-center gap-2 px-5 py-3 bg-white/5 border border-white/10 text-textMain font-medium rounded-xl hover:bg-white/10 hover:border-white/20 transition-all"
-                                    >
-                                        <Ticket size={18} weight="bold" />
-                                        Apply Coupon
-                                    </button>
-                                </div>
-                            </>
-                        )}
                     </div>
                 </div>
 
