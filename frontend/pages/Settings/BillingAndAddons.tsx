@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 import ApplyCouponModal from '../../components/billing/ApplyCouponModal';
-import AddFundsModal from '../../components/billing/AddFundsModal';
+import BuyCreditsModal from '../../components/billing/BuyCreditsModal';
 import { useAuth } from '../../contexts/AuthContext';
 import { getUsageSummary, getCreditTransactions, checkBalance, CreditTransaction, UsageSummary } from '../../services/billingService';
 import { 
@@ -65,10 +65,9 @@ const BillingAndAddons: React.FC = () => {
     const [isTransactionHistoryOpen, setIsTransactionHistoryOpen] = useState(false);
 
     // Modal State
-    const [showAddFundsModal, setShowAddFundsModal] = useState(false);
+    const [showBuyCreditsModal, setShowBuyCreditsModal] = useState(false);
     const [showCouponModal, setShowCouponModal] = useState(false);
-    // Coupon from ApplyCouponModal to be used in AddFundsModal (currently stored but not passed through)
-    // TODO: Pass appliedCoupon prop to AddFundsModal to pre-fill discount
+    // Coupon from ApplyCouponModal to be used in BuyCreditsModal (currently stored but not passed through)
     const [, setAppliedCoupon] = useState<Coupon | null>(null);
 
     // Billing Mode State
@@ -203,7 +202,7 @@ const BillingAndAddons: React.FC = () => {
     const handleCouponApply = (coupon: Coupon) => {
         setAppliedCoupon(coupon);
         setShowCouponModal(false);
-        setShowAddFundsModal(true);
+        setShowBuyCreditsModal(true);
     };
 
     // Handle credits redeemed from promo coupons
@@ -298,7 +297,7 @@ const BillingAndAddons: React.FC = () => {
                                 </div>
                                 <div className="flex flex-wrap gap-3">
                                     <button 
-                                        onClick={() => setShowAddFundsModal(true)}
+                                        onClick={() => setShowBuyCreditsModal(true)}
                                         className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-primary to-primary/80 text-black font-semibold rounded-xl hover:shadow-lg hover:shadow-primary/25 transition-all hover:-translate-y-0.5"
                                     >
                                         <Plus size={18} weight="bold" />
@@ -1079,10 +1078,10 @@ const BillingAndAddons: React.FC = () => {
             </div>
 
             {/* Modals */}
-            <AddFundsModal
-                isOpen={showAddFundsModal}
+            <BuyCreditsModal
+                isOpen={showBuyCreditsModal}
                 onClose={() => {
-                    setShowAddFundsModal(false);
+                    setShowBuyCreditsModal(false);
                     setAppliedCoupon(null);
                 }}
                 onSuccess={handlePaymentSuccess}

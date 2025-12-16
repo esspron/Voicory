@@ -13,14 +13,14 @@ import {
     QUICK_AMOUNTS
 } from '../../services/paddleService';
 
-interface AddFundsModalProps {
+interface BuyCreditsModalProps {
     isOpen: boolean;
     onClose: () => void;
     onSuccess: (result: PaymentResult) => void;
     currentBalance: number;
 }
 
-const AddFundsModal: React.FC<AddFundsModalProps> = ({
+const BuyCreditsModal: React.FC<BuyCreditsModalProps> = ({
     isOpen,
     onClose,
     onSuccess,
@@ -395,4 +395,4 @@ const AddFundsModal: React.FC<AddFundsModalProps> = ({
     );
 };
 
-export default AddFundsModal;
+export default BuyCreditsModal;

@@ -371,10 +371,12 @@ app.get('/health', (req, res) => {
 const testChatRoutes = require('./routes/testChat');
 const twilioRoutes = require('./routes/twilio');
 const whatsappOAuthRoutes = require('./routes/whatsappOAuth');
+const paddleRoutes = require('./routes/paddle');
 
 app.use('/api', testChatRoutes);
 app.use('/api/twilio', twilioRoutes);
 app.use('/api/whatsapp', whatsappOAuthRoutes);
+app.use('/api/paddle', paddleRoutes);
 
 // ============================================
 // WHATSAPP WEBHOOK ENDPOINTS
