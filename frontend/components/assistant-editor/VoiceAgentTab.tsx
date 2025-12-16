@@ -24,14 +24,14 @@ import Select, { type SelectOption } from '../ui/Select';
 
 export interface VoiceAgentConfig {
     // STT Settings
-    stt_provider: 'deepgram' | 'whisper' | 'assemblyai' | 'google';
+    stt_provider: 'deepgram' | 'whisper';
     stt_model: string;
     stt_language: string;
     stt_interim_results: boolean;
     stt_endpointing_ms: number;
     
     // LLM Settings
-    llm_provider: 'openai' | 'anthropic' | 'groq' | 'together' | 'fireworks';
+    llm_provider: 'openai';
     llm_model: string;
     llm_temperature: number;
     llm_max_tokens: number;
@@ -39,7 +39,7 @@ export interface VoiceAgentConfig {
     llm_first_response_filler?: string;
     
     // TTS Settings
-    tts_provider: 'elevenlabs' | 'deepgram' | 'cartesia' | 'openai' | 'azure';
+    tts_provider: 'elevenlabs' | 'google';
     tts_voice_id?: string;
     tts_model: string;
     tts_stability: number;
@@ -85,10 +85,8 @@ interface VoiceAgentTabProps {
 // ============================================
 
 const STT_PROVIDERS = [
-    { value: 'deepgram', label: 'Deepgram', description: 'Best accuracy & speed', recommended: true },
+    { value: 'deepgram', label: 'Deepgram', description: 'Best accuracy & real-time streaming', recommended: true },
     { value: 'whisper', label: 'OpenAI Whisper', description: 'High accuracy, batch mode' },
-    { value: 'assemblyai', label: 'AssemblyAI', description: 'Good accuracy, real-time' },
-    { value: 'google', label: 'Google Speech', description: 'Wide language support' },
 ];
 
 const STT_MODELS: Record<string, { value: string; label: string }[]> = {
@@ -101,56 +99,24 @@ const STT_MODELS: Record<string, { value: string; label: string }[]> = {
     whisper: [
         { value: 'whisper-1', label: 'Whisper 1' },
     ],
-    assemblyai: [
-        { value: 'default', label: 'Default' },
-        { value: 'nano', label: 'Nano (Fast)' },
-    ],
-    google: [
-        { value: 'default', label: 'Default' },
-        { value: 'latest_long', label: 'Latest Long' },
-        { value: 'latest_short', label: 'Latest Short' },
-    ],
 };
 
 const LLM_PROVIDERS = [
-    { value: 'openai', label: 'OpenAI', description: 'GPT-4o, fastest for streaming' },
-    { value: 'anthropic', label: 'Anthropic', description: 'Claude 3.5 Sonnet' },
-    { value: 'groq', label: 'Groq', description: 'Ultra-fast inference' },
-    { value: 'together', label: 'Together AI', description: 'Open models' },
-    { value: 'fireworks', label: 'Fireworks AI', description: 'Fast open models' },
+    { value: 'openai', label: 'OpenAI', description: 'GPT-4o, best for real-time voice AI', recommended: true },
 ];
 
 const LLM_MODELS: Record<string, { value: string; label: string }[]> = {
     openai: [
         { value: 'gpt-4o', label: 'GPT-4o (Recommended)' },
-        { value: 'gpt-4o-mini', label: 'GPT-4o Mini (Fast)' },
+        { value: 'gpt-4o-mini', label: 'GPT-4o Mini (Fast & Cheap)' },
         { value: 'gpt-4-turbo', label: 'GPT-4 Turbo' },
-    ],
-    anthropic: [
-        { value: 'claude-3-5-sonnet-latest', label: 'Claude 3.5 Sonnet' },
-        { value: 'claude-3-opus-latest', label: 'Claude 3 Opus' },
-        { value: 'claude-3-haiku-20240307', label: 'Claude 3 Haiku (Fast)' },
-    ],
-    groq: [
-        { value: 'llama-3.1-70b-versatile', label: 'Llama 3.1 70B' },
-        { value: 'llama-3.1-8b-instant', label: 'Llama 3.1 8B (Fast)' },
-        { value: 'mixtral-8x7b-32768', label: 'Mixtral 8x7B' },
-    ],
-    together: [
-        { value: 'meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo', label: 'Llama 3.1 70B' },
-        { value: 'Qwen/Qwen3-30B-A3B', label: 'Qwen3 30B' },
-    ],
-    fireworks: [
-        { value: 'accounts/fireworks/models/llama-v3p1-70b-instruct', label: 'Llama 3.1 70B' },
-        { value: 'accounts/fireworks/models/mixtral-8x22b-instruct', label: 'Mixtral 8x22B' },
+        { value: 'gpt-3.5-turbo', label: 'GPT-3.5 Turbo (Fastest)' },
     ],
 };
 
 const TTS_PROVIDERS = [
     { value: 'elevenlabs', label: 'ElevenLabs', description: 'Best quality, streaming WebSocket', recommended: true },
-    { value: 'deepgram', label: 'Deepgram Aura', description: 'Fast, good quality' },
-    { value: 'cartesia', label: 'Cartesia Sonic', description: 'Ultra-fast streaming' },
-    { value: 'openai', label: 'OpenAI TTS', description: 'Good quality' },
+    { value: 'google', label: 'Google Cloud TTS', description: 'Multi-language, natural voices' },
 ];
 
 const TTS_MODELS: Record<string, { value: string; label: string }[]> = {
@@ -159,18 +125,13 @@ const TTS_MODELS: Record<string, { value: string; label: string }[]> = {
         { value: 'eleven_flash_v2_5', label: 'Flash v2.5' },
         { value: 'eleven_multilingual_v2', label: 'Multilingual v2' },
     ],
-    deepgram: [
-        { value: 'aura-asteria-en', label: 'Asteria (Female)' },
-        { value: 'aura-orion-en', label: 'Orion (Male)' },
-        { value: 'aura-luna-en', label: 'Luna (Female)' },
-    ],
-    cartesia: [
-        { value: 'sonic-english', label: 'Sonic English' },
-        { value: 'sonic-multilingual', label: 'Sonic Multilingual' },
-    ],
-    openai: [
-        { value: 'tts-1', label: 'TTS-1 (Fast)' },
-        { value: 'tts-1-hd', label: 'TTS-1 HD (Quality)' },
+    google: [
+        { value: 'en-US-Neural2-J', label: 'Neural2 Male (English)' },
+        { value: 'en-US-Neural2-F', label: 'Neural2 Female (English)' },
+        { value: 'en-US-Studio-O', label: 'Studio Male (English)' },
+        { value: 'en-US-Studio-Q', label: 'Studio Female (English)' },
+        { value: 'hi-IN-Neural2-A', label: 'Neural2 Female (Hindi)' },
+        { value: 'hi-IN-Neural2-B', label: 'Neural2 Male (Hindi)' },
     ],
 };
 
