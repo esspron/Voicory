@@ -1,4 +1,4 @@
-import { Copy, Info, Moon, Sun, Check, Globe, CircleNotch, Buildings, Envelope, IdentificationCard, Wallet, Hash, Phone, ShieldCheck, CurrencyDollar, Sparkle } from '@phosphor-icons/react';
+import { Copy, Info, Check, Globe, CircleNotch, Buildings, Envelope, IdentificationCard, Wallet, Hash, Phone, ShieldCheck, CurrencyDollar, Sparkle } from '@phosphor-icons/react';
 import React, { useEffect, useState } from 'react';
 
 import Select, { type SelectOption } from '../../components/ui/Select';
@@ -30,7 +30,6 @@ const countryOptions: SelectOption[] = [
 
 const OrgSettings: React.FC = () => {
     const { user } = useAuth();
-    const [theme, setTheme] = useState<'dark' | 'light'>('dark');
     const [profile, setProfile] = useState<UserProfile | null>(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -42,14 +41,6 @@ const OrgSettings: React.FC = () => {
     const [channel, setChannel] = useState<SelectOption>(channelOptions[0]);
     const [callConcurrencyLimit, setCallConcurrencyLimit] = useState(10);
     const [selectedCountry, setSelectedCountry] = useState<SelectOption>(countryOptions[0]);
-
-    useEffect(() => {
-        if (document.documentElement.classList.contains('dark')) {
-            setTheme('dark');
-        } else {
-            setTheme('light');
-        }
-    }, []);
 
     useEffect(() => {
         const fetchProfile = async () => {
@@ -74,16 +65,6 @@ const OrgSettings: React.FC = () => {
             fetchProfile();
         }
     }, [user]);
-
-    const toggleTheme = () => {
-        const newTheme = theme === 'dark' ? 'light' : 'dark';
-        setTheme(newTheme);
-        if (newTheme === 'dark') {
-            document.documentElement.classList.add('dark');
-        } else {
-            document.documentElement.classList.remove('dark');
-        }
-    };
 
     const handleCopy = async (text: string, field: string) => {
         try {
@@ -152,28 +133,6 @@ const OrgSettings: React.FC = () => {
             </div>
 
             <div className="space-y-6">
-                {/* Theme Toggle Card */}
-                <div className="bg-surface/50 backdrop-blur-sm border border-white/[0.06] rounded-2xl p-5 hover:border-white/10 transition-all">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500/20 to-violet-500/5 flex items-center justify-center">
-                                {theme === 'dark' ? <Moon size={20} weight="duotone" className="text-violet-400" /> : <Sun size={20} weight="duotone" className="text-yellow-400" />}
-                            </div>
-                            <div>
-                                <label className="text-sm font-medium text-textMain">Theme</label>
-                                <p className="text-xs text-textMuted">Switch between dark and light mode</p>
-                            </div>
-                        </div>
-                        <button
-                            onClick={toggleTheme}
-                            className="flex items-center gap-2 px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-textMain hover:bg-white/10 hover:border-white/20 transition-all"
-                        >
-                            {theme === 'dark' ? <Moon size={18} weight="fill" /> : <Sun size={18} weight="fill" />}
-                            <span className="text-sm font-medium capitalize">{theme} Mode</span>
-                        </button>
-                    </div>
-                </div>
-
                 {/* Organization Info Section */}
                 <div className="bg-surface/50 backdrop-blur-sm border border-white/[0.06] rounded-2xl p-6 space-y-5">
                     <div className="flex items-center gap-2 mb-2">

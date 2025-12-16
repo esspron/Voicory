@@ -14,8 +14,7 @@ import {
     ArrowSquareOut,
     Trophy,
     Sparkle,
-    ShieldCheck,
-    CurrencyDollar
+    ShieldCheck
 } from '@phosphor-icons/react';
 import React, { useState, useEffect } from 'react';
 

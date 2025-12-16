@@ -193,68 +193,68 @@ const BillingAndAddons: React.FC = () => {
                 </div>
 
                 {/* Balance Card */}
-                <div className="bg-gradient-to-br from-primary/10 via-surface/80 to-violet-500/5 border border-primary/20 rounded-2xl p-8 mb-8">
-                    <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
+                <div className="bg-gradient-to-br from-primary/10 via-surface/80 to-violet-500/5 border border-primary/20 rounded-2xl p-6 mb-6">
+                    <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
                         {/* Prepaid Credits Content */}
                         <div>
-                            <div className="flex items-center gap-3 mb-3">
-                                <h2 className="text-2xl font-bold text-textMain">Pay As You Go</h2>
-                                <span className="px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-400 font-medium flex items-center gap-1.5">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                            <div className="flex items-center gap-2 mb-2">
+                                <h2 className="text-lg font-semibold text-textMain">Pay As You Go</h2>
+                                <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[10px] text-emerald-400 font-medium flex items-center gap-1">
+                                    <span className="w-1 h-1 rounded-full bg-emerald-400 animate-pulse"></span>
                                     Active
                                 </span>
                             </div>
-                            <p className="text-sm text-textMuted mb-1">Credit Balance</p>
+                            <p className="text-xs text-textMuted mb-1">Credit Balance</p>
                             <div className="flex items-baseline gap-2">
-                                <span className="text-4xl font-bold text-textMain">{formatUSD(creditsBalance)}</span>
+                                <span className="text-3xl font-bold text-textMain">{formatUSD(creditsBalance)}</span>
                             </div>
-                            <p className="text-xs text-textMuted mt-1">Buy credits, use anytime. No monthly commitment.</p>
+                            <p className="text-[11px] text-textMuted mt-1">Buy credits, use anytime. No monthly commitment.</p>
                         </div>
-                        <div className="flex flex-wrap gap-3">
+                        <div className="flex flex-wrap gap-2">
                             <button 
                                 onClick={() => setShowBuyCreditsModal(true)}
-                                        className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-primary to-primary/80 text-black font-semibold rounded-xl hover:shadow-lg hover:shadow-primary/25 transition-all hover:-translate-y-0.5"
-                                    >
-                                        <Plus size={18} weight="bold" />
-                                        Add Funds
-                                    </button>
-                                    <button 
-                                        onClick={() => setShowCouponModal(true)}
-                                        className="flex items-center gap-2 px-5 py-3 bg-white/5 border border-white/10 text-textMain font-medium rounded-xl hover:bg-white/10 hover:border-white/20 transition-all"
-                                    >
-                                        <Ticket size={18} weight="bold" />
-                                        Apply Coupon
-                                    </button>
-                                </div>
+                                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-primary to-primary/80 text-black text-sm font-semibold rounded-xl hover:shadow-lg hover:shadow-primary/25 transition-all hover:-translate-y-0.5"
+                            >
+                                <Plus size={16} weight="bold" />
+                                Add Funds
+                            </button>
+                            <button 
+                                onClick={() => setShowCouponModal(true)}
+                                className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 text-textMain text-sm font-medium rounded-xl hover:bg-white/10 hover:border-white/20 transition-all"
+                            >
+                                <Ticket size={16} weight="bold" />
+                                Apply Coupon
+                            </button>
+                        </div>
                     </div>
                 </div>
 
                 {/* Usage Chart */}
-                <div className="bg-surface/50 backdrop-blur-sm border border-white/[0.06] rounded-2xl p-6">
-                    <div className="flex justify-between items-start mb-6">
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
-                                <Lightning size={20} weight="fill" className="text-primary" />
+                <div className="bg-surface/50 backdrop-blur-sm border border-white/[0.06] rounded-2xl p-5">
+                    <div className="flex justify-between items-start mb-4">
+                        <div className="flex items-center gap-2.5">
+                            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
+                                <Lightning size={18} weight="fill" className="text-primary" />
                             </div>
                             <div>
-                                <h3 className="text-lg font-semibold text-textMain">Usage Costs</h3>
-                                <p className="text-xs text-textMuted">Total LLM and AI costs incurred</p>
+                                <h3 className="text-sm font-semibold text-textMain">Usage Costs</h3>
+                                <p className="text-[11px] text-textMuted">Total LLM and AI costs incurred</p>
                             </div>
                         </div>
                         <div className="text-right">
-                            <span className="text-2xl font-bold text-primary">{formatUSD(totalCost)}</span>
-                            <p className="text-xs text-textMuted mt-1">spent this period</p>
+                            <span className="text-xl font-bold text-primary">{formatUSD(totalCost)}</span>
+                            <p className="text-[11px] text-textMuted">spent this period</p>
                         </div>
                     </div>
 
-                    <div className="flex justify-end mb-4">
-                        <div className="bg-background rounded-lg p-1 flex gap-1">
-                            <button className="px-3 py-1 text-xs font-medium rounded bg-surface text-textMain shadow-sm">Daily</button>
-                            <button className="px-3 py-1 text-xs font-medium rounded text-textMuted hover:text-textMain">Weekly</button>
+                    <div className="flex justify-end mb-3">
+                        <div className="bg-background rounded-lg p-0.5 flex gap-0.5">
+                            <button className="px-2.5 py-1 text-[11px] font-medium rounded bg-surface text-textMain shadow-sm">Daily</button>
+                            <button className="px-2.5 py-1 text-[11px] font-medium rounded text-textMuted hover:text-textMain">Weekly</button>
                         </div>
                     </div>
 
-                    <div className="h-64 w-full">
+                    <div className="h-56 w-full">
                         <ResponsiveContainer width="100%" height="100%">
                             <AreaChart data={usageData}>
                                 <defs>
@@ -380,18 +380,16 @@ const BillingAndAddons: React.FC = () => {
             <div>
                 <h3 className="text-xl font-semibold text-textMain mb-2">Billing Plans</h3>
                 <p className="text-sm text-textMuted mb-6">
-                    Choose how you want to pay. <span className="font-medium text-textMain">Prepaid</span> - buy credits upfront. <span className="font-medium text-textMain">Monthly Usage</span> - pay at the end of each month for what you used.
+                    Simple pay-as-you-go pricing. Buy credits upfront, use anytime. No monthly commitment.
                 </p>
 
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    {/* Prepaid Credits Card */}
-                    <div className={`bg-surface rounded-xl p-6 relative flex flex-col ${billingMode === 'prepaid' ? 'border-2 border-primary/30' : 'border border-border'}`}>
-                        {billingMode === 'prepaid' && (
-                            <div className="absolute -top-3 left-4 px-3 py-1 bg-primary text-black text-xs font-semibold rounded-full">
-                                Current Plan
-                            </div>
-                        )}
-                        <h4 className="text-sm text-textMuted font-medium mb-1">Prepaid</h4>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* Pay as you go Card - Current */}
+                    <div className="bg-surface rounded-xl p-6 relative flex flex-col border-2 border-primary/30">
+                        <div className="absolute -top-3 left-4 px-3 py-1 bg-primary text-black text-xs font-semibold rounded-full">
+                            Current Plan
+                        </div>
+                        <h4 className="text-sm text-textMuted font-medium mb-1">Prepaid Credits</h4>
                         <h3 className="text-2xl font-bold text-textMain mb-2">Pay as you go</h3>
                         <p className="text-xs text-textMuted mb-6">Buy credits upfront, use anytime</p>
 
@@ -414,70 +412,19 @@ const BillingAndAddons: React.FC = () => {
                             </div>
                         </div>
 
-                        {billingMode !== 'prepaid' && (
-                            <button 
-                                onClick={() => handleBillingModeSwitch('prepaid')}
-                                disabled={isSwitchingMode}
-                                className="w-full bg-surface border border-white/10 text-textMain font-semibold py-2.5 rounded-lg text-sm hover:bg-surfaceHover transition-colors mt-auto"
-                            >
-                                Switch to Prepaid
-                            </button>
-                        )}
-                    </div>
-
-                    {/* Monthly Usage Card */}
-                    <div className={`bg-surface rounded-xl p-6 relative flex flex-col ${billingMode === 'postpaid' ? 'border-2 border-primary/30' : 'border border-border'}`}>
-                        {billingMode === 'postpaid' && (
-                            <div className="absolute -top-3 left-4 px-3 py-1 bg-primary text-black text-xs font-semibold rounded-full">
-                                Current Plan
-                            </div>
-                        )}
-                        <div className="flex items-center gap-2 mb-1">
-                            <h4 className="text-sm text-textMuted font-medium">Monthly Usage</h4>
-                            <span className="px-2 py-0.5 bg-violet-500/20 text-violet-400 text-[10px] font-semibold rounded">POPULAR</span>
-                        </div>
-                        <h3 className="text-2xl font-bold text-textMain mb-2">Use now, pay later</h3>
-                        <p className="text-xs text-textMuted mb-6">Billed at the end of each month</p>
-
-                        <div className="space-y-3 mb-6 flex-1">
-                            <div className="flex items-center gap-2 text-sm">
-                                <Check size={16} weight="bold" className="text-emerald-400" />
-                                <span className="text-textMain">No upfront payment</span>
-                            </div>
-                            <div className="flex items-center gap-2 text-sm">
-                                <Check size={16} weight="bold" className="text-emerald-400" />
-                                <span className="text-textMain">Pay only for actual usage</span>
-                            </div>
-                            <div className="flex items-center gap-2 text-sm">
-                                <Check size={16} weight="bold" className="text-emerald-400" />
-                                <span className="text-textMain">Detailed usage breakdown</span>
-                            </div>
-                            <div className="flex items-center gap-2 text-sm">
-                                <Check size={16} weight="bold" className="text-emerald-400" />
-                                <span className="text-textMain">10 concurrent calls</span>
-                            </div>
-                        </div>
-
-                        {billingMode !== 'postpaid' && (
-                            <button 
-                                onClick={() => handleBillingModeSwitch('postpaid')}
-                                disabled={isSwitchingMode}
-                                className="w-full bg-primary text-black font-semibold py-2.5 rounded-lg text-sm hover:bg-primaryHover transition-colors mt-auto flex items-center justify-center gap-2"
-                            >
-                                {isSwitchingMode ? (
-                                    <CircleNotch size={16} className="animate-spin" />
-                                ) : (
-                                    'Switch to Monthly'
-                                )}
-                            </button>
-                        )}
+                        <button 
+                            onClick={() => setShowBuyCreditsModal(true)}
+                            className="w-full bg-primary text-black font-semibold py-2.5 rounded-lg text-sm hover:bg-primaryHover transition-colors mt-auto"
+                        >
+                            Add Credits
+                        </button>
                     </div>
 
                     {/* Enterprise Card */}
                     <div className="bg-surface border border-border rounded-xl p-6 flex flex-col">
                         <h4 className="text-sm text-textMuted font-medium mb-1">Enterprise</h4>
                         <div className="flex items-end gap-2 mb-2">
-                            <h3 className="text-2xl font-bold text-textMain">Custom</h3>
+                            <h3 className="text-2xl font-bold text-textMain">Custom Pricing</h3>
                         </div>
                         <p className="text-xs text-textMuted mb-6">Annual contract with volume discounts</p>
 
@@ -488,7 +435,7 @@ const BillingAndAddons: React.FC = () => {
                             </div>
                             <div className="flex items-center gap-2 text-sm">
                                 <Check size={16} weight="bold" className="text-emerald-400" />
-                                <span className="text-textMain">Custom pricing</span>
+                                <span className="text-textMain">Volume discounts</span>
                             </div>
                             <div className="flex items-center gap-2 text-sm">
                                 <Check size={16} weight="bold" className="text-emerald-400" />
@@ -500,9 +447,12 @@ const BillingAndAddons: React.FC = () => {
                             </div>
                         </div>
 
-                        <button className="w-full bg-surface border border-white/10 text-textMain font-semibold py-2.5 rounded-lg text-sm hover:bg-surfaceHover transition-colors mt-auto">
+                        <a 
+                            href="mailto:enterprise@voicory.com?subject=Enterprise%20Inquiry"
+                            className="w-full bg-surface border border-white/10 text-textMain font-semibold py-2.5 rounded-lg text-sm hover:bg-surfaceHover transition-colors mt-auto text-center block"
+                        >
                             Contact Sales
-                        </button>
+                        </a>
                     </div>
                 </div>
             </div>
