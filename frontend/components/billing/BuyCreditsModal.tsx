@@ -347,6 +347,9 @@ const BuyCreditsModal: React.FC<BuyCreditsModalProps> = ({
                             <p className="text-textMuted mb-6">
                                 ${paymentResult.credits?.toFixed(2)} has been added to your account.
                             </p>
+                            <p className="text-sm text-textMuted/70 mb-4">
+                                Your balance will be updated in a few seconds.
+                            </p>
                             {paymentResult.newBalance !== undefined && (
                                 <div className="p-4 bg-white/[0.02] border border-white/5 rounded-xl inline-block">
                                     <div className="text-sm text-textMuted mb-1">New Balance</div>
@@ -382,7 +385,11 @@ const BuyCreditsModal: React.FC<BuyCreditsModalProps> = ({
 
                     {step === 'success' && (
                         <button
-                            onClick={onClose}
+                            onClick={() => {
+                                onClose();
+                                // Refresh the page to show updated balance
+                                window.location.reload();
+                            }}
                             className="w-full px-6 py-3 bg-gradient-to-r from-primary to-primary/80 text-black font-semibold rounded-xl hover:shadow-lg hover:shadow-primary/25 transition-all"
                         >
                             Done
