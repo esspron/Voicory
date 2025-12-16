@@ -333,7 +333,8 @@ export const openPaddleCheckout = async (
                 displayMode: 'overlay',
                 theme: 'dark',
                 locale: 'en',
-                successUrl: `${window.location.origin}/settings/billing?payment=success&txn=${transactionData.transactionId}`,
+                // Don't set successUrl - let the overlay close and trigger successCallback
+                // so we can show our own success dialog
                 allowLogout: false
             },
             // Callback when checkout completes successfully
