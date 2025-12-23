@@ -18,9 +18,14 @@ const BACKEND_URLS = {
  * Get the nearest backend URL based on user's timezone
  */
 const getGeoBackendUrl = (): string => {
-  // Allow override via env var
+  // Allow override via env var (but ignore localhost in production)
   const envUrl = import.meta.env['VITE_BACKEND_URL'] as string | undefined;
-  if (envUrl && envUrl !== 'auto') return envUrl;
+  const isProduction = typeof window !== 'undefined' && window.location.hostname !== 'localhost';
+  
+  // In production, ignore localhost URLs - use geo-routing instead
+  if (envUrl && envUrl !== 'auto' && !(isProduction && envUrl.includes('localhost'))) {
+    return envUrl;
+  }
 
   try {
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
