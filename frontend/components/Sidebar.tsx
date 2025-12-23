@@ -5,7 +5,6 @@ import {
     Phone,
     Microphone,
     Key,
-    ChartBar,
     Gear,
     Notebook,
     Books,
@@ -15,7 +14,8 @@ import {
     SidebarSimple,
     WhatsappLogo,
     CaretRight,
-    Sparkle
+    Sparkle,
+    Megaphone
 } from '@phosphor-icons/react';
 import React, { useEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
@@ -46,8 +46,8 @@ const Sidebar: React.FC = () => {
     // Get user initials from email
     const getUserInitials = (email: string | undefined) => {
         if (!email) return 'U';
-        const parts = email.split('@')[0].split(/[._-]/);
-        if (parts.length >= 2) {
+        const parts = email.split('@')[0]?.split(/[._-]/) ?? [];
+        if (parts.length >= 2 && parts[0] && parts[1]) {
             return (parts[0][0] + parts[1][0]).toUpperCase();
         }
         return email.substring(0, 2).toUpperCase();
@@ -126,6 +126,18 @@ const Sidebar: React.FC = () => {
                     )}
                     <nav className="space-y-1">
                         <NavItem to="/messenger/whatsapp" icon={WhatsappLogo} label="WhatsApp" />
+                    </nav>
+                </div>
+
+                {/* Outbound Group */}
+                <div>
+                    {!isCollapsed && (
+                        <h3 className="px-3 text-[10px] font-semibold text-textMuted/50 uppercase tracking-[0.2em] mb-3">
+                            Outbound
+                        </h3>
+                    )}
+                    <nav className="space-y-1">
+                        <NavItem to="/campaigns" icon={Megaphone} label="Campaigns" />
                     </nav>
                 </div>
 

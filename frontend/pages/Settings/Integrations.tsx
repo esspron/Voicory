@@ -1,5 +1,14 @@
-import { MagnifyingGlass, CaretDown, CaretUp, Sparkle, Lightning, Microphone, Robot, Database, Cloud, ChartLine, Phone, Plug } from '@phosphor-icons/react';
-import React, { useState } from 'react';
+import { MagnifyingGlass, CaretDown, CaretUp, Sparkle, Lightning, Microphone, Robot, Database, Cloud, ChartLine, Phone, Plug, Plugs, CircleNotch } from '@phosphor-icons/react';
+import React, { useState, useEffect } from 'react';
+
+import { CRMConfigModal, CRMIntegrationCard } from '@/components/crm';
+import {
+  getIntegrations,
+  CRM_PROVIDERS_LIST,
+  type CRMIntegration,
+  type CRMProvider,
+} from '@/services/crmService';
+import { logger } from '@/lib/logger';
 
 interface Provider {
     name: string;
@@ -75,6 +84,62 @@ const CategorySection: React.FC<{ category: Category; icon: React.ElementType }>
 };
 
 const Integrations: React.FC = () => {
+    // CRM integrations state
+    const [crmIntegrations, setCrmIntegrations] = useState<CRMIntegration[]>([]);
+    const [crmLoading, setCrmLoading] = useState(true);
+    const [selectedProvider, setSelectedProvider] = useState<CRMProvider | null>(null);
+    const [selectedIntegration, setSelectedIntegration] = useState<CRMIntegration | undefined>(undefined);
+    const [showCrmModal, setShowCrmModal] = useState(false);
+
+    // Load CRM integrations
+    useEffect(() => {
+        loadCrmIntegrations();
+    }, []);
+
+    const loadCrmIntegrations = async () => {
+        setCrmLoading(true);
+        try {
+            const integrations = await getIntegrations();
+            setCrmIntegrations(integrations);
+        } catch (err) {
+            logger.error('Failed to load CRM integrations', { error: err });
+        } finally {
+            setCrmLoading(false);
+        }
+    };
+
+    const handleConnectCRM = (providerId: CRMProvider) => {
+        setSelectedProvider(providerId);
+        setSelectedIntegration(undefined);
+        setShowCrmModal(true);
+    };
+
+    const handleConfigureCRM = (integration: CRMIntegration) => {
+        setSelectedProvider(integration.provider);
+        setSelectedIntegration(integration);
+        setShowCrmModal(true);
+    };
+
+    const handleCRMSuccess = (integration: CRMIntegration) => {
+        setCrmIntegrations(prev => {
+            const existing = prev.findIndex(i => i.id === integration.id);
+            if (existing >= 0) {
+                const updated = [...prev];
+                updated[existing] = integration;
+                return updated;
+            }
+            return [...prev, integration];
+        });
+        setShowCrmModal(false);
+    };
+
+    const handleCRMDelete = () => {
+        if (selectedIntegration) {
+            setCrmIntegrations(prev => prev.filter(i => i.id !== selectedIntegration.id));
+        }
+        setShowCrmModal(false);
+    };
+
     const categories: Category[] = [
         {
             title: "Voice Providers",
@@ -213,7 +278,51 @@ const Integrations: React.FC = () => {
                         <span className="font-semibold text-textMain">{categories.length}</span> categories
                     </span>
                 </div>
+                <div className="h-4 w-px bg-white/10" />
+                <div className="flex items-center gap-2">
+                    <Plugs size={16} weight="fill" className="text-green-400" />
+                    <span className="text-sm text-textMuted">
+                        <span className="font-semibold text-textMain">{crmIntegrations.filter(i => i.isConnected).length}</span> CRMs connected
+                    </span>
+                </div>
             </div>
+
+            {/* CRM Integrations Section */}
+            <div className="mb-10">
+                <div className="flex items-center gap-3 mb-5">
+                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center border border-white/10">
+                        <Plugs size={16} weight="duotone" className="text-primary" />
+                    </div>
+                    <h3 className="text-base font-semibold text-textMain">CRM Integrations</h3>
+                    <span className="text-xs text-textMuted bg-white/5 px-2 py-0.5 rounded-full border border-white/10">
+                        {CRM_PROVIDERS_LIST.length} available
+                    </span>
+                </div>
+                
+                {crmLoading ? (
+                    <div className="flex items-center justify-center py-12">
+                        <CircleNotch size={24} className="animate-spin text-primary" />
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pl-11">
+                        {CRM_PROVIDERS_LIST.map((provider) => {
+                            const integration = crmIntegrations.find(i => i.provider === provider.id);
+                            return (
+                                <CRMIntegrationCard
+                                    key={provider.id}
+                                    provider={provider}
+                                    integration={integration}
+                                    onConnect={() => handleConnectCRM(provider.id)}
+                                    onConfigure={() => integration && handleConfigureCRM(integration)}
+                                />
+                            );
+                        })}
+                    </div>
+                )}
+            </div>
+
+            {/* Divider */}
+            <div className="border-t border-white/5 my-8" />
 
             <div className="space-y-2">
                 {categories.map((category) => (
@@ -224,6 +333,18 @@ const Integrations: React.FC = () => {
                     />
                 ))}
             </div>
+
+            {/* CRM Config Modal */}
+            {selectedProvider && (
+                <CRMConfigModal
+                    isOpen={showCrmModal}
+                    provider={selectedProvider}
+                    existingIntegration={selectedIntegration}
+                    onClose={() => setShowCrmModal(false)}
+                    onSuccess={handleCRMSuccess}
+                    onDelete={handleCRMDelete}
+                />
+            )}
         </div>
     );
 };

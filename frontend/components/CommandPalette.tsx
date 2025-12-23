@@ -1,4 +1,4 @@
-import { MagnifyingGlass, House, Gear, SignOut, Phone, BookOpen, Users } from '@phosphor-icons/react';
+import { MagnifyingGlass, House, Gear, SignOut, Phone, BookOpen, Users, User } from '@phosphor-icons/react';
 import { Command } from 'cmdk';
 import { motion, AnimatePresence } from 'framer-motion';
 import * as React from 'react';

@@ -1,24 +1,28 @@
 import {
-    FloppyDisk, Play, BookOpen,
+    FloppyDisk, Play,
     Globe, X, Check, ChatCircle, Phone, CircleNotch,
-    Brain, Trash, Translate, SquaresFour, TestTube, Lightning, Copy, Waveform
+    Trash, Translate, Lightning, Copy
 } from '@phosphor-icons/react';
 import React, { useEffect, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 
 import AgentTab from '../components/assistant-editor/AgentTab';
 import TestsTab from '../components/assistant-editor/TestsTab';
 import ChatSidebar from '../components/assistant-editor/ChatSidebar';
+import IntegrationsTab from '../components/assistant-editor/IntegrationsTab';
 import KnowledgeBaseTab from '../components/assistant-editor/KnowledgeBaseTab';
 import LLMSelectorModal from '../components/assistant-editor/LLMSelectorModal';
 import MemoryTab from '../components/assistant-editor/MemoryTab';
 import PromptGeneratorModal from '../components/assistant-editor/PromptGeneratorModal';
 import VoiceSelectorModal from '../components/assistant-editor/VoiceSelectorModal';
-import VoiceAgentTab, { type VoiceAgentConfig, DEFAULT_VOICE_AGENT_CONFIG } from '../components/assistant-editor/VoiceAgentTab';
-import VoiceCallPreview from '../components/VoiceCallPreview';
+import LiveKitVoiceCall from '../components/LiveKitVoiceCall';
 import WidgetTab from '../components/assistant-editor/WidgetTab';
 import { FadeIn } from '../components/ui/FadeIn';
+import type { AssistantIntegrations } from '../types/integrations';
+import { DEFAULT_INTEGRATIONS } from '../types/integrations';
+import { getAssistantIntegrations, saveAssistantIntegrations } from '../services/integrationService';
+import type { REScript } from '../types/reScripts';
 import { useAuth } from '../contexts/AuthContext';
 import { useClipboard } from '../hooks';
 import { supabase } from '../services/supabase';
@@ -35,12 +39,12 @@ import {
 
 // Tab definitions - Agent tab with unified instruction for both calls and messages
 const TABS = [
-    { id: 'agent', label: 'Agent', icon: Brain, isNew: false },
-    { id: 'voice-agent', label: 'Voice Config', icon: Waveform, isNew: true, highlight: true },
-    { id: 'memory', label: 'Memory', icon: Brain, isNew: true, highlight: true },
-    { id: 'knowledge-base', label: 'Knowledge Base', icon: BookOpen, isNew: false },
-    { id: 'tests', label: 'Tests', icon: TestTube, isNew: true },
-    { id: 'widget', label: 'Widget', icon: SquaresFour, isNew: false },
+    { id: 'agent', label: 'Agent' },
+    { id: 'memory', label: 'Memory' },
+    { id: 'knowledge-base', label: 'Knowledge Base' },
+    { id: 'integrations', label: 'Integrations' },
+    { id: 'tests', label: 'Tests' },
+    { id: 'widget', label: 'Widget' },
 ] as const;
 
 type TabId = typeof TABS[number]['id'];
@@ -97,8 +101,8 @@ interface AssistantFormData {
     // Memory settings
     memoryEnabled: boolean;
     memoryConfig: MemoryConfig;
-    // Voice Agent Config (real-time voice settings)
-    voiceAgentConfig: VoiceAgentConfig;
+    // Integrations (CRM, HTTP, LiveKit)
+    integrations: AssistantIntegrations;
     status: 'active' | 'inactive' | 'draft';
 }
 
@@ -148,12 +152,13 @@ You can be customized with specific knowledge, personality traits, and capabilit
     knowledgeBaseIds: [],
     memoryEnabled: false,
     memoryConfig: DEFAULT_MEMORY_CONFIG,
-    voiceAgentConfig: { ...DEFAULT_VOICE_AGENT_CONFIG },
+    integrations: { ...DEFAULT_INTEGRATIONS },
     status: 'draft',
 };
 
 const AssistantEditor: React.FC = () => {
     const { id } = useParams();
+    const [searchParams] = useSearchParams();
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState<TabId>('agent');
     const [formData, setFormData] = useState<AssistantFormData>(DEFAULT_FORM_DATA);
@@ -200,8 +205,8 @@ const AssistantEditor: React.FC = () => {
             languageDefault: data.languageSettings?.default,
             languageAutoDetect: data.languageSettings?.autoDetect,
             styleMode: data.styleSettings?.mode,
-            // Voice Agent Config (for change detection)
-            voiceAgentConfig: data.voiceAgentConfig,
+            // Integrations (for change detection)
+            integrations: data.integrations,
         });
     };
 
@@ -228,7 +233,7 @@ const AssistantEditor: React.FC = () => {
                 setVoices(voicesData);
 
                 let loadedFormData: AssistantFormData;
-                let loadedVoiceAgentConfig: VoiceAgentConfig = { ...DEFAULT_VOICE_AGENT_CONFIG };
+                let loadedIntegrations: AssistantIntegrations = { ...DEFAULT_INTEGRATIONS };
 
                 // If editing existing assistant, fetch it
                 if (id && id !== 'new') {
@@ -236,20 +241,11 @@ const AssistantEditor: React.FC = () => {
                     if (assistant) {
                         setAssistantId(assistant.id);
                         
-                        // Fetch voice agent config for this assistant
+                        // Fetch integrations for this assistant
                         try {
-                            const { data: voiceConfigData } = await supabase
-                                .from('voice_agent_config')
-                                .select('*')
-                                .eq('assistant_id', assistant.id)
-                                .single();
-                            
-                            if (voiceConfigData && typeof voiceConfigData === 'object') {
-                                loadedVoiceAgentConfig = { ...DEFAULT_VOICE_AGENT_CONFIG, ...(voiceConfigData as Partial<VoiceAgentConfig>) };
-                            }
+                            loadedIntegrations = await getAssistantIntegrations(assistant.id);
                         } catch {
-                            // Voice agent config not found, use defaults
-                            logger.debug('No voice agent config found, using defaults');
+                            logger.debug('No integrations found, using defaults');
                         }
                         
                         loadedFormData = {
@@ -277,7 +273,7 @@ const AssistantEditor: React.FC = () => {
                             knowledgeBaseIds: assistant.knowledgeBaseIds || [],
                             memoryEnabled: assistant.memoryEnabled ?? false,
                             memoryConfig: assistant.memoryConfig || DEFAULT_MEMORY_CONFIG,
-                            voiceAgentConfig: loadedVoiceAgentConfig,
+                            integrations: loadedIntegrations,
                             status: assistant.status,
                         };
                         setFormData(loadedFormData);
@@ -292,6 +288,37 @@ const AssistantEditor: React.FC = () => {
                     // Reset to defaults for new assistant
                     setAssistantId(null);
                     loadedFormData = { ...DEFAULT_FORM_DATA };
+                    
+                    // Check if applying RE script template from gallery
+                    const templateParam = searchParams.get('template');
+                    if (templateParam === 're-script') {
+                        const templateJson = sessionStorage.getItem('applyScriptTemplate');
+                        if (templateJson) {
+                            try {
+                                const template: REScript = JSON.parse(templateJson);
+                                loadedFormData = {
+                                    ...loadedFormData,
+                                    name: template.name,
+                                    instruction: template.systemPrompt,
+                                    // Map template variables to dynamic variables
+                                    dynamicVariables: {
+                                        ...DEFAULT_DYNAMIC_VARIABLES_CONFIG,
+                                        variables: template.variables.map(v => ({
+                                            name: v.name,
+                                            type: v.type === 'currency' || v.type === 'number' ? 'string' : v.type,
+                                            description: v.description,
+                                            placeholder: v.placeholder || '',
+                                        })),
+                                    },
+                                };
+                                sessionStorage.removeItem('applyScriptTemplate');
+                                logger.info('Applied RE script template', { templateId: template.id });
+                            } catch (e) {
+                                logger.error('Failed to parse RE script template', { error: e });
+                            }
+                        }
+                    }
+                    
                     setFormData(loadedFormData);
                     setSelectedVoice(null);
                 }
@@ -306,7 +333,7 @@ const AssistantEditor: React.FC = () => {
             }
         };
         fetchData();
-    }, [id]);
+    }, [id, searchParams]);
 
     const handleSave = async (publish: boolean = false) => {
         if (saving) return;
@@ -356,24 +383,13 @@ const AssistantEditor: React.FC = () => {
                 const updatedFormData = { ...formData, status: savedAssistant.status };
                 setFormData(updatedFormData);
                 
-                // Save voice agent config to database
+                // Save integrations to database
                 try {
-                    const voiceConfigData = {
-                        assistant_id: savedAssistant.id,
-                        user_id: user?.id || '',
-                        ...formData.voiceAgentConfig,
-                    };
-                    
-                    // Use type assertion for table not in generated types
-                    await (supabase as unknown as { from: (table: string) => { upsert: (data: Record<string, unknown>, options?: { onConflict?: string }) => Promise<{ error: Error | null }> } })
-                        .from('voice_agent_config')
-                        .upsert(voiceConfigData as Record<string, unknown>, {
-                            onConflict: 'assistant_id',
-                        });
-                    logger.info('Voice agent config saved');
-                } catch (voiceConfigError) {
-                    const errorMessage = voiceConfigError instanceof Error ? voiceConfigError.message : 'Unknown error';
-                    logger.error('Failed to save voice agent config: ' + errorMessage);
+                    await saveAssistantIntegrations(savedAssistant.id, formData.integrations);
+                    logger.info('Integrations saved');
+                } catch (integrationsError) {
+                    const errorMessage = integrationsError instanceof Error ? integrationsError.message : 'Unknown error';
+                    logger.error('Failed to save integrations: ' + errorMessage);
                 }
                 
                 // Update the fingerprint to match new saved state
@@ -588,9 +604,9 @@ const AssistantEditor: React.FC = () => {
         });
     };
 
-    // Handler for voice agent config changes
-    const handleVoiceAgentConfigChange = (newConfig: VoiceAgentConfig) => {
-        setFormData(prev => ({ ...prev, voiceAgentConfig: newConfig }));
+    // Handler for integrations changes
+    const handleIntegrationsChange = (newIntegrations: AssistantIntegrations) => {
+        setFormData(prev => ({ ...prev, integrations: newIntegrations }));
     };
 
     const renderTabContent = () => {
@@ -613,15 +629,6 @@ const AssistantEditor: React.FC = () => {
                         onOpenPromptGenerator={() => setShowPromptGenerator(true)}
                     />
                 );
-            case 'voice-agent':
-                return (
-                    <div className="h-full overflow-y-auto p-6">
-                        <VoiceAgentTab 
-                            config={formData.voiceAgentConfig}
-                            onConfigChange={handleVoiceAgentConfigChange}
-                        />
-                    </div>
-                );
             case 'memory':
                 return (
                     <MemoryTab
@@ -633,6 +640,14 @@ const AssistantEditor: React.FC = () => {
                 return <KnowledgeBaseTab formData={formData} setFormData={setFormData} onSave={handleSaveWithKnowledgeBaseIds} />;
             case 'tests':
                 return <TestsTab assistantId={assistantId} formData={formData} selectedVoice={selectedVoice} />;
+            case 'integrations':
+                return (
+                    <IntegrationsTab
+                        integrations={formData.integrations}
+                        onIntegrationsChange={handleIntegrationsChange}
+                        assistantId={assistantId}
+                    />
+                );
             case 'widget':
                 return <WidgetTab assistantId={assistantId || undefined} assistantName={formData.name} />;
             default:
@@ -774,8 +789,6 @@ const AssistantEditor: React.FC = () => {
             <div className="border-b border-white/5 bg-surface/50 backdrop-blur-sm">
                 <div className="flex items-center gap-1 px-6 py-2 overflow-x-auto scrollbar-thin">
                     {TABS.map((tab) => {
-                        const Icon = tab.icon;
-                        const isHighlighted = 'highlight' in tab && tab.highlight;
                         const isActive = activeTab === tab.id;
                         return (
                             <button
@@ -789,21 +802,7 @@ const AssistantEditor: React.FC = () => {
                                     }
                                 `}
                             >
-                                <Icon
-                                    size={18}
-                                    weight={isActive ? "fill" : "regular"}
-                                    className={`transition-all ${isHighlighted ? 'text-purple-400' : isActive ? 'text-primary' : 'group-hover:text-primary'}`}
-                                />
                                 {tab.label}
-                                {isHighlighted ? (
-                                    <span className="px-1.5 py-0.5 bg-gradient-to-r from-purple-500 to-violet-600 text-white text-[10px] font-bold rounded-md uppercase shadow-lg shadow-purple-500/25">
-                                        New
-                                    </span>
-                                ) : tab.isNew && (
-                                    <span className="px-1.5 py-0.5 bg-white/10 text-textMuted text-[10px] font-medium rounded-md">
-                                        New
-                                    </span>
-                                )}
                             </button>
                         );
                     })}
@@ -1019,16 +1018,15 @@ const AssistantEditor: React.FC = () => {
                 />
             )}
 
-            {/* Voice Call Preview Modal */}
+            {/* Voice Call Preview Modal - Using LiveKit */}
             {showVoiceCallPreview && assistantId && user && (
-                <VoiceCallPreview
+                <LiveKitVoiceCall
                     assistantId={assistantId}
-                    userId={user.id}
                     assistantName={formData.name}
                     isOpen={showVoiceCallPreview}
                     onClose={() => setShowVoiceCallPreview(false)}
                     onConversationEnd={(transcript) => {
-                        console.log('Voice conversation ended:', transcript.length, 'messages');
+                        logger.info('Voice conversation ended', { context: { messageCount: transcript.length } });
                     }}
                 />
             )}

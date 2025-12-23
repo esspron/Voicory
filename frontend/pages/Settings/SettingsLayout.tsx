@@ -1,4 +1,4 @@
-import { Gear, CreditCard, Sparkle } from '@phosphor-icons/react';
+import { Gear, CreditCard, Sparkle, ShieldCheck, Megaphone } from '@phosphor-icons/react';
 import React from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 
@@ -9,6 +9,8 @@ const SettingsLayout: React.FC = () => {
     const navItems = [
         { to: '/settings/org', icon: Gear, label: 'Org Settings' },
         { to: '/settings/billing', icon: CreditCard, label: 'Billing & Add-Ons' },
+        { to: '/settings/dialer', icon: Megaphone, label: 'Dialer Settings' },
+        { to: '/settings/compliance', icon: ShieldCheck, label: 'TCPA Compliance' },
     ];
 
     return (

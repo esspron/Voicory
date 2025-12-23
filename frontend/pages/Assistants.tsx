@@ -2,8 +2,10 @@ import { Plus, Robot, Sparkle, CircleNotch, CaretLeft, CaretRight } from '@phosp
 import React, { useState, useEffect, useRef } from 'react';
 import { NavLink, useNavigate, useParams, useLocation } from 'react-router-dom';
 
+import NewAssistantModal from '../components/assistant-editor/NewAssistantModal';
 import { AmbientBackground } from '../components/ui/AmbientBackground';
 import { FadeIn } from '../components/ui/FadeIn';
+import type { REScript } from '../data/reScriptTemplates';
 import { getAssistants } from '../services/voicoryService';
 import type { Assistant } from '../types';
 import { useGPUCapabilities } from '../utils/gpuDetection';
@@ -28,6 +30,7 @@ const Assistants: React.FC = () => {
     const [assistants, setAssistants] = useState<Assistant[]>([]);
     const [loading, setLoading] = useState(true);
     const [isSubSidebarCollapsed, setIsSubSidebarCollapsed] = useState(false);
+    const [showNewAssistantModal, setShowNewAssistantModal] = useState(false);
     const prevIdRef = useRef<string | undefined>(id);
 
     const fetchAssistants = async () => {
@@ -62,7 +65,17 @@ const Assistants: React.FC = () => {
     const handleCreateNew = (e: React.MouseEvent) => {
         e.preventDefault();
         e.stopPropagation();
+        setShowNewAssistantModal(true);
+    };
+
+    const handleSelectBlank = () => {
         navigate('/assistants/new');
+    };
+
+    const handleSelectTemplate = (template: REScript) => {
+        // Store template in sessionStorage and navigate
+        sessionStorage.setItem('applyScriptTemplate', JSON.stringify(template));
+        navigate('/assistants/new?template=re-script');
     };
 
     return (
@@ -167,9 +180,17 @@ const Assistants: React.FC = () => {
                 {id ? (
                     <AssistantEditor />
                 ) : (
-                    <EmptyState onCreateNew={() => navigate('/assistants/new')} />
+                    <EmptyState onCreateNew={() => setShowNewAssistantModal(true)} />
                 )}
             </div>
+
+            {/* New Assistant Modal */}
+            <NewAssistantModal
+                isOpen={showNewAssistantModal}
+                onClose={() => setShowNewAssistantModal(false)}
+                onSelectBlank={handleSelectBlank}
+                onSelectTemplate={handleSelectTemplate}
+            />
         </FadeIn>
     );
 };

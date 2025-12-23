@@ -1,16 +1,14 @@
 import {
-    Phone, PhoneOutgoing, PhoneIncoming, Sparkle, Globe, Microphone,
+    Sparkle, Globe, Microphone,
     CaretRight, Plus, X, Check, Translate, Palette, Lightning, Gear,
-    BracketsCurly, Code, FileText
+    BracketsCurly, Code
 } from '@phosphor-icons/react';
 import React, { useState, useRef, useEffect } from 'react';
-import { createPortal } from 'react-dom';
 
 import {
     Voice, LanguageSettings, StyleSettings, StyleMode,
-    DynamicVariable, DynamicVariablesConfig, StaticVariable, STATIC_VARIABLE_TEMPLATES,
+    DynamicVariable, DynamicVariablesConfig,
     SUPPORTED_LANGUAGES, STYLE_OPTIONS, SYSTEM_VARIABLES,
-    DEFAULT_LANGUAGE_SETTINGS, DEFAULT_STYLE_SETTINGS
 } from '../../types';
 
 // Timezone options
@@ -86,8 +84,10 @@ const CallsTab: React.FC<CallsTabProps> = ({
 }) => {
     const [callMode, setCallMode] = useState<CallMode>('inbound');
     const [showAddLanguageDropdown, setShowAddLanguageDropdown] = useState(false);
-    const currentTimezone = TIMEZONES.find(tz => tz.value === formData.timezone) || TIMEZONES[0];
-    const currentLanguage = SUPPORTED_LANGUAGES.find(l => l.code === formData.languageSettings.default) || SUPPORTED_LANGUAGES[0];
+    const defaultTimezone = TIMEZONES[0] ?? { value: 'Asia/Kolkata', label: 'India (IST)', offset: '+5:30' };
+    const currentTimezone = TIMEZONES.find(tz => tz.value === formData.timezone) ?? defaultTimezone;
+    const defaultLanguage = SUPPORTED_LANGUAGES[0] ?? { code: 'en-US', name: 'English (US)', flag: '🇺🇸' };
+    const currentLanguage = SUPPORTED_LANGUAGES.find(l => l.code === formData.languageSettings.default) ?? defaultLanguage;
     const isFirstAutoDetectRun = useRef(true);
 
     // Get the current prompt and first message based on mode
@@ -127,7 +127,10 @@ const CallsTab: React.FC<CallsTabProps> = ({
         const foundVars = new Set<string>();
         let match;
         while ((match = varPattern.exec(allText)) !== null) {
-            foundVars.add(match[1].toLowerCase());
+            const varName = match[1];
+            if (varName) {
+                foundVars.add(varName.toLowerCase());
+            }
         }
 
         const newVarsToAdd: DynamicVariable[] = [];

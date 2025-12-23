@@ -135,17 +135,6 @@ const AgentTab: React.FC<AgentTabProps> = ({
         <div className="flex h-full overflow-hidden">
             {/* Left Panel - Instruction */}
             <div className="flex-1 overflow-y-auto p-6 border-r border-white/5">
-                {/* Header Info */}
-                <div className="mb-4 p-3 bg-gradient-to-r from-primary/10 to-primary/5 border border-primary/20 rounded-xl">
-                    <div className="flex items-start gap-2">
-                        <Robot size={16} weight="duotone" className="text-primary mt-0.5" />
-                        <div>
-                            <p className="text-xs font-medium text-textMain">Unified Instruction</p>
-                            <p className="text-xs text-textMuted">This instruction applies to both voice calls and messaging channels (WhatsApp, SMS, Web Chat).</p>
-                        </div>
-                    </div>
-                </div>
-
                 {/* Instruction Section */}
                 <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">

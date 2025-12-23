@@ -1,10 +1,20 @@
-import { CreditCard, Check, Warning, DownloadSimple, Plus, Info, PencilSimple, CircleNotch, Cpu, ChatCircle, Lightning, Ticket, CaretDown } from '@phosphor-icons/react';
+import { CreditCard, Check, Warning, DownloadSimple, Plus, Info, PencilSimple, CircleNotch, Cpu, ChatCircle, Lightning, Ticket, CaretDown, Phone, Database } from '@phosphor-icons/react';
 import React, { useState, useEffect } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
+import AddOnConfirmationDialog from '../../components/billing/AddOnConfirmationDialog';
 import ApplyCouponModal from '../../components/billing/ApplyCouponModal';
 import BuyCreditsModal from '../../components/billing/BuyCreditsModal';
 import { useAuth } from '../../contexts/AuthContext';
+import { 
+    AddonType, 
+    ADDON_PRICING, 
+    UserAddon, 
+    getActiveAddons, 
+    getAddonBillingHistory,
+    AddonBillingHistory,
+    formatAddonType
+} from '../../services/addonsService';
 import { getUsageSummary, getCreditTransactions, checkBalance, CreditTransaction, UsageSummary } from '../../services/billingService';
 import { 
     Coupon, 
@@ -54,9 +64,14 @@ const formatAmount = (amount: number): string => {
 const currencySymbol = '$';
 
 const BillingAndAddons: React.FC = () => {
-    const [hipaaEnabled, setHipaaEnabled] = useState(false);
+    // Add-on states
+    const [activeAddons, setActiveAddons] = useState<UserAddon[]>([]);
+    const [addonBillingHistory, setAddonBillingHistory] = useState<AddonBillingHistory[]>([]);
+    const [selectedAddon, setSelectedAddon] = useState<AddonType | null>(null);
+    const [showAddonDialog, setShowAddonDialog] = useState(false);
+    
+    // Other states
     const [autoReloadEnabled, setAutoReloadEnabled] = useState(false);
-    const [dataRetentionEnabled, setDataRetentionEnabled] = useState(false);
     const [isTransactionHistoryOpen, setIsTransactionHistoryOpen] = useState(false);
 
     // Modal State
@@ -86,19 +101,20 @@ const BillingAndAddons: React.FC = () => {
                 // Initialize Paddle for checkout
                 await initializePaddle();
                 
-                const [profile, summary, txns, billingStatusResult] = await Promise.all([
+                const [profile, summary, txns, billingStatusResult, addons, addonHistory] = await Promise.all([
                     getUserProfile(),
                     getUsageSummary(30),
                     getCreditTransactions(20),
-                    getBillingStatus()
+                    getBillingStatus(),
+                    getActiveAddons(),
+                    getAddonBillingHistory(10)
                 ]);
                 setUserProfile(profile);
                 setUsageSummary(summary);
                 setTransactions(txns);
                 setBillingStatus(billingStatusResult);
-                if (profile) {
-                    setHipaaEnabled(profile.hipaaEnabled);
-                }
+                setActiveAddons(addons);
+                setAddonBillingHistory(addonHistory);
             } catch (error) {
                 console.error('Error fetching billing data:', error);
             } finally {
@@ -107,6 +123,15 @@ const BillingAndAddons: React.FC = () => {
         };
         fetchData();
     }, [user]);
+
+    // Listen for open-buy-credits event from AddOnConfirmationDialog
+    useEffect(() => {
+        const handleOpenBuyCredits = () => {
+            setShowBuyCreditsModal(true);
+        };
+        window.addEventListener('open-buy-credits', handleOpenBuyCredits);
+        return () => window.removeEventListener('open-buy-credits', handleOpenBuyCredits);
+    }, []);
 
     // Prepare chart data from usage summary
     const usageData = React.useMemo(() => {
@@ -146,6 +171,37 @@ const BillingAndAddons: React.FC = () => {
         // Also refresh billing status
         const newStatus = await getBillingStatus();
         setBillingStatus(newStatus);
+    };
+
+    // Handle add-on activation/deactivation
+    const handleAddonSuccess = async () => {
+        // Refresh all relevant data
+        const [balanceResult, txns, addons, addonHistory] = await Promise.all([
+            checkBalance(0),
+            getCreditTransactions(20),
+            getActiveAddons(),
+            getAddonBillingHistory(10)
+        ]);
+        if (userProfile) {
+            setUserProfile({ ...userProfile, creditsBalance: balanceResult.balance });
+        }
+        setTransactions(txns);
+        setActiveAddons(addons);
+        setAddonBillingHistory(addonHistory);
+        // Also refresh billing status
+        const newStatus = await getBillingStatus();
+        setBillingStatus(newStatus);
+    };
+
+    // Open add-on dialog
+    const openAddonDialog = (addonType: AddonType) => {
+        setSelectedAddon(addonType);
+        setShowAddonDialog(true);
+    };
+
+    // Get existing addon for a type
+    const getExistingAddon = (addonType: AddonType): UserAddon | undefined => {
+        return activeAddons.find(a => a.addonType === addonType && a.isActive);
     };
 
     // Handle coupon apply (for discount coupons)
@@ -463,89 +519,83 @@ const BillingAndAddons: React.FC = () => {
                 <p className="text-sm text-textMuted mb-6">Configure add-ons and supercharge your experience</p>
 
                 <div className="bg-surface border border-border rounded-xl divide-y divide-border">
-                    {/* HIPAA Compliance */}
+                    {/* Reserved Concurrency */}
                     <div className="p-6">
-                        <div className="flex justify-between items-start mb-4">
-                            <div>
-                                <div className="flex items-center gap-2 mb-1">
-                                    <span className="text-sm font-medium text-textMain">Enable HIPAA Compliance</span>
-                                    <Info size={14} className="text-textMuted cursor-help" />
+                        <div className="flex justify-between items-start">
+                            <div className="flex items-start gap-4">
+                                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500/20 to-blue-500/5 flex items-center justify-center border border-blue-500/20">
+                                    <Phone size={20} weight="duotone" className="text-blue-400" />
                                 </div>
-                                <div className="flex items-center gap-2">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                                    <span className="text-xs text-textMuted">Bills monthly</span>
+                                <div>
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <span className="text-sm font-medium text-textMain">{ADDON_PRICING.reserved_concurrency.displayName}</span>
+                                        <Info size={14} className="text-textMuted cursor-help" title={ADDON_PRICING.reserved_concurrency.tooltip} />
+                                        {getExistingAddon('reserved_concurrency') && (
+                                            <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[10px] text-emerald-400 font-medium">
+                                                Active • {getExistingAddon('reserved_concurrency')?.quantity} lines
+                                            </span>
+                                        )}
+                                    </div>
+                                    <p className="text-xs text-textMuted mb-1">{ADDON_PRICING.reserved_concurrency.description}</p>
+                                    <div className="flex items-center gap-2">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                        <span className="text-xs text-textMuted">Bills monthly from your credit balance</span>
+                                    </div>
                                 </div>
                             </div>
                             <div className="flex items-center gap-4">
-                                <span className="text-sm text-textMuted">+ {formatAmount(1000)}/mo</span>
+                                <span className="text-sm text-textMuted whitespace-nowrap">+ ${ADDON_PRICING.reserved_concurrency.pricePerUnit}/mo each</span>
                                 <button
-                                    onClick={() => setHipaaEnabled(!hipaaEnabled)}
-                                    className={`w-11 h-6 rounded-full relative transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary/50 ${hipaaEnabled ? 'bg-primary' : 'bg-surfaceHover border border-border'}`}
+                                    onClick={() => openAddonDialog('reserved_concurrency')}
+                                    className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                                        getExistingAddon('reserved_concurrency')
+                                            ? 'bg-surface border border-white/10 text-textMain hover:bg-surfaceHover'
+                                            : 'bg-primary/10 border border-primary/20 text-primary hover:bg-primary/20'
+                                    }`}
                                 >
-                                    <div className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-all duration-200 shadow-sm ${hipaaEnabled ? 'left-6' : 'left-1'}`} />
+                                    {getExistingAddon('reserved_concurrency') ? 'Manage' : 'Enable'}
                                 </button>
                             </div>
-                        </div>
-
-                        {/* Show inputs only if enabled or always visible based on design preference */}
-                        <div className="space-y-3 bg-background/50 p-4 rounded-lg border border-border/50">
-                            <input
-                                type="text"
-                                placeholder="Recipient Name"
-                                className="w-full bg-background border border-border rounded px-3 py-2 text-sm text-textMain outline-none focus:border-primary placeholder:text-gray-600"
-                            />
-                            <input
-                                type="text"
-                                placeholder="Recipient Organization"
-                                className="w-full bg-background border border-border rounded px-3 py-2 text-sm text-textMain outline-none focus:border-primary placeholder:text-gray-600"
-                            />
-                        </div>
-                    </div>
-
-                    {/* Reserved Concurrency */}
-                    <div className="p-6 flex justify-between items-center">
-                        <div>
-                            <div className="flex items-center gap-2 mb-1">
-                                <span className="text-sm font-medium text-textMain">Reserved Concurrency (Call Lines)</span>
-                                <Info size={14} className="text-textMuted" />
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                                <span className="text-xs text-textMuted">Bills monthly</span>
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-4">
-                            <div className="text-right">
-                                <input
-                                    type="number"
-                                    className="w-24 bg-background border border-border rounded px-3 py-1.5 text-right text-sm text-textMain outline-none focus:border-primary"
-                                    defaultValue={0}
-                                />
-                            </div>
-                            <span className="text-sm text-textMuted whitespace-nowrap min-w-[80px] text-right">+ {formatAmount(10)}/mo each</span>
                         </div>
                     </div>
 
                     {/* Data Retention */}
-                    <div className="p-6 flex justify-between items-center">
-                        <div>
-                            <div className="flex items-center gap-2 mb-1">
-                                <span className="text-sm font-medium text-textMain">60-day Call and Chat Data Retention</span>
-                                <Info size={14} className="text-textMuted" />
+                    <div className="p-6">
+                        <div className="flex justify-between items-start">
+                            <div className="flex items-start gap-4">
+                                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500/20 to-violet-500/5 flex items-center justify-center border border-violet-500/20">
+                                    <Database size={20} weight="duotone" className="text-violet-400" />
+                                </div>
+                                <div>
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <span className="text-sm font-medium text-textMain">{ADDON_PRICING.extended_retention.displayName}</span>
+                                        <Info size={14} className="text-textMuted cursor-help" title={ADDON_PRICING.extended_retention.tooltip} />
+                                        {getExistingAddon('extended_retention') && (
+                                            <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[10px] text-emerald-400 font-medium">
+                                                Active
+                                            </span>
+                                        )}
+                                    </div>
+                                    <p className="text-xs text-textMuted mb-1">{ADDON_PRICING.extended_retention.description}</p>
+                                    <div className="flex items-center gap-2">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                        <span className="text-xs text-textMuted">Bills monthly from your credit balance</span>
+                                    </div>
+                                </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                                <span className="text-xs text-textMuted">Bills monthly</span>
+                            <div className="flex items-center gap-4">
+                                <span className="text-sm text-textMuted whitespace-nowrap">+ ${ADDON_PRICING.extended_retention.pricePerUnit}/mo</span>
+                                <button
+                                    onClick={() => openAddonDialog('extended_retention')}
+                                    className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                                        getExistingAddon('extended_retention')
+                                            ? 'bg-surface border border-white/10 text-textMain hover:bg-surfaceHover'
+                                            : 'bg-primary/10 border border-primary/20 text-primary hover:bg-primary/20'
+                                    }`}
+                                >
+                                    {getExistingAddon('extended_retention') ? 'Manage' : 'Enable'}
+                                </button>
                             </div>
-                        </div>
-                        <div className="flex items-center gap-4">
-                            <span className="text-sm text-textMuted">+ {formatAmount(1000)}/mo</span>
-                            <button
-                                onClick={() => setDataRetentionEnabled(!dataRetentionEnabled)}
-                                className={`w-11 h-6 rounded-full relative transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary/50 ${dataRetentionEnabled ? 'bg-primary' : 'bg-surfaceHover border border-border'}`}
-                            >
-                                <div className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-all duration-200 shadow-sm ${dataRetentionEnabled ? 'left-6' : 'left-1'}`} />
-                            </button>
                         </div>
                     </div>
                 </div>
@@ -799,10 +849,61 @@ const BillingAndAddons: React.FC = () => {
                         <h3 className="text-lg font-semibold text-textMain">Add-Ons History</h3>
                     </div>
                     <div className="p-6">
-                        <p className="text-xs text-textMuted mb-4">Add-ons are charged to your Voicory credits on the first day of each month.</p>
-                        <div className="text-center py-8 text-textMuted text-sm">
-                            No data available
-                        </div>
+                        <p className="text-xs text-textMuted mb-4">Add-ons are charged to your Voicory credits on activation and renewed monthly.</p>
+                        {addonBillingHistory.length > 0 ? (
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm">
+                                    <thead>
+                                        <tr className="border-b border-border">
+                                            <th className="text-left py-3 px-2 text-textMuted font-medium">Date</th>
+                                            <th className="text-left py-3 px-2 text-textMuted font-medium">Add-on</th>
+                                            <th className="text-left py-3 px-2 text-textMuted font-medium">Period</th>
+                                            <th className="text-right py-3 px-2 text-textMuted font-medium">Amount</th>
+                                            <th className="text-right py-3 px-2 text-textMuted font-medium">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {addonBillingHistory.map((item) => (
+                                            <tr key={item.id} className="border-b border-border/50 hover:bg-background/30">
+                                                <td className="py-3 px-2 text-textMuted">
+                                                    {new Date(item.createdAt).toLocaleDateString('en-IN', {
+                                                        day: '2-digit',
+                                                        month: 'short',
+                                                        year: 'numeric'
+                                                    })}
+                                                </td>
+                                                <td className="py-3 px-2">
+                                                    <span className="text-textMain">{formatAddonType(item.addonType)}</span>
+                                                    {item.quantity > 1 && (
+                                                        <span className="text-textMuted ml-1">× {item.quantity}</span>
+                                                    )}
+                                                </td>
+                                                <td className="py-3 px-2 text-textMuted text-xs">
+                                                    {new Date(item.billingPeriodStart).toLocaleDateString()} - {new Date(item.billingPeriodEnd).toLocaleDateString()}
+                                                </td>
+                                                <td className="py-3 px-2 text-right text-primary font-medium">
+                                                    ${item.totalAmount.toFixed(2)}
+                                                </td>
+                                                <td className="py-3 px-2 text-right">
+                                                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                                                        item.status === 'completed' ? 'bg-emerald-500/20 text-emerald-400' :
+                                                        item.status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' :
+                                                        item.status === 'failed' ? 'bg-red-500/20 text-red-400' :
+                                                        'bg-orange-500/20 text-orange-400'
+                                                    }`}>
+                                                        {item.status === 'insufficient_balance' ? 'Insufficient' : item.status.charAt(0).toUpperCase() + item.status.slice(1)}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        ) : (
+                            <div className="text-center py-8 text-textMuted text-sm">
+                                No add-on billing history yet
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
@@ -824,6 +925,21 @@ const BillingAndAddons: React.FC = () => {
                 onApply={handleCouponApply}
                 onCreditsRedeemed={handleCreditsRedeemed}
             />
+
+            {/* Add-On Confirmation Dialog */}
+            {selectedAddon && (
+                <AddOnConfirmationDialog
+                    isOpen={showAddonDialog}
+                    onClose={() => {
+                        setShowAddonDialog(false);
+                        setSelectedAddon(null);
+                    }}
+                    addonType={selectedAddon}
+                    currentBalance={creditsBalance}
+                    existingAddon={getExistingAddon(selectedAddon)}
+                    onSuccess={handleAddonSuccess}
+                />
+            )}
         </div>
     );
 };

@@ -1,39 +1,122 @@
-import { X, MagnifyingGlass, Play, Pause, Check, Lightning, Clock, Sparkle, Funnel } from '@phosphor-icons/react';
+import { X, MagnifyingGlass, Play, Pause, Check, Lightning, Clock, Sparkle, CaretDown, Globe, Microphone } from '@phosphor-icons/react';
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 
-import { Voice } from '../../types';
+import { Voice, TTSProvider } from '../../types';
 
-// Voice Model Options
-const VOICE_MODELS = [
+// ============================================
+// PROVIDER-SPECIFIC MODEL CONFIGURATIONS
+// ============================================
+
+// ElevenLabs Voice Quality Tiers (Voicory pricing tiers)
+const ELEVENLABS_TIERS = [
     { 
-        id: 'eleven_multilingual_v2', 
-        name: 'Multilingual v2', 
-        quality: 'Best',
-        latency: '~500ms',
-        description: 'Highest quality, supports 29 languages',
+        id: 'fusion', 
+        backendId: 'eleven_multilingual_v2',
+        name: 'Fusion', 
+        quality: 'Premium',
+        latency: '~200ms',
+        description: 'Ultra-realistic, 29+ languages',
         icon: Sparkle,
         color: 'text-purple-400'
     },
     { 
-        id: 'eleven_turbo_v2_5', 
-        name: 'Turbo v2.5', 
+        id: 'boost', 
+        backendId: 'eleven_turbo_v2_5',
+        name: 'Boost', 
         quality: 'High',
-        latency: '~300ms',
-        description: 'Balanced quality and speed',
+        latency: '~150ms',
+        description: 'Great quality, faster response',
         icon: Lightning,
         color: 'text-yellow-400'
     },
     { 
-        id: 'eleven_flash_v2_5', 
-        name: 'Flash v2.5', 
+        id: 'spark', 
+        backendId: 'eleven_flash_v2_5',
+        name: 'Spark', 
         quality: 'Good',
-        latency: '~150ms',
-        description: 'Fastest, ideal for real-time',
+        latency: '~100ms',
+        description: 'Budget-friendly, high volume',
         icon: Clock,
         color: 'text-green-400'
     }
 ];
+
+// OpenAI TTS Models
+// Supports 57+ languages (auto-detected from input text)
+const OPENAI_MODELS = [
+    {
+        id: 'hd',
+        backendId: 'tts-1-hd',
+        name: 'HD Quality',
+        quality: 'Premium',
+        latency: '~300ms',
+        description: 'Best quality, 57+ languages',
+        icon: Sparkle,
+        color: 'text-purple-400'
+    },
+    {
+        id: 'standard',
+        backendId: 'tts-1',
+        name: 'Standard',
+        quality: 'Good',
+        latency: '~150ms',
+        description: 'Fast, 57+ languages',
+        icon: Lightning,
+        color: 'text-yellow-400'
+    }
+];
+
+// Google Chirp3-HD - single high quality model
+// Supports 24+ languages with multilingual voices
+const GOOGLE_MODEL = {
+    id: 'chirp3-hd',
+    backendId: 'chirp3-hd',
+    name: 'Chirp3 HD',
+    quality: 'Premium',
+    latency: '~200ms',
+    description: 'High quality, 24+ languages',
+    icon: Globe,
+    color: 'text-blue-400'
+};
+
+// Provider info for display
+const PROVIDER_INFO: Record<TTSProvider, { name: string; icon: typeof Microphone; languages: string }> = {
+    elevenlabs: { name: 'ElevenLabs', icon: Microphone, languages: '29+ languages' },
+    openai: { name: 'OpenAI', icon: Lightning, languages: '57+ languages' },
+    google: { name: 'Google', icon: Globe, languages: '24+ languages' },
+    deepgram: { name: 'Deepgram', icon: Microphone, languages: '36+ languages' },
+    cartesia: { name: 'Cartesia', icon: Microphone, languages: 'English' },
+    azure: { name: 'Azure', icon: Globe, languages: '140+ languages' },
+};
+
+// Helper to get model options based on provider
+const getModelOptionsForProvider = (provider: TTSProvider) => {
+    switch (provider) {
+        case 'elevenlabs':
+            return ELEVENLABS_TIERS;
+        case 'openai':
+            return OPENAI_MODELS;
+        case 'google':
+            return [GOOGLE_MODEL];
+        default:
+            return ELEVENLABS_TIERS;  // Default to ElevenLabs
+    }
+};
+
+// Helper to get backend ID based on provider and tier ID
+const getBackendIdForProvider = (provider: TTSProvider, tierId: string): string => {
+    const models = getModelOptionsForProvider(provider);
+    const model = models.find(m => m.id === tierId);
+    return model?.backendId || models[0]?.backendId || 'eleven_turbo_v2_5';
+};
+
+// Helper to get tier ID from backend ID for a provider
+const getTierIdFromBackendId = (provider: TTSProvider, backendId: string): string => {
+    const models = getModelOptionsForProvider(provider);
+    const model = models.find(m => m.backendId === backendId);
+    return model?.id || models[0]?.id || 'boost';
+};
 
 interface VoiceSelectorModalProps {
     voices: Voice[];
@@ -55,8 +138,15 @@ const VoiceSelectorModal: React.FC<VoiceSelectorModalProps> = ({
     const [searchQuery, setSearchQuery] = useState('');
     const [genderFilter, setGenderFilter] = useState<'all' | 'Male' | 'Female'>('all');
     const [languageFilter, setLanguageFilter] = useState<string>('all');
+    const [providerFilter, setProviderFilter] = useState<TTSProvider | 'all'>('all');
     const [playingVoiceId, setPlayingVoiceId] = useState<string | null>(null);
+    const [showGenderDropdown, setShowGenderDropdown] = useState(false);
+    const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
+    const [showProviderDropdown, setShowProviderDropdown] = useState(false);
     const audioRef = useRef<HTMLAudioElement | null>(null);
+    const genderDropdownRef = useRef<HTMLDivElement>(null);
+    const languageDropdownRef = useRef<HTMLDivElement>(null);
+    const providerDropdownRef = useRef<HTMLDivElement>(null);
 
     // Get unique languages from voices
     const availableLanguages = useMemo(() => {
@@ -67,6 +157,18 @@ const VoiceSelectorModal: React.FC<VoiceSelectorModalProps> = ({
         });
         return Array.from(langs).sort();
     }, [voices]);
+
+    // Get available providers from voices
+    const availableProviders = useMemo(() => {
+        const providers = new Set<TTSProvider>();
+        voices.forEach(v => providers.add(v.ttsProvider));
+        return Array.from(providers);
+    }, [voices]);
+
+    // Get the currently selected voice's provider for model selection
+    const currentProvider = selectedVoice?.ttsProvider || 'elevenlabs';
+    const modelOptions = getModelOptionsForProvider(currentProvider);
+    const currentTierId = getTierIdFromBackendId(currentProvider, elevenlabsModelId);
 
     // Filter voices
     const filteredVoices = useMemo(() => {
@@ -80,10 +182,12 @@ const VoiceSelectorModal: React.FC<VoiceSelectorModalProps> = ({
             const matchesLanguage = languageFilter === 'all' || 
                 voice.primaryLanguage === languageFilter ||
                 voice.supportedLanguages?.includes(languageFilter);
+
+            const matchesProvider = providerFilter === 'all' || voice.ttsProvider === providerFilter;
             
-            return matchesSearch && matchesGender && matchesLanguage;
+            return matchesSearch && matchesGender && matchesLanguage && matchesProvider;
         });
-    }, [voices, searchQuery, genderFilter, languageFilter]);
+    }, [voices, searchQuery, genderFilter, languageFilter, providerFilter]);
 
     // Handle voice preview
     const togglePreview = (voice: Voice) => {
@@ -127,6 +231,23 @@ const VoiceSelectorModal: React.FC<VoiceSelectorModalProps> = ({
         return () => window.removeEventListener('keydown', handleEscape);
     }, [onClose]);
 
+    // Close dropdowns on click outside
+    useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            if (genderDropdownRef.current && !genderDropdownRef.current.contains(e.target as Node)) {
+                setShowGenderDropdown(false);
+            }
+            if (languageDropdownRef.current && !languageDropdownRef.current.contains(e.target as Node)) {
+                setShowLanguageDropdown(false);
+            }
+            if (providerDropdownRef.current && !providerDropdownRef.current.contains(e.target as Node)) {
+                setShowProviderDropdown(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
     return createPortal(
         <div className="fixed inset-0 z-[100] flex items-center justify-center">
             {/* Backdrop */}
@@ -151,20 +272,20 @@ const VoiceSelectorModal: React.FC<VoiceSelectorModalProps> = ({
                     </button>
                 </div>
 
-                {/* Model Selection */}
+                {/* Model/Tier Selection - adapts based on selected voice's provider */}
                 <div className="px-6 py-4 border-b border-border bg-surface/30">
                     <div className="flex items-center gap-2 mb-3">
                         <Lightning size={16} weight="fill" className="text-primary" />
-                        <span className="text-sm font-medium text-textMain">Voice Model (Latency vs Quality)</span>
+                        <span className="text-sm font-medium text-textMain">Voice Tier (Quality vs Speed)</span>
                     </div>
-                    <div className="grid grid-cols-3 gap-3">
-                        {VOICE_MODELS.map((model) => {
+                    <div className={`grid gap-3 ${modelOptions.length === 1 ? 'grid-cols-1 max-w-xs' : modelOptions.length === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
+                        {modelOptions.map((model) => {
                             const Icon = model.icon;
-                            const isSelected = elevenlabsModelId === model.id;
+                            const isSelected = currentTierId === model.id;
                             return (
                                 <button
                                     key={model.id}
-                                    onClick={() => onModelChange(model.id)}
+                                    onClick={() => onModelChange(getBackendIdForProvider(currentProvider, model.id))}
                                     className={`
                                         relative p-3 rounded-xl border transition-all text-left
                                         ${isSelected 
@@ -205,32 +326,97 @@ const VoiceSelectorModal: React.FC<VoiceSelectorModalProps> = ({
                                 placeholder="Search voices..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full bg-surface border border-border rounded-lg pl-10 pr-4 py-2 text-sm text-textMain outline-none focus:border-primary"
+                                className="w-full bg-surface border border-border rounded-xl pl-10 pr-4 py-2.5 text-sm text-textMain outline-none focus:border-primary transition-colors"
                             />
                         </div>
 
-                        {/* Gender Filter */}
-                        <select
-                            value={genderFilter}
-                            onChange={(e) => setGenderFilter(e.target.value as typeof genderFilter)}
-                            className="bg-surface border border-border rounded-lg px-3 py-2 text-sm text-textMain outline-none focus:border-primary"
-                        >
-                            <option value="all">All Genders</option>
-                            <option value="Male">Male</option>
-                            <option value="Female">Female</option>
-                        </select>
+                        {/* Gender Filter - Custom Dropdown */}
+                        <div ref={genderDropdownRef} className="relative">
+                            <button
+                                onClick={() => {
+                                    setShowGenderDropdown(!showGenderDropdown);
+                                    setShowLanguageDropdown(false);
+                                }}
+                                className="flex items-center gap-2 bg-surface border border-border rounded-xl px-4 py-2.5 text-sm text-textMain hover:border-primary/50 transition-colors min-w-[140px] justify-between"
+                            >
+                                <span>{genderFilter === 'all' ? 'All Genders' : genderFilter}</span>
+                                <CaretDown size={14} weight="bold" className={`text-textMuted transition-transform ${showGenderDropdown ? 'rotate-180' : ''}`} />
+                            </button>
+                            {showGenderDropdown && (
+                                <div className="absolute top-full left-0 mt-2 w-full bg-surface border border-border rounded-xl shadow-xl overflow-hidden z-50">
+                                    {[
+                                        { value: 'all', label: 'All Genders' },
+                                        { value: 'Male', label: 'Male' },
+                                        { value: 'Female', label: 'Female' },
+                                    ].map((option) => (
+                                        <button
+                                            key={option.value}
+                                            onClick={() => {
+                                                setGenderFilter(option.value as typeof genderFilter);
+                                                setShowGenderDropdown(false);
+                                            }}
+                                            className={`w-full px-4 py-2.5 text-sm text-left transition-colors flex items-center justify-between ${
+                                                genderFilter === option.value
+                                                    ? 'bg-primary/10 text-primary'
+                                                    : 'text-textMain hover:bg-white/5'
+                                            }`}
+                                        >
+                                            {option.label}
+                                            {genderFilter === option.value && <Check size={14} weight="bold" />}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
 
-                        {/* Language Filter */}
-                        <select
-                            value={languageFilter}
-                            onChange={(e) => setLanguageFilter(e.target.value)}
-                            className="bg-surface border border-border rounded-lg px-3 py-2 text-sm text-textMain outline-none focus:border-primary"
-                        >
-                            <option value="all">All Languages</option>
-                            {availableLanguages.map(lang => (
-                                <option key={lang} value={lang}>{lang}</option>
-                            ))}
-                        </select>
+                        {/* Language Filter - Custom Dropdown */}
+                        <div ref={languageDropdownRef} className="relative">
+                            <button
+                                onClick={() => {
+                                    setShowLanguageDropdown(!showLanguageDropdown);
+                                    setShowGenderDropdown(false);
+                                }}
+                                className="flex items-center gap-2 bg-surface border border-border rounded-xl px-4 py-2.5 text-sm text-textMain hover:border-primary/50 transition-colors min-w-[150px] justify-between"
+                            >
+                                <span className="truncate">{languageFilter === 'all' ? 'All Languages' : languageFilter}</span>
+                                <CaretDown size={14} weight="bold" className={`text-textMuted transition-transform flex-shrink-0 ${showLanguageDropdown ? 'rotate-180' : ''}`} />
+                            </button>
+                            {showLanguageDropdown && (
+                                <div className="absolute top-full left-0 mt-2 w-full bg-surface border border-border rounded-xl shadow-xl overflow-hidden z-50 max-h-60 overflow-y-auto">
+                                    <button
+                                        onClick={() => {
+                                            setLanguageFilter('all');
+                                            setShowLanguageDropdown(false);
+                                        }}
+                                        className={`w-full px-4 py-2.5 text-sm text-left transition-colors flex items-center justify-between ${
+                                            languageFilter === 'all'
+                                                ? 'bg-primary/10 text-primary'
+                                                : 'text-textMain hover:bg-white/5'
+                                        }`}
+                                    >
+                                        All Languages
+                                        {languageFilter === 'all' && <Check size={14} weight="bold" />}
+                                    </button>
+                                    {availableLanguages.map(lang => (
+                                        <button
+                                            key={lang}
+                                            onClick={() => {
+                                                setLanguageFilter(lang);
+                                                setShowLanguageDropdown(false);
+                                            }}
+                                            className={`w-full px-4 py-2.5 text-sm text-left transition-colors flex items-center justify-between ${
+                                                languageFilter === lang
+                                                    ? 'bg-primary/10 text-primary'
+                                                    : 'text-textMain hover:bg-white/5'
+                                            }`}
+                                        >
+                                            {lang}
+                                            {languageFilter === lang && <Check size={14} weight="bold" />}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
 

@@ -22,6 +22,8 @@ import BillingAndAddons from './pages/Settings/BillingAndAddons';
 import Members from './pages/Settings/Members';
 import Integrations from './pages/Settings/Integrations';
 import ReferralProgram from './pages/Settings/ReferralProgram';
+import Compliance from './pages/Settings/Compliance';
+import DialerSettings from './pages/Settings/DialerSettings';
 import WhatsAppMessenger from './pages/messenger/WhatsAppMessenger';
 import WidgetConfig from './pages/WidgetConfig';
 
@@ -59,6 +61,9 @@ const EditorLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => 
 
 import ProtectedRoute from './components/ProtectedRoute';
 import { CommandPalette } from './components/CommandPalette';
+import Campaigns from './pages/Campaigns';
+import CampaignEditor from './pages/CampaignEditor';
+import CampaignDashboard from './pages/CampaignDashboard';
 
 const AppRoutes: React.FC = () => {
     return (
@@ -83,6 +88,12 @@ const AppRoutes: React.FC = () => {
                     <Route path="/logs" element={<Layout><CallLogs /></Layout>} />
                     <Route path="/metrics" element={<Layout><Metrics /></Layout>} />
 
+                    {/* Campaign Routes */}
+                    <Route path="/campaigns" element={<Layout><Campaigns /></Layout>} />
+                    <Route path="/campaigns/new" element={<Layout><CampaignEditor /></Layout>} />
+                    <Route path="/campaigns/:id" element={<Layout><CampaignDashboard /></Layout>} />
+                    <Route path="/campaigns/:id/edit" element={<Layout><CampaignEditor /></Layout>} />
+
                     {/* Messenger Routes */}
                     <Route path="/messenger/whatsapp" element={<Layout><WhatsAppMessenger /></Layout>} />
 
@@ -90,9 +101,11 @@ const AppRoutes: React.FC = () => {
                         <Route index element={<Navigate to="org" replace />} />
                         <Route path="org" element={<OrgSettings />} />
                         <Route path="billing" element={<BillingAndAddons />} />
+                        <Route path="dialer" element={<DialerSettings />} />
                         <Route path="members" element={<Members />} />
                         <Route path="integrations" element={<Integrations />} />
                         <Route path="referral" element={<ReferralProgram />} />
+                        <Route path="compliance" element={<Compliance />} />
                     </Route>
                     <Route path="/billing" element={<Navigate to="/settings/billing" replace />} />
                 </Route>

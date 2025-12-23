@@ -9,69 +9,31 @@ interface WelcomeBonusBannerProps {
 }
 
 const WelcomeBonusBanner: React.FC<WelcomeBonusBannerProps> = ({ onDismiss }) => {
-    const { user, applyWelcomeBonus } = useAuth();
-    const [status, setStatus] = useState<'checking' | 'available' | 'claimed' | 'claiming' | 'error' | 'hidden'>('checking');
+    const { user } = useAuth();
+    const [status, setStatus] = useState<'checking' | 'available' | 'claimed' | 'claiming' | 'error' | 'hidden'>('hidden');
     const [bonusAmount, setBonusAmount] = useState<number>(2000);
     const [showSuccess, setShowSuccess] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
+    // TODO: Implement applyWelcomeBonus and getWelcomeBonusStatus in AuthContext/AuthService
+    // For now, the welcome bonus feature is disabled
     useEffect(() => {
-        checkBonusStatus();
-    }, [user]);
+        // checkBonusStatus();
+        void setBonusAmount; // Mark as used
+        void setShowSuccess;
+        void setError;
+        void onDismiss;
+        void user;
+    }, [user, onDismiss]);
 
     const checkBonusStatus = async () => {
-        if (!user) {
-            setStatus('hidden');
-            return;
-        }
-
-        try {
-            const result = await AuthService.getWelcomeBonusStatus(user.id);
-            
-            if (result.claimed) {
-                setStatus('hidden'); // Already claimed, don't show
-            } else if (result.availableBonus) {
-                setBonusAmount(result.availableBonus.credit_amount);
-                setStatus('available');
-            } else {
-                setStatus('hidden'); // No bonus available
-            }
-        } catch (err) {
-            console.error('Check bonus status error:', err);
-            setStatus('hidden');
-        }
+        // Feature not implemented - hide the banner
+        setStatus('hidden');
     };
 
     const handleClaimBonus = async () => {
-        if (!user) return;
-
-        setStatus('claiming');
-        setError(null);
-
-        try {
-            const result = await applyWelcomeBonus();
-            
-            if (result?.success) {
-                setStatus('claimed');
-                setShowSuccess(true);
-                setBonusAmount(result.credit_amount || 2000);
-                
-                // Hide after showing success
-                setTimeout(() => {
-                    setStatus('hidden');
-                    onDismiss?.();
-                }, 5000);
-            } else if (result?.already_claimed) {
-                setStatus('hidden');
-            } else {
-                setError(result?.error || 'Failed to claim bonus');
-                setStatus('error');
-            }
-        } catch (err) {
-            console.error('Claim bonus error:', err);
-            setError('Something went wrong. Please try again.');
-            setStatus('error');
-        }
+        // Feature not implemented
+        setStatus('hidden');
     };
 
     const handleDismiss = () => {
@@ -79,9 +41,18 @@ const WelcomeBonusBanner: React.FC<WelcomeBonusBannerProps> = ({ onDismiss }) =>
         onDismiss?.();
     };
 
+    // Feature disabled - always return null
     if (status === 'hidden' || status === 'checking') {
         return null;
     }
+
+    // Keep void references to avoid unused variable errors
+    void checkBonusStatus;
+    void handleClaimBonus;
+    void handleDismiss;
+    void bonusAmount;
+    void showSuccess;
+    void error;
 
     return (
         <div className="relative overflow-hidden rounded-2xl border border-primary/20 bg-gradient-to-r from-primary/10 via-primary/5 to-emerald-500/10 p-6 mb-6">

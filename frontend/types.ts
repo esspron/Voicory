@@ -895,3 +895,428 @@ export interface WhatsAppWebhookPayload {
         }[];
     }[];
 }
+
+// ============================================
+// OUTBOUND DIALER TYPES
+// ============================================
+
+export type CampaignStatus = 'draft' | 'scheduled' | 'active' | 'paused' | 'completed' | 'cancelled';
+export type CampaignType = 'fsbo' | 'expired' | 'circle_prospecting' | 'followup' | 'general' | 'outbound_sales' | 'lead_qualification' | 'appointment_setting' | 'follow_up' | 'survey';
+export type LeadStatus = 'pending' | 'queued' | 'calling' | 'completed' | 'failed' | 'dnc' | 'callback' | 'skipped';
+export type LeadOutcome = 'answered' | 'voicemail' | 'no_answer' | 'busy' | 'disconnected' | 'wrong_number' | 'callback_requested';
+export type LeadDisposition = 'hot' | 'warm' | 'cold' | 'not_interested' | 'callback' | 'dnc' | 'appointment_set';
+
+export interface OutboundCampaign {
+    id: string;
+    userId: string;
+    assistantId?: string;
+    phoneNumberId?: string;
+    
+    // Campaign basics
+    name: string;
+    description?: string;
+    campaignType: CampaignType;
+    status: CampaignStatus;
+    
+    // Scheduling
+    startDate?: string;
+    endDate?: string;
+    callDays: number[];  // 0=Sunday, 6=Saturday
+    callStartTime: string;  // HH:MM
+    callEndTime: string;    // HH:MM
+    timezone: string;
+    
+    // Pacing controls
+    maxCallsPerHour: number;
+    maxCallsPerDay: number;
+    maxConcurrentCalls: number;
+    
+    // Retry settings
+    maxAttempts: number;
+    maxAttemptsPerLead?: number;
+    retryDelayHours: number;
+    retryDelayMinutes?: number;
+    ringTimeoutSeconds: number;
+    
+    // Stats
+    totalLeads: number;
+    leadsPending: number;
+    leadsCompleted: number;
+    callsMade: number;
+    callsAnswered: number;
+    callsVoicemail: number;
+    callsNoAnswer: number;
+    callsFailed: number;
+    appointmentsBooked: number;
+    totalTalkTimeSeconds: number;
+    
+    // Timestamps
+    startedAt?: string;
+    completedAt?: string;
+    createdAt: string;
+    updatedAt: string;
+    
+    // Joined data
+    assistant?: { id: string; name: string };
+    phoneNumber?: { id: string; number: string; label?: string };
+}
+
+export interface CampaignLead {
+    id: string;
+    campaignId: string;
+    userId: string;
+    
+    // Contact info
+    phoneNumber: string;
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+    company?: string;
+    
+    // Real estate fields
+    propertyAddress?: string;
+    propertyCity?: string;
+    propertyState?: string;
+    propertyZip?: string;
+    leadSource?: string;
+    daysOnMarket?: number;
+    listingPrice?: number;
+    originalListDate?: string;
+    expirationDate?: string;
+    
+    // Call status
+    status: LeadStatus;
+    callAttempts: number;
+    lastCallAt?: string;
+    nextCallAt?: string;
+    
+    // Outcome
+    outcome?: LeadOutcome;
+    disposition?: LeadDisposition;
+    leadScore?: number;
+    notes?: string;
+    appointmentDate?: string;
+    callbackDate?: string;
+    
+    // Custom fields
+    customFields: Record<string, string>;
+    importBatchId?: string;
+    priority: number;
+    
+    // Timestamps
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface CampaignCallLog {
+    id: string;
+    campaignId: string;
+    leadId: string;
+    userId: string;
+    
+    // Call info
+    twilioCallSid?: string;
+    fromNumber: string;
+    toNumber: string;
+    status: string;
+    answeredBy?: string;
+    
+    // Timing
+    initiatedAt: string;
+    ringingAt?: string;
+    answeredAt?: string;
+    endedAt?: string;
+    durationSeconds: number;
+    
+    // Outcome
+    outcome?: LeadOutcome;
+    disposition?: LeadDisposition;
+    
+    // Recording
+    recordingUrl?: string;
+    transcript?: string;
+    transcriptSummary?: string;
+    
+    // AI analysis
+    sentiment?: string;
+    leadScore?: number;
+    keyInsights?: string[];
+    
+    // Cost
+    costUsd: number;
+}
+
+export interface UserDialerSettings {
+    id?: string;
+    userId?: string;
+    concurrentCallSlots: number;
+    defaultTimezone: string;
+    defaultCallStartHour: number;
+    defaultCallEndHour: number;
+    defaultMaxAttempts: number;
+    defaultRetryDelayHours: number;
+    respectDnc: boolean;
+    requireConsent: boolean;
+    defaultCallerId?: string;
+}
+
+export interface CampaignInput {
+    name: string;
+    description?: string;
+    campaignType?: CampaignType;
+    assistantId?: string;
+    phoneNumberId?: string;
+    startDate?: string;
+    endDate?: string;
+    callDays?: number[];
+    callStartTime?: string;
+    callEndTime?: string;
+    timezone?: string;
+    maxCallsPerHour?: number;
+    maxCallsPerDay?: number;
+    maxConcurrentCalls?: number;
+    maxAttempts?: number;
+    maxAttemptsPerLead?: number;
+    retryDelayHours?: number;
+    retryDelayMinutes?: number;
+    ringTimeoutSeconds?: number;
+}
+
+export interface LeadInput {
+    phoneNumber: string;
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+    company?: string;
+    propertyAddress?: string;
+    propertyCity?: string;
+    propertyState?: string;
+    propertyZip?: string;
+    leadSource?: string;
+    daysOnMarket?: number;
+    listingPrice?: number;
+    notes?: string;
+    customFields?: Record<string, string>;
+    priority?: number;
+}
+
+export interface LeadImportResult {
+    total: number;
+    imported: number;
+    skipped: number;
+    errors: Array<{ row: number; error: string }>;
+    batchId: string;
+}
+
+export interface CampaignStats {
+    totalLeads: number;
+    leadsPending: number;
+    leadsCompleted: number;
+    callsMade: number;
+    callsAnswered: number;
+    callsVoicemail: number;
+    callsNoAnswer: number;
+    callsFailed: number;
+    appointmentsBooked: number;
+    totalTalkTimeSeconds: number;
+    answerRate: string;
+    appointmentRate: string;
+    dispositionBreakdown: Record<string, number>;
+    averageLeadScore: string;
+}
+
+export interface DialerStatus {
+    isRunning: boolean;
+    callsMade?: number;
+    startedAt?: string;
+    queueLength?: number;
+    activeCalls?: number;
+    isInitialized?: boolean;
+}
+
+export interface DNCEntry {
+    id: string;
+    phoneNumber: string;
+    reason?: string;
+    source: string;
+    addedAt: string;
+}
+
+// ============================================
+// LEAD SCORING TYPES
+// ============================================
+
+export type LeadTimeline = 'immediate' | '1-3months' | '3-6months' | '6months+' | 'unknown';
+export type LeadMotivation = 'high' | 'medium' | 'low' | 'unknown';
+export type LeadInterestLevel = 'yes' | 'maybe' | 'no' | 'unknown';
+export type LeadGrade = 'hot' | 'warm' | 'cold' | 'unscored';
+export type RecommendedAction = 
+    | 'call_immediately' 
+    | 'schedule_followup' 
+    | 'send_information' 
+    | 'add_to_nurture' 
+    | 'mark_not_interested'
+    | 'book_appointment';
+export type ScoreSource = 'ai' | 'manual' | 'rules';
+
+export interface LeadScoreBreakdown {
+    timeline: number;
+    motivation: number;
+    priceAlignment: number;
+    preApproved: number;
+    mustSell: number;
+    appointmentBooked: number;
+}
+
+export interface AIQualificationAnalysis {
+    timeline: LeadTimeline;
+    motivation: LeadMotivation;
+    priceAlignment: boolean;
+    preApproved: boolean;
+    mustSell: boolean;
+    appointmentBooked: boolean;
+    interestLevel: LeadInterestLevel;
+    objections: string[];
+    lifeEvents: string[];
+    keyInsights: string;
+    recommendedAction: RecommendedAction;
+    recommendedActionReason: string;
+    confidence: number;
+}
+
+export interface LeadScore {
+    id: string;
+    leadId: string;
+    callId?: string;
+    userId: string;
+    
+    // Overall score
+    overallScore: number;
+    
+    // Timeline
+    timeline: LeadTimeline;
+    timelineScore: number;
+    
+    // Motivation
+    motivation: LeadMotivation;
+    motivationScore: number;
+    
+    // Boolean factors
+    priceAlignment: boolean;
+    priceAlignmentScore: number;
+    
+    preApproved: boolean;
+    preApprovedScore: number;
+    
+    mustSell: boolean;
+    mustSellScore: number;
+    
+    appointmentBooked: boolean;
+    appointmentBookedScore: number;
+    
+    // AI insights
+    objections: string[];
+    keyInsights: string;
+    lifeEvents: string[];
+    interestLevel: LeadInterestLevel;
+    
+    // Recommended action
+    recommendedAction: RecommendedAction;
+    recommendedActionReason: string;
+    
+    // Full AI analysis
+    aiAnalysis: AIQualificationAnalysis;
+    aiConfidence: number;
+    
+    // Metadata
+    scoreSource: ScoreSource;
+    transcriptHash?: string;
+    scoringVersion: string;
+    processingTimeMs?: number;
+    
+    // Timestamps
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface LeadScoringRules {
+    id?: string;
+    userId?: string;
+    name: string;
+    description?: string;
+    
+    // Scoring weights
+    timelineWeights: Record<LeadTimeline, number>;
+    motivationWeights: Record<LeadMotivation, number>;
+    priceAlignmentWeight: number;
+    preApprovedWeight: number;
+    mustSellWeight: number;
+    appointmentBookedWeight: number;
+    
+    // Thresholds
+    hotLeadThreshold: number;
+    warmLeadThreshold: number;
+    
+    isActive: boolean;
+    isDefault?: boolean;
+    
+    createdAt?: string;
+    updatedAt?: string;
+}
+
+export interface CampaignScoreSummary {
+    totalLeads: number;
+    scoredLeads: number;
+    hotLeads: number;
+    warmLeads: number;
+    coldLeads: number;
+    averageScore: number | null;
+    scoreDistribution: {
+        '0-20': number;
+        '21-40': number;
+        '41-60': number;
+        '61-80': number;
+        '81-100': number;
+    };
+}
+
+export interface ScoreLeadResult {
+    success: boolean;
+    skipped?: boolean;
+    scoreId?: string;
+    score?: number;
+    grade?: LeadGrade;
+    breakdown?: LeadScoreBreakdown;
+    analysis?: AIQualificationAnalysis;
+    processingTimeMs?: number;
+    message?: string;
+    existingScoreId?: string;
+}
+
+export interface BatchScoreResult {
+    total: number;
+    scored: number;
+    skipped: number;
+    errors: Array<{ leadId: string; error: string }>;
+}
+
+export interface ScoringWeightsInfo {
+    weights: {
+        timeline: Record<LeadTimeline, number>;
+        motivation: Record<LeadMotivation, number>;
+        priceAlignment: number;
+        preApproved: number;
+        mustSell: number;
+        appointmentBooked: number;
+    };
+    thresholds: {
+        hot: number;
+        warm: number;
+    };
+    maxPossibleScore: number;
+    categories: Record<string, {
+        description: string;
+        maxScore: number;
+        options?: Array<{ value: string; score: number; label: string }>;
+    }>;
+}

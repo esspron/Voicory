@@ -1,18 +1,15 @@
-import { DotsThree, Copy, Star, Check, CurrencyDollar, Lightning, Sparkle } from '@phosphor-icons/react';
+import { DotsThree, Copy, Star, Check, CurrencyDollar, Lightning, Sparkle, Clock } from '@phosphor-icons/react';
 import React from 'react';
 
 import { Voice } from '../types';
 
 import VoiceSamplePlayer from './VoiceSamplePlayer';
 
-// Provider colors and labels
-const PROVIDER_CONFIG: Record<string, { label: string; color: string; icon: React.ElementType }> = {
-    elevenlabs: { label: 'ElevenLabs', color: 'text-violet-400 bg-violet-500/20 border-violet-500/30', icon: Sparkle },
-    openai: { label: 'OpenAI', color: 'text-green-400 bg-green-500/20 border-green-500/30', icon: Sparkle },
-    deepgram: { label: 'Deepgram', color: 'text-blue-400 bg-blue-500/20 border-blue-500/30', icon: Lightning },
-    cartesia: { label: 'Cartesia', color: 'text-orange-400 bg-orange-500/20 border-orange-500/30', icon: Lightning },
-    google: { label: 'Google', color: 'text-cyan-400 bg-cyan-500/20 border-cyan-500/30', icon: Sparkle },
-    azure: { label: 'Azure', color: 'text-sky-400 bg-sky-500/20 border-sky-500/30', icon: Sparkle },
+// Voicory pricing tier colors and labels
+const TIER_CONFIG: Record<string, { label: string; color: string; icon: React.ElementType }> = {
+    fusion: { label: 'Fusion', color: 'text-purple-400 bg-purple-500/20 border-purple-500/30', icon: Sparkle },
+    boost: { label: 'Boost', color: 'text-yellow-400 bg-yellow-500/20 border-yellow-500/30', icon: Lightning },
+    spark: { label: 'Spark', color: 'text-green-400 bg-green-500/20 border-green-500/30', icon: Clock },
 };
 
 interface VoiceCardProps {
@@ -47,12 +44,12 @@ const VoiceCard: React.FC<VoiceCardProps> = ({ voice, onSelect }) => {
                         <span className="px-2 py-0.5 rounded-full bg-white/5 border border-white/10">{voice.gender}</span>
                         <span className="text-white/20">•</span>
                         <span>{voice.accent}</span>
-                        {/* TTS Provider Badge */}
-                        {voice.ttsProvider && PROVIDER_CONFIG[voice.ttsProvider] ? (
+                        {/* Pricing Tier Badge */}
+                        {voice.pricingTier && TIER_CONFIG[voice.pricingTier] ? (
                             <>
                                 <span className="text-white/20">•</span>
-                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium border ${PROVIDER_CONFIG[voice.ttsProvider]?.color || ''}`}>
-                                    {PROVIDER_CONFIG[voice.ttsProvider]?.label || voice.ttsProvider}
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium border ${TIER_CONFIG[voice.pricingTier]?.color || ''}`}>
+                                    {TIER_CONFIG[voice.pricingTier]?.label || voice.pricingTier}
                                 </span>
                             </>
                         ) : null}
