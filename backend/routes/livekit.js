@@ -27,84 +27,134 @@ const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY || 'APIVoicoryDev';
 const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET || 'VoicoryDevSecretKey12345678901234567890';
 const LIVEKIT_URL = process.env.LIVEKIT_URL || 'wss://livekit.voicory.com';
 
-// Usage limits configuration
-const USAGE_LIMITS = {
-    FREE_MINUTES_PER_MONTH: 10,           // Free tier: 10 minutes/month
-    PAID_MINUTES_PER_MONTH: 1000,         // Paid tier: based on credits
-    MAX_CONCURRENT_SESSIONS: 3,           // Max simultaneous voice calls
-    TOKEN_TTL_MINUTES: 30,                // Token expires in 30 min
-    RATE_LIMIT_REQUESTS: 10,              // Max token requests per minute
-    RATE_LIMIT_WINDOW: 60,                // Rate limit window (seconds)
+// Pricing configuration (USD)
+const PRICING = {
+    VOICE_CALL_PER_MINUTE: 0.0100,        // $0.01/min for voice calls
+    MIN_CREDITS_REQUIRED: 0.10,            // Minimum $0.10 credits to start a call
+    DEFAULT_CONCURRENT_LINES: 1,           // Default concurrent calls (free)
+    RESERVED_LINE_COST_MONTHLY: 10.00,     // $10/mo per reserved line
+    TOKEN_TTL_MINUTES: 30,                 // Token expires in 30 min
+    RATE_LIMIT_REQUESTS: 10,               // Max token requests per minute
+    RATE_LIMIT_WINDOW: 60,                 // Rate limit window (seconds)
 };
 
 /**
- * Check user's voice usage and enforce limits
+ * Check user's credits and concurrent call limits
  * @param {string} userId - User ID
- * @returns {Object} - { allowed: boolean, usage: object, error?: string }
+ * @returns {Object} - { allowed: boolean, credits: number, concurrentLimit: number, error?: string }
  */
-async function checkUserUsageLimits(userId) {
+async function checkUserCreditsAndLimits(userId) {
     try {
-        // Get user profile with credits and usage
+        // Get user profile with credits
         const { data: profile, error: profileError } = await supabase
             .from('user_profiles')
-            .select('credits_balance, voice_minutes_used, voice_minutes_limit, plan_type')
+            .select('credits_balance')
             .eq('id', userId)
             .single();
         
         if (profileError) {
             console.error('Failed to get user profile:', profileError);
-            // Allow if profile check fails (fail open for now)
-            return { allowed: true, usage: null };
+            return { allowed: false, error: 'Failed to verify account. Please try again.' };
         }
         
-        const planType = profile?.plan_type || 'free';
         const creditsBalance = profile?.credits_balance || 0;
-        const minutesUsed = profile?.voice_minutes_used || 0;
         
-        // Calculate available minutes based on plan
-        let minutesLimit;
-        if (planType === 'free') {
-            minutesLimit = USAGE_LIMITS.FREE_MINUTES_PER_MONTH;
-        } else {
-            // Paid users: 1 credit = 1 voice minute (or use custom limit)
-            minutesLimit = profile?.voice_minutes_limit || creditsBalance;
-        }
-        
-        const minutesRemaining = Math.max(0, minutesLimit - minutesUsed);
-        
-        // Check if user has minutes remaining
-        if (minutesRemaining <= 0) {
+        // Check minimum credits requirement
+        if (creditsBalance < PRICING.MIN_CREDITS_REQUIRED) {
             return {
                 allowed: false,
-                error: `Voice minutes exhausted. Used: ${minutesUsed}/${minutesLimit} minutes. Please upgrade or add credits.`,
-                usage: { minutesUsed, minutesLimit, minutesRemaining, planType },
+                error: `Insufficient credits. You need at least $${PRICING.MIN_CREDITS_REQUIRED.toFixed(2)} to start a voice call. Current balance: $${creditsBalance.toFixed(2)}`,
+                credits: creditsBalance,
             };
         }
         
-        // Check concurrent sessions limit
+        // Get user's reserved concurrent call lines from add-ons
+        const { data: addon } = await supabase
+            .from('user_addons')
+            .select('quantity')
+            .eq('user_id', userId)
+            .eq('addon_type', 'reserved_concurrency')
+            .eq('status', 'active')
+            .single();
+        
+        // Default 1 concurrent line + any reserved lines
+        const concurrentLimit = PRICING.DEFAULT_CONCURRENT_LINES + (addon?.quantity || 0);
+        
+        // Check current active sessions
         const { count: activeSessions } = await supabase
             .from('voice_sessions')
             .select('*', { count: 'exact', head: true })
             .eq('user_id', userId)
-            .eq('status', 'active');
+            .in('status', ['created', 'active', 'connecting']);
         
-        if (activeSessions >= USAGE_LIMITS.MAX_CONCURRENT_SESSIONS) {
+        if (activeSessions >= concurrentLimit) {
             return {
                 allowed: false,
-                error: `Maximum concurrent sessions reached (${USAGE_LIMITS.MAX_CONCURRENT_SESSIONS}). Please end an existing call first.`,
-                usage: { minutesUsed, minutesLimit, minutesRemaining, activeSessions },
+                error: `Maximum concurrent calls reached (${concurrentLimit}). End an existing call or upgrade your Reserved Concurrency in Settings > Billing.`,
+                credits: creditsBalance,
+                concurrentLimit,
+                activeSessions,
             };
         }
         
         return {
             allowed: true,
-            usage: { minutesUsed, minutesLimit, minutesRemaining, activeSessions, planType },
+            credits: creditsBalance,
+            concurrentLimit,
+            activeSessions: activeSessions || 0,
         };
         
     } catch (error) {
-        console.error('Usage check error:', error);
-        // Fail open
-        return { allowed: true, usage: null };
+        console.error('Credits check error:', error);
+        return { allowed: false, error: 'Failed to verify account' };
+    }
+}
+
+/**
+ * Deduct credits for voice call usage
+ * @param {string} userId - User ID
+ * @param {number} durationMinutes - Call duration in minutes
+ * @param {string} sessionId - Voice session ID for reference
+ * @returns {Object} - { success: boolean, amountDeducted: number, newBalance: number }
+ */
+async function deductVoiceCredits(userId, durationMinutes, sessionId) {
+    try {
+        const amount = durationMinutes * PRICING.VOICE_CALL_PER_MINUTE;
+        
+        // Use the deduct_credits RPC function
+        const { data, error } = await supabase.rpc('deduct_credits', {
+            p_user_id: userId,
+            p_amount: amount,
+            p_transaction_type: 'voice_call',
+            p_description: `Voice call - ${durationMinutes} min @ $${PRICING.VOICE_CALL_PER_MINUTE}/min`,
+            p_reference_type: 'voice_session',
+            p_reference_id: sessionId,
+        });
+        
+        if (error) {
+            console.error('Failed to deduct credits:', error);
+            // Fallback: direct update
+            const { data: profile } = await supabase
+                .from('user_profiles')
+                .select('credits_balance')
+                .eq('id', userId)
+                .single();
+            
+            const newBalance = Math.max(0, (profile?.credits_balance || 0) - amount);
+            
+            await supabase
+                .from('user_profiles')
+                .update({ credits_balance: newBalance })
+                .eq('id', userId);
+            
+            return { success: true, amountDeducted: amount, newBalance };
+        }
+        
+        return { success: true, amountDeducted: amount, newBalance: data };
+        
+    } catch (error) {
+        console.error('Credit deduction error:', error);
+        return { success: false, error: error.message };
     }
 }
 
@@ -122,10 +172,10 @@ async function checkRateLimit(userId) {
         
         if (current === 1) {
             // First request in window, set expiry
-            await redis.expire(key, USAGE_LIMITS.RATE_LIMIT_WINDOW);
+            await redis.expire(key, PRICING.RATE_LIMIT_WINDOW);
         }
         
-        return current <= USAGE_LIMITS.RATE_LIMIT_REQUESTS;
+        return current <= PRICING.RATE_LIMIT_REQUESTS;
     } catch (error) {
         console.error('Rate limit check error:', error);
         return true; // Fail open
@@ -170,16 +220,18 @@ router.post('/token', async (req, res) => {
         if (!rateLimitAllowed) {
             return res.status(429).json({ 
                 error: 'Too many requests. Please wait a moment before trying again.',
-                retryAfter: USAGE_LIMITS.RATE_LIMIT_WINDOW,
+                retryAfter: PRICING.RATE_LIMIT_WINDOW,
             });
         }
         
-        // Check usage limits
-        const usageLimits = await checkUserUsageLimits(user.id);
-        if (!usageLimits.allowed) {
+        // Check credits and concurrent call limits
+        const creditsCheck = await checkUserCreditsAndLimits(user.id);
+        if (!creditsCheck.allowed) {
             return res.status(403).json({ 
-                error: usageLimits.error,
-                usage: usageLimits.usage,
+                error: creditsCheck.error,
+                credits: creditsCheck.credits,
+                concurrentLimit: creditsCheck.concurrentLimit,
+                activeSessions: creditsCheck.activeSessions,
             });
         }
         
@@ -213,7 +265,7 @@ router.post('/token', async (req, res) => {
             identity: participantIdentity,
             name: user.email?.split('@')[0] || 'User',
             // Short TTL for security
-            ttl: `${USAGE_LIMITS.TOKEN_TTL_MINUTES}m`,
+            ttl: `${PRICING.TOKEN_TTL_MINUTES}m`,
             // Metadata accessible in agent (verified server-side)
             metadata: JSON.stringify({
                 assistantId,
@@ -316,7 +368,7 @@ router.post('/webhook', async (req, res) => {
                     // Calculate duration and update session
                     const { data: session } = await supabase
                         .from('voice_sessions')
-                        .select('connected_at, user_id')
+                        .select('id, connected_at, user_id')
                         .eq('room_name', roomName)
                         .single();
                     
@@ -324,37 +376,30 @@ router.post('/webhook', async (req, res) => {
                         ? Math.floor((Date.now() - new Date(session.connected_at).getTime()) / 1000)
                         : 0;
                     
-                    const durationMinutes = Math.ceil(durationSeconds / 60); // Round up
+                    // Round up to nearest minute for billing
+                    const durationMinutes = Math.ceil(durationSeconds / 60);
+                    const costUsd = durationMinutes * PRICING.VOICE_CALL_PER_MINUTE;
                     
-                    // Update session with duration
+                    // Update session with duration and cost
                     await supabase
                         .from('voice_sessions')
                         .update({
                             status: 'completed',
                             ended_at: new Date().toISOString(),
                             duration_seconds: durationSeconds,
+                            cost_usd: costUsd,
                         })
                         .eq('room_name', roomName);
                     
-                    // Update user's voice minutes usage
+                    // Deduct credits from user's balance
                     if (session?.user_id && durationMinutes > 0) {
-                        const { error: usageError } = await supabase.rpc('increment_voice_minutes', {
-                            p_user_id: session.user_id,
-                            p_minutes: durationMinutes,
-                        });
+                        const deduction = await deductVoiceCredits(
+                            session.user_id, 
+                            durationMinutes, 
+                            session.id
+                        );
                         
-                        if (usageError) {
-                            console.error('Failed to update voice usage:', usageError);
-                            // Fallback: direct update
-                            await supabase
-                                .from('user_profiles')
-                                .update({ 
-                                    voice_minutes_used: supabase.raw(`COALESCE(voice_minutes_used, 0) + ${durationMinutes}`)
-                                })
-                                .eq('id', session.user_id);
-                        }
-                        
-                        console.log(`[LiveKit] Updated usage for user ${session.user_id}: +${durationMinutes} minutes`);
+                        console.log(`[LiveKit] Call ended - User: ${session.user_id}, Duration: ${durationMinutes}min, Cost: $${costUsd.toFixed(4)}, Deducted: ${deduction.success}`);
                     }
                 }
                 break;
@@ -459,7 +504,7 @@ router.delete('/rooms/:roomName', async (req, res) => {
 
 /**
  * GET /api/livekit/usage
- * Get authenticated user's voice usage statistics
+ * Get authenticated user's voice usage and billing statistics
  */
 router.get('/usage', async (req, res) => {
     try {
@@ -476,70 +521,93 @@ router.get('/usage', async (req, res) => {
             return res.status(401).json({ error: 'Invalid token' });
         }
         
-        // Get user profile with usage
+        // Get user profile with credits
         const { data: profile, error: profileError } = await supabase
             .from('user_profiles')
-            .select('credits_balance, voice_minutes_used, voice_minutes_limit, plan_type')
+            .select('credits_balance')
             .eq('id', user.id)
             .single();
         
         if (profileError) {
-            return res.status(500).json({ error: 'Failed to get usage data' });
+            return res.status(500).json({ error: 'Failed to get account data' });
         }
         
-        const planType = profile?.plan_type || 'free';
-        const minutesUsed = profile?.voice_minutes_used || 0;
         const creditsBalance = profile?.credits_balance || 0;
         
-        // Calculate limit based on plan
-        let minutesLimit;
-        if (planType === 'free') {
-            minutesLimit = USAGE_LIMITS.FREE_MINUTES_PER_MONTH;
-        } else {
-            minutesLimit = profile?.voice_minutes_limit || creditsBalance;
-        }
-        
-        // Get session history for this month
-        const startOfMonth = new Date();
-        startOfMonth.setDate(1);
-        startOfMonth.setHours(0, 0, 0, 0);
-        
-        const { data: sessions, count: sessionCount } = await supabase
-            .from('voice_sessions')
-            .select('duration_seconds, status, created_at', { count: 'exact' })
+        // Get user's reserved concurrent lines
+        const { data: addon } = await supabase
+            .from('user_addons')
+            .select('quantity')
             .eq('user_id', user.id)
-            .gte('created_at', startOfMonth.toISOString())
-            .order('created_at', { ascending: false })
-            .limit(10);
+            .eq('addon_type', 'reserved_concurrency')
+            .eq('status', 'active')
+            .single();
+        
+        const reservedLines = addon?.quantity || 0;
+        const concurrentLimit = PRICING.DEFAULT_CONCURRENT_LINES + reservedLines;
         
         // Get active sessions count
         const { count: activeSessions } = await supabase
             .from('voice_sessions')
             .select('*', { count: 'exact', head: true })
             .eq('user_id', user.id)
-            .eq('status', 'active');
+            .in('status', ['created', 'active', 'connecting']);
+        
+        // Get session history for this month
+        const startOfMonth = new Date();
+        startOfMonth.setDate(1);
+        startOfMonth.setHours(0, 0, 0, 0);
+        
+        const { data: monthlyStats } = await supabase
+            .from('voice_sessions')
+            .select('duration_seconds, cost_usd')
+            .eq('user_id', user.id)
+            .eq('status', 'completed')
+            .gte('created_at', startOfMonth.toISOString());
+        
+        // Calculate monthly totals
+        const totalMinutes = monthlyStats?.reduce((sum, s) => sum + Math.ceil((s.duration_seconds || 0) / 60), 0) || 0;
+        const totalCost = monthlyStats?.reduce((sum, s) => sum + (s.cost_usd || 0), 0) || 0;
+        
+        // Get recent sessions
+        const { data: recentSessions } = await supabase
+            .from('voice_sessions')
+            .select('id, duration_seconds, cost_usd, status, created_at')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false })
+            .limit(10);
+        
+        // Calculate estimated minutes from current balance
+        const estimatedMinutes = Math.floor(creditsBalance / PRICING.VOICE_CALL_PER_MINUTE);
         
         return res.json({
-            usage: {
-                minutesUsed,
-                minutesLimit,
-                minutesRemaining: Math.max(0, minutesLimit - minutesUsed),
-                percentUsed: minutesLimit > 0 ? Math.round((minutesUsed / minutesLimit) * 100) : 0,
+            balance: {
+                credits: creditsBalance,
+                estimatedMinutes,
+                minRequired: PRICING.MIN_CREDITS_REQUIRED,
             },
-            plan: {
-                type: planType,
-                creditsBalance,
+            pricing: {
+                perMinute: PRICING.VOICE_CALL_PER_MINUTE,
+                reservedLineMonthly: PRICING.RESERVED_LINE_COST_MONTHLY,
             },
-            sessions: {
-                activeCount: activeSessions || 0,
-                maxConcurrent: USAGE_LIMITS.MAX_CONCURRENT_SESSIONS,
-                thisMonth: sessionCount || 0,
-                recent: sessions || [],
+            concurrency: {
+                active: activeSessions || 0,
+                limit: concurrentLimit,
+                reservedLines,
+                available: concurrentLimit - (activeSessions || 0),
             },
-            limits: {
-                freeMinutesPerMonth: USAGE_LIMITS.FREE_MINUTES_PER_MONTH,
-                maxConcurrentSessions: USAGE_LIMITS.MAX_CONCURRENT_SESSIONS,
+            thisMonth: {
+                totalMinutes,
+                totalCost,
+                sessionCount: monthlyStats?.length || 0,
             },
+            recentSessions: recentSessions?.map(s => ({
+                id: s.id,
+                durationMinutes: Math.ceil((s.duration_seconds || 0) / 60),
+                cost: s.cost_usd || 0,
+                status: s.status,
+                createdAt: s.created_at,
+            })) || [],
         });
         
     } catch (error) {
