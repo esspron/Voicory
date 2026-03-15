@@ -1,19 +1,23 @@
 # Voicory — AI Voice Agents with Customer Memory
 
-Voicory is a SaaS platform that replaces human call handlers with AI voice agents. Each agent remembers every customer interaction across calls, so conversations pick up where they left off — no repeat questions, no lost context.
+Voicory replaces human call handlers with AI voice agents that remember every customer interaction. Conversations pick up where they left off across calls — no repeat questions, no lost context.
 
-Built as a production product with live customers.
+Built as a production SaaS product. Inbound + outbound calling, WhatsApp, embedded widget, and a full CRM — all in one platform.
 
 ---
 
 ## What it does
 
-- **AI Voice Agents** — Inbound and outbound calling powered by VAPI, with ElevenLabs and PlayHT for voice synthesis
-- **Customer Memory** — Every call is stored and summarized. The AI references past interactions automatically on the next call
-- **Multi-channel** — Same agent handles Voice + WhatsApp in one dashboard
-- **Knowledge Base** — Upload docs, PDFs, SOPs. The agent uses them to answer questions accurately
-- **Phone Number Management** — Provision and route numbers via Twilio
-- **Team + Org Management** — Multi-member orgs, roles, referral program
+- **AI Voice Agents** — Inbound and outbound calling via VAPI + LiveKit, with ElevenLabs and PlayHT for voice synthesis
+- **Outbound Dialer** — Automated outbound campaigns with AI agents
+- **Customer Memory** — Every call summarized and stored. The AI references past interactions on the next call automatically
+- **Knowledge Base** — Upload docs and URLs. The agent crawls and indexes them to answer questions accurately
+- **Lead Scoring** — Automatic lead qualification from call transcripts
+- **Built-in CRM** — Contact management, conversation history, appointments
+- **WhatsApp Integration** — Same AI agent handles Voice + WhatsApp in one dashboard
+- **Embeddable Widget** — Drop a voice widget onto any website
+- **Payments** — Stripe + Razorpay billing built in
+- **TCPA Compliance** — US calling compliance layer
 
 ## Tech stack
 
@@ -22,26 +26,31 @@ Built as a production product with live customers.
 | Frontend | React 19, TypeScript, Vite, Tailwind CSS |
 | Backend | Node.js, Express |
 | Database | Supabase (PostgreSQL + RLS) |
-| Voice AI | VAPI, ElevenLabs, PlayHT |
+| Cache | Upstash Redis |
+| Voice AI | VAPI, LiveKit, ElevenLabs, PlayHT |
 | Telephony | Twilio |
 | Messaging | WhatsApp Business API |
+| Payments | Stripe, Razorpay |
 | Deployment | Vercel (frontend) + Railway (backend) |
 
 ## Architecture
 
 ```
-├── frontend/       React + Vite dashboard
-├── backend/        Node.js API server
-│   └── supabase/   DB migrations
-├── docs/           Product docs + marketing
-└── assets/         Static assets
+├── frontend/         React dashboard (TypeScript + Vite)
+├── backend/          Node.js API
+│   ├── routes/       REST endpoints (voice, CRM, payments, WhatsApp, etc.)
+│   ├── services/     Business logic
+│   └── supabase/     DB migrations
+├── widget/           Embeddable voice widget
+├── website-nextjs/   Marketing site
+└── docs/             Product docs
 ```
 
 ## Why I built this
 
-Most businesses still use human agents for repetitive inbound calls — compliance checks, appointment confirmations, order status. Voicory automates that with AI that actually remembers who it's talking to.
+Most businesses still use human agents for repetitive inbound calls — follow-ups, appointment confirmations, order status. Voicory automates that with AI that actually remembers who it's talking to.
 
-The hardest part was the memory layer: structuring conversation summaries so the LLM can reference them accurately without hallucinating past events.
+The hardest part was the memory layer: structuring conversation summaries so the LLM retrieves the right context without hallucinating past events. The second hard part was reliability — voice AI fails in unexpected ways, so the fallback logic and error handling took as long to build as the happy path.
 
 ## Running locally
 
@@ -56,15 +65,17 @@ cd backend && npm install
 node index.js
 ```
 
-**Required env vars:**
+**Key env vars (backend):**
 ```
-VITE_SUPABASE_URL=
-VITE_SUPABASE_ANON_KEY=
-VAPI_API_KEY=
+SUPABASE_URL=
+SUPABASE_SERVICE_ROLE_KEY=
+OPENAI_API_KEY=
 TWILIO_ACCOUNT_SID=
 TWILIO_AUTH_TOKEN=
+STRIPE_SECRET_KEY=
+UPSTASH_REDIS_REST_URL=
 ```
 
 ## Built by
 
-[Vishwas Verma](https://linkedin.com/in/vishwasverma) — founder, architect, shipped solo using AI-assisted development.
+[Vishwas Verma](https://linkedin.com/in/vishwasverma) — founder and architect, shipped solo using AI-assisted development.
