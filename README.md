@@ -1,95 +1,70 @@
-# Voicory - AI Voice Agents with Relationship Memory
+# Voicory — AI Voice Agents with Customer Memory
 
-Voicory is a comprehensive dashboard for managing AI-powered voice agents that remember every customer interaction. Built with React, TypeScript, and Supabase.
+Voicory is a SaaS platform that replaces human call handlers with AI voice agents. Each agent remembers every customer interaction across calls, so conversations pick up where they left off — no repeat questions, no lost context.
 
-## 🚀 Features
+Built as a production product with live customers.
 
-- **AI Voice Assistants** - Create and manage AI-powered voice agents
-- **Customer Memory** - AI-powered customer insights and conversation history that persists across calls
-- **Voice Library** - Browse and select from multiple voice providers (ElevenLabs, PlayHT, etc.)
-- **Phone Numbers** - Manage inbound/outbound phone numbers with Twilio/VAPI integration
-- **Call Logs** - Track and analyze all voice interactions
-- **WhatsApp Integration** - Multi-channel AI agents (Voice + WhatsApp)
-- **Knowledge Base** - Upload and manage documents for your AI assistants
-- **Team Management** - Invite members and manage organization settings
-- **Referral Program** - Built-in referral system with rewards
+---
 
-## 📁 Project Structure
+## What it does
 
-\`\`\`
-├── frontend/          # React + Vite frontend application
-├── backend/           # Node.js/Express backend server
-├── docs/              # Documentation and setup guides
-│   └── marketing/     # Marketing materials and playbooks
-├── assets/            # Static assets (fonts, etc.)
-└── .github/           # GitHub configuration
-\`\`\`
+- **AI Voice Agents** — Inbound and outbound calling powered by VAPI, with ElevenLabs and PlayHT for voice synthesis
+- **Customer Memory** — Every call is stored and summarized. The AI references past interactions automatically on the next call
+- **Multi-channel** — Same agent handles Voice + WhatsApp in one dashboard
+- **Knowledge Base** — Upload docs, PDFs, SOPs. The agent uses them to answer questions accurately
+- **Phone Number Management** — Provision and route numbers via Twilio
+- **Team + Org Management** — Multi-member orgs, roles, referral program
 
-## 🛠️ Tech Stack
+## Tech stack
 
-### Frontend
-- React 19 with TypeScript
-- Vite for build tooling
-- Tailwind CSS (CDN-based)
-- React Router v7
-- Lucide React icons
+| Layer | Stack |
+|---|---|
+| Frontend | React 19, TypeScript, Vite, Tailwind CSS |
+| Backend | Node.js, Express |
+| Database | Supabase (PostgreSQL + RLS) |
+| Voice AI | VAPI, ElevenLabs, PlayHT |
+| Telephony | Twilio |
+| Messaging | WhatsApp Business API |
+| Deployment | Vercel (frontend) + Railway (backend) |
 
-### Backend
-- Node.js with Express
-- Supabase (PostgreSQL + Auth)
-- Row Level Security (RLS)
+## Architecture
 
-### Integrations
-- VAPI for voice AI
-- Twilio for phone numbers
-- ElevenLabs, PlayHT for voice synthesis
-- WhatsApp Business API
+```
+├── frontend/       React + Vite dashboard
+├── backend/        Node.js API server
+│   └── supabase/   DB migrations
+├── docs/           Product docs + marketing
+└── assets/         Static assets
+```
 
-## 🏃‍♂️ Quick Start
+## Why I built this
 
-### Prerequisites
-- Node.js 18+
-- npm or yarn
-- Supabase account
+Most businesses still use human agents for repetitive inbound calls — compliance checks, appointment confirmations, order status. Voicory automates that with AI that actually remembers who it's talking to.
 
-### Frontend Setup
+The hardest part was the memory layer: structuring conversation summaries so the LLM can reference them accurately without hallucinating past events.
 
-\`\`\`bash
-cd frontend
-npm install
-cp .env.example .env.local  # Add your Supabase credentials
+## Running locally
+
+```bash
+# Frontend
+cd frontend && npm install
+cp .env.example .env.local
 npm run dev
-\`\`\`
 
-### Backend Setup
-
-\`\`\`bash
-cd backend
-npm install
+# Backend
+cd backend && npm install
 node index.js
-\`\`\`
+```
 
-### Environment Variables
+**Required env vars:**
+```
+VITE_SUPABASE_URL=
+VITE_SUPABASE_ANON_KEY=
+VAPI_API_KEY=
+TWILIO_ACCOUNT_SID=
+TWILIO_AUTH_TOKEN=
+```
 
-**Frontend** (\`frontend/.env.local\`):
-\`\`\`
-VITE_SUPABASE_URL=your_supabase_url
-VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
-\`\`\`
+## Built by
 
-## 📚 Documentation
-
-All documentation is in the \`docs/\` folder.
-
-## 🗄️ Database Migrations
-
-Migrations are located in \`backend/supabase/migrations/\`. Apply them in order via the Supabase SQL Editor.
-
-## 🌐 Deployment
-
-- **Frontend**: Vercel (voicory.vercel.app → voicory.com)
-- **Backend**: Railway
-
-## 📄 License
-
-Private - All rights reserved.
+[Vishwas Verma](https://linkedin.com/in/vishwasverma) — founder, architect, shipped solo using AI-assisted development.
