@@ -3,27 +3,29 @@
 /**
  * LLM Cost Tracking + P&L Service
  * Pricing last verified: April 2026
+ * Pricing constants: see backend/config/pricing.js
  */
 
 const { createClient } = require('@supabase/supabase-js');
+const PRICING = require('../config/pricing');
 
 const MODEL_PRICING = {
-  'gpt-4o':        { input: 0.0000025,   output: 0.000010   },
-  'gpt-4o-mini':   { input: 0.00000015,  output: 0.0000006  },
-  'gpt-4-turbo':   { input: 0.00001,     output: 0.00003    },
-  'gpt-3.5-turbo': { input: 0.0000005,   output: 0.0000015  },
-  'whisper-1':     { perMinute: 0.006 },
+  'gpt-4o':        { input: PRICING.openai['gpt-4o'].inputPerToken,        output: PRICING.openai['gpt-4o'].outputPerToken        },
+  'gpt-4o-mini':   { input: PRICING.openai['gpt-4o-mini'].inputPerToken,   output: PRICING.openai['gpt-4o-mini'].outputPerToken   },
+  'gpt-4-turbo':   { input: PRICING.openai['gpt-4-turbo'].inputPerToken,   output: PRICING.openai['gpt-4-turbo'].outputPerToken   },
+  'gpt-3.5-turbo': { input: PRICING.openai['gpt-3.5-turbo'].inputPerToken, output: PRICING.openai['gpt-3.5-turbo'].outputPerToken },
+  'whisper-1':     { perMinute: PRICING.openai['whisper-1'].perMinute },
 };
 
 const ELEVENLABS_PRICING = {
-  starter:  { perCharacter: 0.000030 },
-  creator:  { perCharacter: 0.000024 },
-  pro:      { perCharacter: 0.000018 },
-  default:  { perCharacter: 0.000030 },
+  starter:  { perCharacter: PRICING.elevenlabs.starter.perCharacter },
+  creator:  { perCharacter: PRICING.elevenlabs.creator.perCharacter },
+  pro:      { perCharacter: PRICING.elevenlabs.pro.perCharacter },
+  default:  { perCharacter: PRICING.elevenlabs.default.perCharacter },
 };
 
 const LIVEKIT_PRICING = {
-  perParticipantMinute: 0.001,
+  perParticipantMinute: PRICING.livekit.perParticipantMinute,
 };
 
 let _supabase = null;
