@@ -366,6 +366,33 @@ app.get('/health', (req, res) => {
 
 
 // ============================================
+// RATE LIMITING
+// ============================================
+const rateLimit = require('express-rate-limit');
+
+// General API rate limiter: 100 req per 15 min
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later.' }
+});
+
+// Strict limiter for expensive endpoints: 10 req per min
+const strictLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Rate limit exceeded for this endpoint.' }
+});
+
+app.use('/api/', apiLimiter);
+app.use('/api/test-chat', strictLimiter);
+app.use('/api/twilio', strictLimiter);
+
+// ============================================
 // MODULAR ROUTES - Use centralized AssistantProcessor
 // ============================================
 const testChatRoutes = require('./routes/testChat');
@@ -1321,6 +1348,12 @@ app.get('/test-db', async (req, res) => {
     console.error('Catch error:', error);
     res.status(500).send(`Error: ${error.message}`);
   }
+});
+
+// Global error handler
+app.use((err, req, res, next) => {
+  console.error('[Global Error Handler]', err.stack || err);
+  res.status(err.status || 500).json({ error: err.message || 'Internal server error' });
 });
 
 app.listen(port, () => {
