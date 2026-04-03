@@ -9,7 +9,7 @@ const { supabase, axios, encrypt, decrypt, validateBody, twilioImportSchema } = 
 const { getCachedPhoneConfig, getCachedAssistant, invalidatePhoneConfigCache } = require('../services/assistant');
 const { searchKnowledgeBase, formatRAGContext } = require('../services/rag');
 const { resolveTemplateVariables } = require('../services/template');
-const { formatMemoryForPrompt } = require('../services/memory');
+const { formatMemoryForPrompt, trimAndSaveMemory } = require('../services/memory');
 const { verifySupabaseAuth } = require('../lib/auth');
 const { pushCallToAllCRMs } = require('../services/crm');
 const { calculateCallCost, logCostToSupabase } = require('../services/costTracking');
@@ -792,6 +792,15 @@ router.post('/:userId/status', async (req, res) => {
                         .catch(err => {
                             console.error('❌ CRM sync error:', err.message);
                         });
+
+                    // Save memory after call ends (async, don't block webhook response)
+                    const callerPhone = statusData.From || callLog.from_number;
+                    const agentId = callLog.assistant?.id || null;
+                    const history = callLog.conversation_history || [];
+                    if (callerPhone && history.length > 0) {
+                        trimAndSaveMemory(callerPhone, agentId, history)
+                            .catch(err => console.error('❌ Memory save error:', err.message));
+                    }
                 } catch (crmError) {
                     // Don't fail the webhook if CRM sync fails
                     console.error('❌ CRM sync error:', crmError.message);

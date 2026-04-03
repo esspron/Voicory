@@ -190,7 +190,14 @@ function formatMemoryForPrompt(memoryContext, memoryConfig = {}) {
     
     lines.push('--- END MEMORY ---');
     
-    return lines.join('\n');
+    let result = lines.join('\n');
+
+    // Truncate to 500 chars to keep system prompts lean
+    if (result.length > 500) {
+        result = result.slice(0, 497) + '...';
+    }
+
+    return result;
 }
 
 /**
@@ -247,8 +254,85 @@ Return a JSON object with:
     }
 }
 
+/**
+ * Trim memory string if > 2000 chars by summarizing with GPT-4o-mini.
+ * Saves the resulting summary back to customer_memories table.
+ * @param {string} phoneNumber
+ * @param {uuid|null} agentId
+ * @param {Array} conversationHistory - [{role, content}]
+ */
+async function trimAndSaveMemory(phoneNumber, agentId, conversationHistory = []) {
+    if (!phoneNumber) return;
+
+    const OpenAI = require('openai');
+    const openaiClient = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+    try {
+        // Fetch existing record
+        const { data: existing } = await supabase
+            .from('customer_memories')
+            .select('id, memories, summary')
+            .eq('phone_number', phoneNumber)
+            .eq('agent_id', agentId)
+            .maybeSingle();
+
+        let memories = existing?.memories || [];
+        let summary = existing?.summary || '';
+
+        // Append new conversation messages
+        if (conversationHistory.length > 0) {
+            memories = memories.concat(conversationHistory);
+        }
+
+        const memoriesStr = JSON.stringify(memories);
+
+        // If over 2000 chars, compress with GPT-4o-mini
+        if (memoriesStr.length > 2000) {
+            const messages = memories.map(m =>
+                `${m.role === 'user' ? 'Customer' : 'Assistant'}: ${m.content}`
+            ).join('\n');
+
+            const completion = await openaiClient.chat.completions.create({
+                model: 'gpt-4o-mini',
+                messages: [
+                    {
+                        role: 'system',
+                        content: 'Summarize the following customer conversation in 3-5 concise bullet points that capture key facts, preferences, and unresolved issues. Output only the bullet points, no headers.'
+                    },
+                    { role: 'user', content: messages }
+                ],
+                max_tokens: 300,
+                temperature: 0.3
+            });
+
+            summary = completion.choices[0]?.message?.content || summary;
+            // Keep only last 20 messages after compression
+            memories = memories.slice(-20);
+            console.log(`[Memory] Compressed memories for ${phoneNumber} (was ${memoriesStr.length} chars)`);
+        }
+
+        // Upsert into customer_memories
+        await supabase
+            .from('customer_memories')
+            .upsert({
+                phone_number: phoneNumber,
+                agent_id: agentId,
+                memories,
+                summary,
+                updated_at: new Date().toISOString()
+            }, {
+                onConflict: 'phone_number,agent_id'
+            });
+
+        console.log(`[Memory] Saved memory for ${phoneNumber}`);
+    } catch (err) {
+        console.error('[Memory] trimAndSaveMemory error:', err.message);
+    }
+}
+
 module.exports = {
     getCustomerMemory,
     formatMemoryForPrompt,
-    analyzeConversationWithAI
+    analyzeConversationWithAI,
+    trimAndSaveMemory
 };
