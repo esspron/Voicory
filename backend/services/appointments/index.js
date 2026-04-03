@@ -587,6 +587,57 @@ const googleCalendarService = {
     },
 };
 
+/**
+ * Wraps a Google Calendar API call with automatic OAuth token refresh on 401.
+ * If the access token is expired, refreshes it using the stored refresh_token,
+ * persists the new token to the calendar_integrations table, and retries once.
+ *
+ * @param {object} integration - The calendar integration record from DB
+ * @param {function} apiFn - Async function that takes (accessToken) and makes the API call
+ * @param {object} [supabase] - Optional Supabase client to persist refreshed token
+ * @returns {Promise<*>} Result of apiFn
+ */
+async function withGoogleTokenRefresh(integration, apiFn, supabase = null) {
+    try {
+        return await apiFn(integration.access_token);
+    } catch (error) {
+        // Only attempt refresh on 401 Unauthorized
+        if (error.response?.status !== 401) throw error;
+
+        if (!integration.refresh_token) {
+            throw new Error('Google Calendar access token expired and no refresh_token available. Re-authenticate.');
+        }
+
+        const clientId = process.env.GOOGLE_CLIENT_ID;
+        const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+        if (!clientId || !clientSecret) {
+            throw new Error('GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET env vars missing — cannot refresh token.');
+        }
+
+        console.log(`[GoogleCalendar] Access token expired for integration ${integration.id}, refreshing...`);
+        const refreshed = await googleCalendarService.refreshToken(clientId, clientSecret, integration.refresh_token);
+        const newAccessToken = refreshed.accessToken;
+
+        // Persist refreshed token to DB so future calls use it
+        if (supabase && integration.id) {
+            const { error: dbError } = await supabase
+                .from('calendar_integrations')
+                .update({
+                    access_token: newAccessToken,
+                    token_expires_at: new Date(Date.now() + refreshed.expiresIn * 1000).toISOString(),
+                    updated_at: new Date().toISOString(),
+                })
+                .eq('id', integration.id);
+            if (dbError) {
+                console.warn('[GoogleCalendar] Failed to persist refreshed token:', dbError.message);
+            }
+        }
+
+        // Retry with new token
+        return await apiFn(newAccessToken);
+    }
+}
+
 // ============================================
 // MAIN APPOINTMENT SERVICE
 // ============================================
@@ -683,21 +734,25 @@ async function createExternalAppointment(integration, appointmentData) {
                 },
             });
 
-        case 'google_calendar':
+        case 'google_calendar': {
+            // Uses withGoogleTokenRefresh to handle expired access tokens automatically
             const calendarId = integration.external_calendar_id || 'primary';
-            return googleCalendarService.createEvent(credentials.accessToken, calendarId, {
-                summary: `${appointmentData.appointmentTypeName} - ${appointmentData.attendeeName}`,
-                description: buildEventDescription(appointmentData),
-                startTime: appointmentData.scheduledAt,
-                endTime,
-                timezone: appointmentData.timezone,
-                location: appointmentData.locationAddress,
-                attendees: appointmentData.attendeeEmail ? [
-                    { email: appointmentData.attendeeEmail, name: appointmentData.attendeeName },
-                ] : undefined,
-                sendNotifications: true,
-                addVideoConference: appointmentData.locationType === 'video',
-            });
+            return withGoogleTokenRefresh(integration, (token) =>
+                googleCalendarService.createEvent(token, calendarId, {
+                    summary: `${appointmentData.appointmentTypeName} - ${appointmentData.attendeeName}`,
+                    description: buildEventDescription(appointmentData),
+                    startTime: appointmentData.scheduledAt,
+                    endTime,
+                    timezone: appointmentData.timezone,
+                    location: appointmentData.locationAddress,
+                    attendees: appointmentData.attendeeEmail ? [
+                        { email: appointmentData.attendeeEmail, name: appointmentData.attendeeName },
+                    ] : undefined,
+                    sendNotifications: true,
+                    addVideoConference: appointmentData.locationType === 'video',
+                })
+            );
+        }
 
         default:
             console.warn(`External sync not implemented for provider: ${provider}`);
@@ -722,14 +777,13 @@ async function cancelExternalAppointment(integration, externalEventId, reason) {
         case 'calendly':
             return calendlyService.cancelEvent(credentials.accessToken, externalEventId, reason);
 
-        case 'google_calendar':
+        case 'google_calendar': {
+            // Uses withGoogleTokenRefresh to handle expired access tokens automatically
             const calendarId = integration.external_calendar_id || 'primary';
-            return googleCalendarService.deleteEvent(
-                credentials.accessToken, 
-                calendarId, 
-                externalEventId,
-                true
+            return withGoogleTokenRefresh(integration, (token) =>
+                googleCalendarService.deleteEvent(token, calendarId, externalEventId, true)
             );
+        }
 
         default:
             console.warn(`External cancellation not implemented for provider: ${provider}`);
@@ -762,19 +816,18 @@ async function rescheduleExternalAppointment(integration, externalEventId, newDa
                 reason: newData.reason,
             });
 
-        case 'google_calendar':
+        case 'google_calendar': {
+            // Uses withGoogleTokenRefresh to handle expired access tokens automatically
             const calendarId = integration.external_calendar_id || 'primary';
-            return googleCalendarService.updateEvent(
-                credentials.accessToken,
-                calendarId,
-                externalEventId,
-                {
+            return withGoogleTokenRefresh(integration, (token) =>
+                googleCalendarService.updateEvent(token, calendarId, externalEventId, {
                     startTime: newData.scheduledAt,
                     endTime,
                     timezone: newData.timezone,
                     sendNotifications: newData.notifyAttendee !== false,
-                }
+                })
             );
+        }
 
         default:
             console.warn(`External reschedule not implemented for provider: ${provider}`);
