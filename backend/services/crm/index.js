@@ -75,52 +75,67 @@ function getProviderService(provider) {
 
 /**
  * Test connection to a CRM provider
+ * Implemented for: followupboss (Basic auth with API key), liondesk (OAuth Bearer token)
+ * All failures are caught and returned as { success: false } — never throws.
  */
 async function testConnection(provider, credentials) {
-    const service = getProviderService(provider);
-    
-    switch (provider) {
-        case 'followupboss':
-            return service.testConnection(credentials.apiKey);
-        case 'liondesk':
-            return service.testConnection(credentials.accessToken);
-        default:
-            throw new Error(`Connection test not implemented for: ${provider}`);
+    try {
+        const service = getProviderService(provider);
+
+        switch (provider) {
+            case 'followupboss':
+                return service.testConnection(credentials.apiKey);
+            case 'liondesk':
+                return service.testConnection(credentials.accessToken);
+            default:
+                console.warn(`[CRM] testConnection: unsupported provider "${provider}"`);
+                return { success: false, message: `Provider not supported: ${provider}` };
+        }
+    } catch (error) {
+        console.warn(`[CRM] testConnection failed for ${provider}:`, error.message);
+        return { success: false, message: error.message || 'Connection test failed' };
     }
 }
 
 /**
  * Push a call log to the appropriate CRM
- * Handles token refresh for LionDesk before making API calls
+ * Handles token refresh for LionDesk before making API calls.
+ * All failures are caught and returned as { success: false } — never throws.
  */
 async function pushCallToCRM(integration, callLog) {
-    const service = getProviderService(integration.provider);
+    try {
+        const service = getProviderService(integration.provider);
     
-    // Decrypt credentials
-    const decrypted = decryptIntegrationCredentials(integration);
-    
-    // Refresh token if needed (LionDesk OAuth)
-    let activeIntegration = decrypted;
-    if (integration.provider === 'liondesk') {
-        try {
-            activeIntegration = await refreshTokenIfNeeded(decrypted);
-        } catch (error) {
-            console.error('Token refresh failed for LionDesk:', error);
-            throw new Error('LionDesk authentication expired. Please reconnect.');
+        // Decrypt credentials
+        const decrypted = decryptIntegrationCredentials(integration);
+        
+        // Refresh token if needed (LionDesk OAuth)
+        let activeIntegration = decrypted;
+        if (integration.provider === 'liondesk') {
+            try {
+                activeIntegration = await refreshTokenIfNeeded(decrypted);
+            } catch (error) {
+                console.warn('[CRM] Token refresh failed for LionDesk:', error.message);
+                return { success: false, message: 'LionDesk authentication expired. Please reconnect.' };
+            }
         }
-    }
-    
-    const options = {
-        autoCreateContact: activeIntegration.auto_create_contacts,
-    };
-    
-    switch (activeIntegration.provider) {
-        case 'followupboss':
-            return service.pushCallToFUB(activeIntegration.api_key, callLog, options);
-        case 'liondesk':
-            return service.pushCallToLionDesk(activeIntegration.access_token, callLog, options);
-        default:
-            throw new Error(`Push call not implemented for: ${activeIntegration.provider}`);
+        
+        const options = {
+            autoCreateContact: activeIntegration.auto_create_contacts,
+        };
+        
+        switch (activeIntegration.provider) {
+            case 'followupboss':
+                return service.pushCallToFUB(activeIntegration.api_key, callLog, options);
+            case 'liondesk':
+                return service.pushCallToLionDesk(activeIntegration.access_token, callLog, options);
+            default:
+                console.warn(`[CRM] pushCallToCRM: unsupported provider "${activeIntegration.provider}"`);
+                return { success: false, message: `Provider not supported: ${activeIntegration.provider}` };
+        }
+    } catch (error) {
+        console.warn(`[CRM] pushCallToCRM failed for ${integration.provider}:`, error.message);
+        return { success: false, message: error.message || 'Failed to push call to CRM' };
     }
 }
 
