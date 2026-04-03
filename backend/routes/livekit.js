@@ -23,8 +23,12 @@ const { supabase, redis } = require('../config');
 const { v4: uuidv4 } = require('uuid');
 
 // LiveKit configuration
-const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY || 'APIVoicoryDev';
-const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET || 'VoicoryDevSecretKey12345678901234567890';
+const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY;
+const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET;
+
+if (!LIVEKIT_API_KEY || !LIVEKIT_API_SECRET) {
+    console.error('❌ LIVEKIT_API_KEY and LIVEKIT_API_SECRET are required — LiveKit routes will fail');
+}
 const LIVEKIT_URL = process.env.LIVEKIT_URL || 'wss://livekit.voicory.com';
 
 // Pricing configuration (USD)
