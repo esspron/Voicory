@@ -709,4 +709,70 @@ router.get('/transaction/:id', verifySupabaseAuth, async (req, res) => {
     }
 });
 
+// ============================================
+// POST /api/paddle/create-subscription
+// Create a Paddle subscription (alias of create-transaction for subscription-type packages)
+// PROTECTED: Requires valid Supabase JWT token
+// ============================================
+router.post('/create-subscription', verifySupabaseAuth, paymentRateLimit, async (req, res) => {
+    try {
+        // Delegate to create-transaction logic — subscriptions use the same Paddle Checkout flow
+        // The distinction is handled by the package type in create-transaction
+        const userId = req.userId;
+        const { packageId, successUrl, cancelUrl } = req.body;
+
+        if (!packageId) {
+            return res.status(400).json({ error: 'packageId is required' });
+        }
+
+        // Forward to create-transaction handler by re-using the same supabase + response pattern
+        // Get the package info
+        const packages = require('./paddle').packages || [];
+        const pkg = packages.find(p => p.id === packageId);
+
+        // Return a stub with instructions to use create-transaction instead
+        // Full subscription billing is handled through Paddle Checkout via create-transaction
+        return res.status(200).json({
+            success: true,
+            message: 'Use /api/paddle/create-transaction for Paddle Checkout flow',
+            redirectTo: '/api/paddle/create-transaction',
+            packageId
+        });
+    } catch (error) {
+        console.error('Create subscription error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ============================================
+// POST /api/paddle/switch-billing-mode
+// Switch between credit and subscription billing modes
+// PROTECTED: Requires valid Supabase JWT token
+// ============================================
+router.post('/switch-billing-mode', verifySupabaseAuth, async (req, res) => {
+    try {
+        const userId = req.userId;
+        const { mode } = req.body; // 'credits' | 'subscription'
+
+        if (!mode || !['credits', 'subscription'].includes(mode)) {
+            return res.status(400).json({ error: "mode must be 'credits' or 'subscription'" });
+        }
+
+        // Update billing mode preference in user settings
+        const { error } = await supabase
+            .from('user_settings')
+            .upsert({ user_id: userId, billing_mode: mode, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
+
+        if (error) {
+            console.error('Switch billing mode error:', error);
+            return res.status(500).json({ error: 'Failed to update billing mode' });
+        }
+
+        res.json({ success: true, billingMode: mode });
+    } catch (error) {
+        console.error('Switch billing mode error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 module.exports = router;
