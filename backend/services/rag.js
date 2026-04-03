@@ -4,8 +4,18 @@
 const { supabase } = require('../config');
 const { generateEmbedding } = require('./embedding');
 
+// Wraps a promise with a timeout; resolves to fallback if time expires
+const withTimeout = (promise, ms, fallback) =>
+    Promise.race([promise, new Promise(resolve => setTimeout(() => resolve(fallback), ms))]);
+
+// Maximum total context chars returned (800 tokens * ~4 chars/token)
+const RAG_MAX_CONTEXT_CHARS = 3200;
+const RAG_TIMEOUT_MS = 2000;
+
 /**
- * Search knowledge base documents using semantic similarity
+ * Search knowledge base documents using semantic similarity.
+ * - Times out after 2 seconds (graceful degradation: returns [])
+ * - Truncates total returned content to ≤ 800 tokens (~3200 chars)
  */
 async function searchKnowledgeBase(query, knowledgeBaseIds, threshold = 0.5, maxResults = 5) {
     console.log('[RAG] searchKnowledgeBase called:', { 
@@ -21,31 +31,64 @@ async function searchKnowledgeBase(query, knowledgeBaseIds, threshold = 0.5, max
     }
     
     try {
-        console.log('[RAG] Generating embedding for query...');
-        const queryEmbedding = await generateEmbedding(query);
-        if (!queryEmbedding) {
-            console.log('[RAG] Failed to generate query embedding');
+        // Wrap embedding fetch + vector search in a 2-second timeout for graceful degradation
+        const searchPromise = (async () => {
+            console.log('[RAG] Generating embedding for query...');
+            const queryEmbedding = await generateEmbedding(query);
+            if (!queryEmbedding) {
+                console.log('[RAG] Failed to generate query embedding');
+                return null;
+            }
+            console.log('[RAG] Query embedding generated, calling match_documents RPC...');
+            
+            const { data, error } = await supabase.rpc('match_documents', {
+                query_embedding: queryEmbedding,
+                match_threshold: threshold,
+                match_count: maxResults,
+                p_knowledge_base_ids: knowledgeBaseIds
+            });
+            
+            if (error) {
+                console.error('[RAG] Error from match_documents RPC:', error);
+                return null;
+            }
+            return data || [];
+        })();
+
+        const result = await withTimeout(searchPromise, RAG_TIMEOUT_MS, null);
+
+        if (result === null) {
+            console.warn('[RAG] searchKnowledgeBase timed out or failed — returning empty (graceful degradation)');
             return [];
         }
-        console.log('[RAG] Query embedding generated, calling match_documents RPC...');
-        
-        const { data, error } = await supabase.rpc('match_documents', {
-            query_embedding: queryEmbedding,
-            match_threshold: threshold,
-            match_count: maxResults,
-            p_knowledge_base_ids: knowledgeBaseIds
-        });
-        
-        if (error) {
-            console.error('[RAG] Error from match_documents RPC:', error);
-            return [];
+
+        console.log(`[RAG] match_documents returned ${result.length} documents`);
+        if (result.length > 0) {
+            console.log('[RAG] Top results:', result.map(d => ({ name: d.name, similarity: d.similarity })));
         }
-        
-        console.log(`[RAG] match_documents returned ${data?.length || 0} documents`);
-        if (data && data.length > 0) {
-            console.log('[RAG] Top results:', data.map(d => ({ name: d.name, similarity: d.similarity })));
+
+        // Apply token limit: accumulate chunks until total chars ≤ RAG_MAX_CONTEXT_CHARS
+        let totalChars = 0;
+        const trimmed = [];
+        for (const doc of result) {
+            const contentLen = (doc.content?.length || 0);
+            if (totalChars + contentLen > RAG_MAX_CONTEXT_CHARS) {
+                // Partially include this chunk if there's remaining budget
+                const remaining = RAG_MAX_CONTEXT_CHARS - totalChars;
+                if (remaining > 0) {
+                    trimmed.push({ ...doc, content: doc.content.slice(0, remaining) });
+                }
+                break;
+            }
+            trimmed.push(doc);
+            totalChars += contentLen;
         }
-        return data || [];
+
+        if (trimmed.length < result.length) {
+            console.log(`[RAG] Context trimmed from ${result.length} to ${trimmed.length} chunks (${totalChars} chars, ~${Math.round(totalChars / 4)} tokens)`);
+        }
+
+        return trimmed;
     } catch (error) {
         console.error('[RAG] Error in searchKnowledgeBase:', error.message);
         return [];
