@@ -192,15 +192,15 @@ docker run -d --name voicory-agent \
 ### Google Cloud Run Multi-Region Setup
 ```
 GCP Project: voicory (ID: 732127099858)
-├── backendvoicory      → asia-south1 (India/Mumbai) - PRIMARY
-├── backendvoicory-us   → us-central1 (USA/Iowa)
-├── backendvoicory-eu   → europe-west1 (Europe/Belgium)
+├── voicory-backend      → asia-south1 (India/Mumbai) - PRIMARY
+├── voicory-backend   → us-central1 (USA/Iowa)
+├── voicory-backend   → europe-west1 (Europe/Belgium)
 └── livekit-server      → GCE VM (asia-south1-a) - Voice
 ```
 
 ### Cloud Run Service Details
 | Service | Region | Min Instances | Max Instances | Memory | CPU |
 |---------|--------|---------------|---------------|--------|-----|
-| backendvoicory | asia-south1 | 1 | 10 | 512Mi | 1 |
-| backendvoicory-us | us-central1 | 0 | 10 | 512Mi | 1 |
-| backendvoicory-eu | europe-west1 | 0 | 10 | 512Mi | 1 |
+| voicory-backend | asia-south1 | 1 | 10 | 512Mi | 1 |
+| voicory-backend | us-central1 | 0 | 10 | 512Mi | 1 |
+| voicory-backend | europe-west1 | 0 | 10 | 512Mi | 1 |

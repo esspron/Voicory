@@ -6,10 +6,8 @@
 |---------|-----|----------|--------|
 | **Website** | `https://www.voicory.com` | Vercel | Global CDN |
 | **Dashboard** | `https://app.voicory.com` | Vercel | Global CDN |
-| **Backend India** | `https://backendvoicory-732127099858.asia-south1.run.app` | Cloud Run | asia-south1 (Mumbai) |
-| **Backend USA** | `https://backendvoicory-us-732127099858.us-central1.run.app` | Cloud Run | us-central1 (Iowa) |
-| **Backend Europe** | `https://backendvoicory-eu-732127099858.europe-west1.run.app` | Cloud Run | europe-west1 (Belgium) |
-| **Supabase** | `https://YOUR_SUPABASE_PROJECT_REF.supabase.co` | Supabase | ap-south-1 |
+| **Backend** | `https://voicory-backend-783942490798.asia-south1.run.app` | Cloud Run | asia-south1 (Mumbai) |
+| **Supabase** | `https://ssxirklimsdmsnwgtwfs.supabase.co` | Supabase | ap-south-1 |
 
 ---
 
@@ -18,9 +16,9 @@ The frontend automatically selects the nearest backend based on user's timezone:
 ```typescript
 // lib/api.ts - authFetch() handles this automatically
 const BACKEND_URLS = {
-  india: 'https://backendvoicory-732127099858.asia-south1.run.app',
-  usa: 'https://backendvoicory-us-732127099858.us-central1.run.app',
-  europe: 'https://backendvoicory-eu-732127099858.europe-west1.run.app',
+  india: 'https://voicory-backend-783942490798.asia-south1.run.app',
+  usa: 'https://voicory-backend-783942490798.asia-south1.run.app',
+  europe: 'https://voicory-backend-783942490798.asia-south1.run.app',
 };
 // Use authFetch('/api/endpoint') - it auto-selects region + adds auth header
 ```
@@ -33,7 +31,7 @@ const BACKEND_URLS = {
 ```
 GitHub (main branch)
     ↓ push
-Cloud Build Trigger (backendvoicory)
+Cloud Build Trigger (voicory-backend)
     ↓ uses backend/cloudbuild.yaml
     ├── Step 1: Build Docker image (from backend/)
     ├── Step 2: Push to Artifact Registry
@@ -43,7 +41,7 @@ Cloud Build Trigger (backendvoicory)
 ```
 
 ### Cloud Build Configuration
-- **Trigger Name**: `backendvoicory`
+- **Trigger Name**: `voicory-backend`
 - **Config File**: `backend/cloudbuild.yaml`
 - **Branch**: `^main$`
 - **Region**: `global`
@@ -59,7 +57,7 @@ steps:
   # Deploy steps use --update-env-vars (NOT --set-env-vars)
   # This preserves existing env vars set on the service
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:slim'
-    args: ['run', 'deploy', 'backendvoicory', '--update-env-vars=NODE_ENV=production', ...]
+    args: ['run', 'deploy', 'voicory-backend', '--update-env-vars=NODE_ENV=production', ...]
 ```
 
 ---
@@ -87,15 +85,15 @@ NODE_ENV=production
 ```bash
 # Read values from backend/.env and update all 3 regions
 # India
-gcloud run services update backendvoicory --region=asia-south1 \
+gcloud run services update voicory-backend --region=asia-south1 \
   --update-env-vars="KEY1=VALUE1,KEY2=VALUE2,..."
 
 # USA
-gcloud run services update backendvoicory-us --region=us-central1 \
+gcloud run services update voicory-backend --region=us-central1 \
   --update-env-vars="KEY1=VALUE1,KEY2=VALUE2,..."
 
 # Europe
-gcloud run services update backendvoicory-eu --region=europe-west1 \
+gcloud run services update voicory-backend --region=europe-west1 \
   --update-env-vars="KEY1=VALUE1,KEY2=VALUE2,..."
 ```
 
@@ -115,7 +113,7 @@ git push origin main
 
 ### 🔧 Manual Backend Deployment (Single Region)
 ```bash
-gcloud run deploy backendvoicory \
+gcloud run deploy voicory-backend \
   --source=backend/ \
   --region=asia-south1 \
   --allow-unauthenticated
@@ -130,9 +128,9 @@ gcloud builds list --limit=5
 gcloud builds log BUILD_ID --stream
 
 # Check service health
-curl https://backendvoicory-732127099858.asia-south1.run.app/health
-curl https://backendvoicory-us-732127099858.us-central1.run.app/health
-curl https://backendvoicory-eu-732127099858.europe-west1.run.app/health
+curl https://voicory-backend-783942490798.asia-south1.run.app/health
+curl https://voicory-backend-783942490798.asia-south1.run.app/health
+curl https://voicory-backend-783942490798.asia-south1.run.app/health
 ```
 
 ### 🌐 Frontend Dashboard (Vercel) - Manual deploy via CLI

@@ -10,7 +10,7 @@
 ## Backend (Google Cloud Run)
 - URL: `https://api.voicory.com`
 - Region: `asia-south1` (primary), `us-central1`, `europe-west1`
-- Service: `backendvoicory`
+- Service: `voicory-backend`
 - Handles: Webhooks, heavy processing, secret API calls, LiveKit token generation
 - **Redis Caching**: Enabled via Upstash for performance
 - **Auto-scaling**: Min 1, Max 20 instances

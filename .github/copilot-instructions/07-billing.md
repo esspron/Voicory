@@ -33,7 +33,7 @@ The app uses **Paddle** for payment processing with a **prepaid credits** model 
 ---
 
 ## Webhook Configuration
-- **Destination**: `https://backendvoicory-732127099858.asia-south1.run.app/api/paddle/webhook`
+- **Destination**: `https://voicory-backend-783942490798.asia-south1.run.app/api/paddle/webhook`
 - **Events**: `transaction.completed` only
 - **Secret**: Set via `PADDLE_WEBHOOK_SECRET` env var on Cloud Run
 
@@ -84,7 +84,7 @@ await supabase.rpc('add_credits', {
 PADDLE_API_KEY=pdl_sdbx_apikey_...
 PADDLE_CLIENT_TOKEN=test_f21c99da...
 PADDLE_WEBHOOK_SECRET=pdl_ntfset_...
-PADDLE_ENVIRONMENT=sandbox  # or 'production'
+PADDLE_ENVIRONMENT=production  # or 'production'
 PADDLE_PRICE_ID=pri_01kckx3pts...  # $1 per unit price
 ```
 
