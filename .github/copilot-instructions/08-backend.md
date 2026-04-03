@@ -61,7 +61,7 @@ module.exports = { myFunction };
 ## Environment Variables (Cloud Run)
 ```env
 NODE_ENV=production
-SUPABASE_URL=https://ssxirklimsdmsnwgtwfs.supabase.co
+SUPABASE_URL=https://YOUR_SUPABASE_PROJECT_REF.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=<your-service-role-key>
 UPSTASH_REDIS_REST_URL=https://your-redis.upstash.io
 UPSTASH_REDIS_REST_TOKEN=your-token

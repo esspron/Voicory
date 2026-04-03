@@ -74,7 +74,7 @@ The Supabase authentication flow has been fully configured and is ready for use.
 
 ### Environment Variables (`frontend/.env`)
 ```env
-VITE_SUPABASE_URL=https://ssxirklimsdmsnwgtwfs.supabase.co
+VITE_SUPABASE_URL=https://YOUR_SUPABASE_PROJECT_REF.supabase.co
 VITE_SUPABASE_ANON_KEY=sb_publishable_ZX3IWuzboUWkTW-hJKM77g_mLrGEeay
 ```
 

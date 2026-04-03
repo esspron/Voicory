@@ -12,13 +12,13 @@ This guide will help you set up the Supabase backend for your Voicory AI Dashboa
 The environment variables have already been added to `.env.local`:
 
 ```bash
-VITE_SUPABASE_URL=https://ssxirklimsdmsnwgtwfs.supabase.co
+VITE_SUPABASE_URL=https://YOUR_SUPABASE_PROJECT_REF.supabase.co
 VITE_SUPABASE_ANON_KEY=sb_publishable_ZX3IWuzboUWkTW-hJKM77g_mLrGEeay
 ```
 
 ## Step 2: Create Database Schema
 
-1. Go to your Supabase Dashboard: https://supabase.com/dashboard/project/ssxirklimsdmsnwgtwfs
+1. Go to your Supabase Dashboard: https://supabase.com/dashboard/project/YOUR_SUPABASE_PROJECT_REF
 2. Navigate to **SQL Editor** in the left sidebar
 3. Click **New Query**
 4. Copy the entire contents of `supabase/migrations/001_initial_schema.sql`

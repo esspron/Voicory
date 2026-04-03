@@ -9,7 +9,7 @@
 | **Backend India** | `https://backendvoicory-732127099858.asia-south1.run.app` | Cloud Run | asia-south1 (Mumbai) |
 | **Backend USA** | `https://backendvoicory-us-732127099858.us-central1.run.app` | Cloud Run | us-central1 (Iowa) |
 | **Backend Europe** | `https://backendvoicory-eu-732127099858.europe-west1.run.app` | Cloud Run | europe-west1 (Belgium) |
-| **Supabase** | `https://ssxirklimsdmsnwgtwfs.supabase.co` | Supabase | ap-south-1 |
+| **Supabase** | `https://YOUR_SUPABASE_PROJECT_REF.supabase.co` | Supabase | ap-south-1 |
 
 ---
 
@@ -71,7 +71,7 @@ The `cloudbuild.yaml` uses `--update-env-vars` to ADD/UPDATE without overwriting
 **Required Backend Env Vars:**
 ```bash
 # Set via: gcloud run services update SERVICE --region=REGION --update-env-vars="KEY=VALUE,..."
-SUPABASE_URL=https://ssxirklimsdmsnwgtwfs.supabase.co
+SUPABASE_URL=https://YOUR_SUPABASE_PROJECT_REF.supabase.co
 SUPABASE_ANON_KEY=eyJhbGci...  # From backend/.env
 SUPABASE_SERVICE_ROLE_KEY=eyJhbGci...  # From backend/.env
 OPENAI_API_KEY=sk-proj-...  # Full key from backend/.env
@@ -184,7 +184,7 @@ cd ../website-nextjs && npx vercel --prod
 
 ## Frontend Environment Variables (Vercel)
 ```env
-VITE_SUPABASE_URL=https://ssxirklimsdmsnwgtwfs.supabase.co
+VITE_SUPABASE_URL=https://YOUR_SUPABASE_PROJECT_REF.supabase.co
 VITE_SUPABASE_ANON_KEY=<your-supabase-anon-key>
 VITE_BACKEND_URL=https://api.voicory.com
 ```

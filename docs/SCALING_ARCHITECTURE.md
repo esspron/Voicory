@@ -78,7 +78,7 @@ Health Check Timeout: 30 seconds
 **Shared Variables (create in Railway Project Settings):**
 ```env
 # Supabase
-SUPABASE_URL=https://ssxirklimsdmsnwgtwfs.supabase.co
+SUPABASE_URL=https://YOUR_SUPABASE_PROJECT_REF.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 
 # Redis (Upstash - RECOMMENDED: HTTP mode)

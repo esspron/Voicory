@@ -61,7 +61,7 @@ DEEPGRAM_API_KEY=your-deepgram-key
 ELEVENLABS_API_KEY=your-elevenlabs-key
 
 # Supabase (from your backend/.env)
-SUPABASE_URL=https://ssxirklimsdmsnwgtwfs.supabase.co
+SUPABASE_URL=https://YOUR_SUPABASE_PROJECT_REF.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 EOF
     
