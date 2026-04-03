@@ -389,6 +389,7 @@ app.use('/api/tcpa', tcpaRoutes);
 app.use('/api/lead-scoring', leadScoringRoutes);
 app.use('/api/appointments', appointmentsRoutes);
 app.use('/api/livekit', livekitRoutes);
+app.use('/api/analytics', require('./routes/analytics'));
 
 // ============================================
 // WHATSAPP WEBHOOK ENDPOINTS

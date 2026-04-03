@@ -12,6 +12,7 @@ const { resolveTemplateVariables } = require('../services/template');
 const { formatMemoryForPrompt } = require('../services/memory');
 const { verifySupabaseAuth } = require('../lib/auth');
 const { pushCallToAllCRMs } = require('../services/crm');
+const { calculateCallCost, logCostToSupabase } = require('../services/costTracking');
 
 // ============================================
 // TWILIO PHONE NUMBER IMPORT
@@ -638,6 +639,25 @@ router.post('/:userId/voice/gather', async (req, res) => {
 
         const aiResponse = completion.choices[0]?.message?.content || 
             "I'm sorry, I didn't understand that. Could you please repeat?";
+
+        // Track LLM cost for P&L
+        try {
+          const _usage = completion.usage || {};
+          const _costData = calculateCallCost({
+            model: assistant.model || 'gpt-4o-mini',
+            inputTokens: _usage.prompt_tokens || 0,
+            outputTokens: _usage.completion_tokens || 0,
+            creditsCharged: 0,
+          });
+          logCostToSupabase(null, CallSid || null, {
+            ..._costData,
+            model: assistant.model || 'gpt-4o-mini',
+            inputTokens: _usage.prompt_tokens || 0,
+            outputTokens: _usage.completion_tokens || 0,
+          }).catch(e => console.error('[costTracking] async log error:', e.message));
+        } catch (_costErr) {
+          console.error('[costTracking] calculation error:', _costErr.message);
+        }
 
         // Add AI response to history
         conversationHistory.push({ role: 'assistant', content: aiResponse });
