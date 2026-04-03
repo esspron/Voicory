@@ -423,6 +423,7 @@ app.use('/api/analytics', require('./routes/analytics'));
 app.use('/api/payments', paymentsRoutes);
 app.use('/api/crawler', crawlerRoutes);
 app.use('/api/coupons', couponsRoutes);
+app.use('/api/calls', require('./routes/calls'));
 
 // ============================================
 // WHATSAPP WEBHOOK ENDPOINTS
