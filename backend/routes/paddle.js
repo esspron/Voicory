@@ -10,6 +10,13 @@ const router = express.Router();
 const { supabase } = require('../config');
 const crypto = require('crypto');
 const { verifySupabaseAuth, rateLimit } = require('../lib/auth');
+const { cacheGet, cacheSet, cacheDelete } = require('../services/cache');
+
+const CREDITS_CACHE_TTL = 60; // 60 seconds TTL for credit balance cache
+
+function creditsCacheKey(userId) {
+    return `credits:${userId}`;
+}
 
 // Rate limiters for payment endpoints
 const paymentRateLimit = rateLimit({ windowMs: 60000, max: 10 }); // 10 per minute for user actions
@@ -172,6 +179,13 @@ router.get('/billing-status', verifySupabaseAuth, async (req, res) => {
     try {
         const userId = req.userId;
 
+        // 🚀 CACHED: Check Redis before hitting Supabase (60s TTL)
+        const cacheKey = creditsCacheKey(userId);
+        const cached = await cacheGet(cacheKey);
+        if (cached) {
+            return res.json({ success: true, billingMode: 'prepaid', ...cached, cached: true });
+        }
+
         // Get user profile with credits balance
         const { data: profile, error: profileError } = await supabase
             .from('user_profiles')
@@ -183,11 +197,18 @@ router.get('/billing-status', verifySupabaseAuth, async (req, res) => {
             return res.status(404).json({ error: 'User profile not found' });
         }
 
+        const payload = {
+            creditsBalance: parseFloat(profile.credits_balance) || 0,
+            paddleCustomerId: profile.paddle_customer_id
+        };
+
+        // Cache the result for 60 seconds
+        await cacheSet(cacheKey, payload, CREDITS_CACHE_TTL);
+
         res.json({
             success: true,
             billingMode: 'prepaid',
-            creditsBalance: parseFloat(profile.credits_balance) || 0,
-            paddleCustomerId: profile.paddle_customer_id
+            ...payload
         });
 
     } catch (error) {
@@ -471,6 +492,8 @@ router.post('/webhook', webhookRateLimit, async (req, res) => {
                     .eq('id', internalTxId);
 
                 console.log('Credits added successfully:', credits, 'to user:', userId);
+                // Invalidate cached credit balance so next fetch is fresh
+                await cacheDelete(creditsCacheKey(userId));
                 break;
             }
 
@@ -567,6 +590,8 @@ router.post('/webhook', webhookRateLimit, async (req, res) => {
                             console.error('Failed to deduct credits for refund:', deductError);
                         } else {
                             console.log('Refund processed: deducted', refundCredits, 'credits from user:', originalTx.user_id);
+                            // Invalidate cached credit balance for refunded user
+                            await cacheDelete(creditsCacheKey(originalTx.user_id));
                         }
                     }
                 }
@@ -659,6 +684,9 @@ router.post('/verify-transaction', verifySupabaseAuth, paymentRateLimit, async (
             console.error('Failed to add credits:', creditError);
             return res.status(500).json({ error: 'Failed to add credits' });
         }
+
+        // Invalidate cached credit balance after manual top-up
+        await cacheDelete(creditsCacheKey(userId));
 
         // Update transaction
         await supabase

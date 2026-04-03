@@ -6,7 +6,7 @@ const express = require('express');
 const router = express.Router();
 const { supabase, axios, openai } = require('../config');
 const { getCachedWhatsAppConfig, getCachedAssistant } = require('../services/assistant');
-const { isMessageProcessed, markMessageProcessed } = require('../services/cache');
+const { isMessageProcessed, markMessageProcessed, cacheDelete } = require('../services/cache');
 const { processMessage } = require('../services/assistantProcessor');
 const { getCustomerMemory } = require('../services/memory');
 
@@ -432,6 +432,8 @@ async function processWithAI(config, message, contact) {
                         costUSD: usageResult?.cost_usd,
                         newBalance: usageResult?.balance
                     });
+                    // Invalidate cached credit balance after usage deduction
+                    await cacheDelete(`credits:${config.user_id}`);
                 }
             } catch (logError) {
                 console.error('Error logging LLM usage:', logError);
