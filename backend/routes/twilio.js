@@ -477,9 +477,9 @@ router.post('/:userId/voice', async (req, res) => {
             name: assistant.name
         });
 
-        // Generate a first message for voice calls
-        // Since we use unified instruction, generate a basic greeting with assistant name
-        const firstMessage = `Hello! Thank you for calling. I'm ${assistant.name || 'your AI assistant'}. How can I help you today?`;
+        // Use the assistant's configured first_message, or fall back to a generated greeting
+        const firstMessage = assistant.first_message || 
+            `Hello! Thank you for calling. I'm ${assistant.name || 'your AI assistant'}. How can I help you today?`;
 
         // Log the incoming call to the database
         const { data: callLog, error: logError } = await supabase
@@ -504,19 +504,12 @@ router.post('/:userId/voice', async (req, res) => {
             console.log('📝 Call logged:', callLog?.id);
         }
 
-        // TODO: In production, integrate with real-time voice AI service
-        // For now, return TwiML with the assistant's first message
-        // This could be extended to:
-        // 1. Connect to a WebSocket for real-time AI conversation
-        // 2. Use Twilio <Stream> to stream audio to an AI service
-        // 3. Use <Gather> to collect speech input and process with AI
-        
+        // Respond with first message and open speech gather for AI conversation loop
         res.type('text/xml');
         res.send(`
             <Response>
                 <Say voice="Polly.Joanna">${escapeXml(firstMessage)}</Say>
                 <Gather input="speech" timeout="5" speechTimeout="auto" action="/api/webhooks/twilio/${userId}/voice/gather" method="POST">
-                    <Say voice="Polly.Joanna">I'm listening...</Say>
                 </Gather>
                 <Say voice="Polly.Joanna">I didn't hear anything. Goodbye!</Say>
                 <Hangup/>
@@ -585,14 +578,84 @@ router.post('/:userId/voice/gather', async (req, res) => {
             `);
         }
 
-        // TODO: In production, use OpenAI/Claude to generate a response
-        // For now, acknowledge the input
-        const acknowledgment = `I heard you say: ${SpeechResult}. Thank you for calling. We will process your request. Goodbye!`;
+        const assistant = phoneConfig.assistant;
 
+        // Build conversation history from call log if available
+        let conversationHistory = [];
+        const { data: callLog } = await supabase
+            .from('call_logs')
+            .select('conversation_history')
+            .eq('call_sid', CallSid)
+            .single();
+
+        if (callLog?.conversation_history) {
+            conversationHistory = callLog.conversation_history;
+        }
+
+        // Add user's speech to history
+        conversationHistory.push({ role: 'user', content: SpeechResult });
+
+        // Build RAG context if knowledge base is available
+        let ragContext = '';
+        try {
+            const kbResults = await searchKnowledgeBase(assistant.id, SpeechResult);
+            if (kbResults?.length > 0) {
+                ragContext = formatRAGContext(kbResults);
+            }
+        } catch (e) {
+            console.warn('⚠️ RAG search failed:', e.message);
+        }
+
+        // Build memory context
+        let memoryContext = '';
+        try {
+            memoryContext = await formatMemoryForPrompt(assistant.id, CallSid);
+        } catch (e) {
+            console.warn('⚠️ Memory fetch failed:', e.message);
+        }
+
+        // Build system prompt
+        const systemPrompt = [
+            assistant.system_prompt || `You are ${assistant.name || 'an AI assistant'}. Be helpful, concise, and conversational. You are on a phone call so keep responses brief (1-3 sentences max).`,
+            ragContext ? `\nRelevant context:\n${ragContext}` : '',
+            memoryContext ? `\nMemory:\n${memoryContext}` : '',
+            '\nIMPORTANT: You are on a voice call. Keep responses very short and conversational. No markdown, no lists, no special characters.'
+        ].filter(Boolean).join('');
+
+        // Call OpenAI for AI response
+        const OpenAI = require('openai');
+        const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+        const completion = await openai.chat.completions.create({
+            model: assistant.model || 'gpt-4o-mini',
+            messages: [
+                { role: 'system', content: systemPrompt },
+                ...conversationHistory
+            ],
+            max_tokens: 150,
+            temperature: 0.7
+        });
+
+        const aiResponse = completion.choices[0]?.message?.content || 
+            "I'm sorry, I didn't understand that. Could you please repeat?";
+
+        // Add AI response to history
+        conversationHistory.push({ role: 'assistant', content: aiResponse });
+
+        // Persist conversation history to call log
+        await supabase
+            .from('call_logs')
+            .update({ conversation_history: conversationHistory })
+            .eq('call_sid', CallSid);
+
+        // Respond with AI message and keep gathering for multi-turn conversation
         res.type('text/xml');
         res.send(`
             <Response>
-                <Say voice="Polly.Joanna">${escapeXml(acknowledgment)}</Say>
+                <Say voice="Polly.Joanna">${escapeXml(aiResponse)}</Say>
+                <Gather input="speech" timeout="5" speechTimeout="auto" action="/api/webhooks/twilio/${userId}/voice/gather" method="POST">
+                </Gather>
+                <Say voice="Polly.Joanna">Goodbye!</Say>
                 <Hangup/>
             </Response>
         `);
