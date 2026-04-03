@@ -18,7 +18,7 @@
 
 const express = require('express');
 const router = express.Router();
-const { AccessToken } = require('livekit-server-sdk');
+const { AccessToken, WebhookReceiver, RoomServiceClient } = require('livekit-server-sdk');
 const { supabase, redis } = require('../config');
 const { v4: uuidv4 } = require('uuid');
 
@@ -336,12 +336,22 @@ router.post('/token', async (req, res) => {
  * - participant_left: User left
  * - track_published: Audio/video track published
  */
-router.post('/webhook', async (req, res) => {
+router.post('/webhook', express.raw({ type: 'application/webhook+json' }), async (req, res) => {
     try {
-        // TODO: Verify webhook signature with LIVEKIT_API_SECRET
-        // const signature = req.headers['authorization'];
+        // Verify webhook signature using WebhookReceiver (uses JWT + body hash)
+        // LiveKit sends a JWT in the Authorization header signed with LIVEKIT_API_SECRET
+        const webhookReceiver = new WebhookReceiver(LIVEKIT_API_KEY, LIVEKIT_API_SECRET);
+        const authHeader = req.headers['authorization'];
+        const rawBody = Buffer.isBuffer(req.body) ? req.body.toString('utf8') : JSON.stringify(req.body);
         
-        const event = req.body;
+        let event;
+        try {
+            event = await webhookReceiver.receive(rawBody, authHeader);
+        } catch (verifyErr) {
+            console.warn('[LiveKit Webhook] Signature verification failed:', verifyErr.message);
+            return res.status(401).json({ error: 'Invalid webhook signature' });
+        }
+        
         const eventType = event.event;
         
         console.log(`[LiveKit Webhook] ${eventType}:`, JSON.stringify(event).slice(0, 200));
@@ -490,9 +500,10 @@ router.delete('/rooms/:roomName', async (req, res) => {
             })
             .eq('room_name', roomName);
         
-        // TODO: Use LiveKit SDK to actually close the room
-        // const roomService = new RoomServiceClient(LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET);
-        // await roomService.deleteRoom(roomName);
+        // Use LiveKit SDK to actually close the room
+        // RoomServiceClient communicates with LiveKit server to force-terminate the room
+        const roomService = new RoomServiceClient(LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET);
+        await roomService.deleteRoom(roomName);
         
         return res.json({ success: true, roomName });
         
