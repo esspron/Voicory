@@ -11,6 +11,7 @@ const { searchKnowledgeBase, formatRAGContext } = require('../services/rag');
 const { resolveTemplateVariables } = require('../services/template');
 const { formatMemoryForPrompt, trimAndSaveMemory } = require('../services/memory');
 const { verifySupabaseAuth } = require('../lib/auth');
+const { validateTwilioVoiceParams, validateTwilioGatherBody, sanitizePromptInput } = require('../middleware/inputValidation');
 const { pushCallToAllCRMs } = require('../services/crm');
 const { calculateCallCost, logCostToSupabase } = require('../services/costTracking');
 
@@ -410,7 +411,7 @@ router.post('/import-number', verifySupabaseAuth, async (req, res) => {
  * Each user has their own unique webhook URL for security and isolation.
  * It looks up the phone number configuration and assigned assistant, then responds with TwiML.
  */
-router.post('/:userId/voice', async (req, res) => {
+router.post('/:userId/voice', validateTwilioVoiceParams, async (req, res) => {
     try {
         const { userId } = req.params;
         const callData = req.body;
@@ -533,10 +534,12 @@ router.post('/:userId/voice', async (req, res) => {
  * Twilio Voice Gather Callback - Handles speech input (User-specific)
  * POST /api/webhooks/twilio/:userId/voice/gather
  */
-router.post('/:userId/voice/gather', async (req, res) => {
+router.post('/:userId/voice/gather', validateTwilioVoiceParams, validateTwilioGatherBody, async (req, res) => {
     try {
         const { userId } = req.params;
-        const { SpeechResult, CallSid, From, To } = req.body;
+        const { SpeechResult: rawSpeechResult, CallSid, From, To } = req.body;
+        // Sanitize speech input to prevent prompt injection attacks
+        const SpeechResult = rawSpeechResult ? sanitizePromptInput(rawSpeechResult) : rawSpeechResult;
         
         console.log('🎤 Speech gathered:', {
             userId,

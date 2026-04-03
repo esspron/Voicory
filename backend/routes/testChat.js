@@ -10,26 +10,30 @@ const { supabase } = require('../config');
 const { processMessage } = require('../services/assistantProcessor');
 const { getCachedAssistant } = require('../services/assistant');
 const { verifySupabaseAuth } = require('../lib/auth');
+const { validateTestChat, sanitizePromptInput } = require('../middleware/inputValidation');
 
 // ============================================
 // TEST CHAT ENDPOINT - For testing agents in the dashboard
 // Now uses centralized AssistantProcessor (same as WhatsApp, SMS, etc.)
 // PROTECTED: Requires valid Supabase JWT token
 // ============================================
-router.post('/test-chat', verifySupabaseAuth, async (req, res) => {
+router.post('/test-chat', verifySupabaseAuth, validateTestChat, async (req, res) => {
     try {
         const { 
-            message, 
+            message: rawMessage, 
             conversationHistory = [], 
             assistantId,
             assistantConfig,
             channel = 'calls'
         } = req.body;
 
+        // SECURITY: Sanitize message to strip prompt injection attempts
+        const message = sanitizePromptInput(rawMessage);
+
         // SECURITY: Use authenticated user ID, not from request body
         const billingUserId = req.userId;
 
-        // Validate required fields
+        // Validate required fields (schema validation already done by middleware, but keep runtime guard)
         if (!message) {
             return res.status(400).json({ error: 'Message is required' });
         }
