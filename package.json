@@ -1,9 +1,35 @@
 {
   "devDependencies": {
-    "opentype.js": "^1.3.4"
+    "@playwright/test": "^1.52.0",
+    "opentype.js": "^1.3.4",
+    "typescript": "^5.0.0"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",
     "framer-motion": "^12.23.25"
-  }
+  },
+  "name": "workspace-voicory-code",
+  "version": "1.0.0",
+  "description": "Voicory replaces human call handlers with AI voice agents that remember every customer interaction. Conversations pick up where they left off across calls \u2014 no repeat questions, no lost context.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "test:e2e": "playwright test",
+    "test:twilio": "playwright test tests/twilio-voice.spec.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/esspron/Voicory.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/esspron/Voicory/issues"
+  },
+  "homepage": "https://github.com/esspron/Voicory#readme"
 }
