@@ -39,3 +39,4 @@ coverage/
 .cache/
 .env.livekit
 .agent/
+.env.production
