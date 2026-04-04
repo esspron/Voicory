@@ -1,9 +1,8 @@
-import { Eye, EyeSlash, Copy, Plus, Trash, Key, ShieldCheck, Globe, CircleNotch, X, Check, Warning } from '@phosphor-icons/react';
+import { Eye, EyeSlash, Copy, Plus, Trash, Key, ShieldCheck, Globe, X, Check, Warning } from '@phosphor-icons/react';
 import React, { useState, useEffect } from 'react';
 
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { Card } from '../components/ui/Card';
 import { getApiKeys, createApiKey, deleteApiKey } from '../services/voicoryService';
 import type { ApiKey } from '../types';
 
