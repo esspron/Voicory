@@ -1,118 +1,167 @@
-# Voicory — AI Voice Agents for Business
+# Voicory — AI Voice Agent Platform for Businesses
 
-Voicory enables businesses to deploy AI voice agents that handle inbound and outbound calls, WhatsApp messages, and web chat — with persistent customer memory across every interaction.
-
-Live at **[voicory.com](https://voicory.com)**
-
----
-
-## Features
-
-- **AI Voice Agents** — Inbound and outbound calling via Twilio + LiveKit, with ElevenLabs and PlayHT voice synthesis
-- **Customer Memory** — Every call summarized and stored. The AI references past interactions automatically on future calls
-- **Knowledge Base** — Upload documents and URLs. The agent indexes them for accurate, grounded answers
-- **WhatsApp Integration** — Same AI agent handles voice and WhatsApp from a unified dashboard
-- **CRM Integrations** — Syncs with Follow Up Boss, LionDesk, and custom HTTP webhooks on call events
-- **Appointment Booking** — AI detects booking intent mid-call and syncs to Google Calendar
-- **Lead Scoring** — Automatic qualification scores generated from call transcripts
-- **Embeddable Widget** — Drop a voice/chat widget onto any website with one script tag
-- **Prepaid Credits** — Billing via Paddle; $1 = 1 credit with per-minute cost tracking
-- **TCPA Compliance** — Built-in US calling compliance layer
+> **Built and shipped solo** by [Vishwas Verma](https://linkedin.com/in/vishwasverma) — AI Product Leader  
+> Live at **[voicory.com](https://voicory.com)** · [Product Demo](#) · [LinkedIn](https://linkedin.com/in/vishwasverma)
 
 ---
 
-## Tech Stack
+## What is Voicory?
 
-| Layer | Stack |
+Voicory replaces human call handlers with AI voice agents that **remember every customer**. Conversations pick up exactly where they left off — no repeat questions, no lost context, no dropped leads.
+
+Businesses plug in Voicory and their inbound calls, WhatsApp messages, and website chats are handled by an AI agent that knows their customer history, answers from their knowledge base, books appointments, scores leads, and pushes data to their CRM — all automatically.
+
+---
+
+## Why This Project Demonstrates AI Product Leadership
+
+This isn't a tutorial project or a weekend hack. It's a **production SaaS product** with real architectural decisions, real tradeoffs, and real complexity — built end-to-end by one person.
+
+### Key product decisions I made and shipped:
+
+| Decision | Problem I solved | Outcome |
+|---|---|---|
+| **Persistent memory layer** | LLMs forget context between calls. Customers repeat themselves every time | Summarize + store every call; inject relevant memory into next call's system prompt |
+| **RAG over knowledge base** | AI hallucinating answers about the business's products | Embed + index docs/URLs; enforce strict retrieval mode so agent only answers from source material |
+| **Prepaid credit model** | Per-seat SaaS pricing doesn't work for voice AI (cost = usage, not users) | $1 = 1 credit, per-minute deduction tied to actual LLM + TTS + telephony costs |
+| **HTTP integration layer** | Businesses need their AI agent to trigger their own systems (CRMs, Zapier, etc.) | Built custom HTTP executor with per-event triggers: `call_started`, `call_ended`, `appointment_booked`, `custom_phrase` |
+| **Multi-channel single agent** | Most tools are voice-only or messaging-only | Same assistant config handles Twilio voice calls, WhatsApp, and embedded web widget |
+| **TCPA compliance layer** | US telephony has strict calling laws — ignoring this = legal liability | Built compliance middleware: do-not-call lists, calling hours enforcement, consent tracking |
+
+---
+
+## Product Scope
+
+### Core Platform
+- **AI Voice Agents** — Inbound + outbound calling via Twilio + LiveKit. ElevenLabs and PlayHT for voice synthesis. Multi-turn conversation with full context window management
+- **Customer Memory** — Every call summarized by GPT-4o-mini and stored. Memory retrieved semantically on next interaction
+- **Knowledge Base** — Upload PDFs, paste URLs. Crawler indexes content, embeddings stored in Supabase with pgvector. Strict RAG mode prevents hallucination
+- **Assistant Editor** — Full no-code configuration: personality, voice, language, RAG settings, memory, integrations — all from a single UI
+
+### Integrations
+- **CRM** — Follow Up Boss and LionDesk: contact lookup during calls, push transcripts + outcomes after calls
+- **Custom HTTP** — Fire any webhook on any call event. Template variables: `{{transcript}}`, `{{phone_number}}`, `{{duration}}`, `{{ai_response}}`
+- **Google Calendar** — Appointment detection mid-call, auto-sync to calendar
+- **WhatsApp** — WhatsApp Business API via embedded signup flow, same agent as voice
+
+### Business Layer
+- **Payments** — Paddle prepaid credits. Per-call cost tracked: LLM tokens + TTS characters + telephony minutes
+- **P&L Analytics** — Real cost vs. credit breakdown per assistant, per call
+- **Lead Scoring** — Automatic qualification scoring from call transcripts
+- **Outbound Dialer** — Campaign-level outbound with AI agents
+- **Embeddable Widget** — One script tag, drop on any website
+
+### Operational
+- **Rate limiting** — Per-route, per-user request throttling
+- **Input validation** — Zod schemas + prompt injection protection on all AI-facing endpoints
+- **Redis caching** — Credit balance caching (Upstash), 60s TTL with invalidation on deduction
+- **Integration logs** — Every HTTP trigger and CRM push logged with status, latency, error
+
+---
+
+## Technical Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     Client Layer                            │
+│  React Dashboard  │  Embedded Widget  │  WhatsApp / Twilio  │
+└──────────┬──────────────────┬─────────────────┬────────────┘
+           │                  │                 │
+┌──────────▼──────────────────▼─────────────────▼────────────┐
+│                    Backend API (Cloud Run)                   │
+│  Express · 23 route modules · Input validation middleware    │
+└──────────┬──────────────────┬─────────────────┬────────────┘
+           │                  │                 │
+    ┌──────▼──────┐   ┌───────▼──────┐  ┌──────▼──────┐
+    │ AI Processor│   │ Integration  │  │   Services  │
+    │ (central)   │   │  Executor    │  │  CRM / RAG  │
+    │ All channels│   │ HTTP/CRM/Cal │  │  Memory/TTS │
+    └──────┬──────┘   └──────────────┘  └─────────────┘
+           │
+    ┌──────▼──────────────────────────────────────────┐
+    │                  Data Layer                      │
+    │  Supabase (PostgreSQL + RLS)  │  Upstash Redis   │
+    │  19 migrations  │  pgvector   │  Credit cache    │
+    └──────────────────────────────────────────────────┘
+```
+
+**Stack:**
+
+| Layer | Technology |
 |---|---|
 | Frontend | React 19, TypeScript, Vite, Tailwind CSS |
 | Backend | Node.js, Express |
-| Database | Supabase (PostgreSQL + RLS) |
+| Database | Supabase (PostgreSQL + pgvector + RLS) |
 | Cache | Upstash Redis |
-| Voice AI | LiveKit, ElevenLabs, PlayHT |
+| AI | OpenAI GPT-4o / GPT-4o-mini |
+| Voice Synthesis | ElevenLabs, PlayHT |
 | Telephony | Twilio |
+| Real-time | LiveKit |
 | Messaging | WhatsApp Business API |
 | Payments | Paddle |
-| Deployment | Vercel (frontend) + Google Cloud Run (backend) |
+| Deployment | Vercel (frontend) · Google Cloud Run (backend) |
+| Testing | Playwright (E2E) |
 
 ---
 
-## Repository Structure
+## Repository Scale
 
-```
-├── frontend/          React dashboard (TypeScript + Vite)
-│   ├── pages/         Route-level page components
-│   ├── components/    Reusable UI components
-│   └── services/      API client layer
-├── backend/           Node.js REST API
-│   ├── routes/        Endpoint handlers (voice, CRM, payments, webhooks, etc.)
-│   ├── services/      Business logic (AI processor, memory, RAG, CRM, appointments)
-│   └── supabase/      Database migrations
-├── livekit/           LiveKit agent server (Dockerfile + config)
-├── widget/            Embeddable voice/chat widget
-├── website-nextjs/    Marketing site (Next.js)
-└── admin/             Internal admin panel (local use only)
-```
+| Metric | Count |
+|---|---|
+| Git commits | 193 |
+| Backend route modules | 23 |
+| Frontend pages | 28 |
+| Backend service modules | 28 |
+| Database migrations | 19 |
+| E2E test specs | 4 |
 
 ---
 
-## Local Development
+## What I'd Do Differently (Product Retrospective)
 
-### Prerequisites
+**What worked:**
+- Starting with memory as the core differentiator — it's the #1 thing users mention
+- Building a unified `assistantProcessor` service early so all channels (voice, WhatsApp, widget) share one AI logic layer — avoided 3x bug surface
 
-- Node.js 18+
-- Supabase project
-- Twilio account
-- OpenAI API key
+**What I'd change:**
+- Should have designed the integration execution layer before building CRM and calendar separately — ended up refactoring to unify them
+- Rate limiting should have been infrastructure-level (API Gateway), not application-level middleware — will move to Cloud Run ingress config
 
-### Setup
+**What's next:**
+- Real-time voice interruption handling (barge-in) via LiveKit agent framework
+- LLM routing: GPT-4o for complex queries, GPT-4o-mini for simple turns — ~40% cost reduction
+- Multi-tenant workspace model (agencies managing clients)
+
+---
+
+## Local Setup
 
 ```bash
-# Clone
-git clone https://github.com/esspron/Voicory
-cd Voicory
+git clone https://github.com/esspron/Voicory && cd Voicory
 
 # Frontend
-cd frontend
-npm install
-cp .env.example .env.local   # fill in Supabase URL + anon key
-npm run dev
+cd frontend && npm install && npm run dev
 
 # Backend
-cd backend
-npm install
-cp .env.example .env          # fill in all service keys
+cd backend && npm install
+# copy .env.example → .env, fill in keys
 node index.js
 ```
 
-### Required environment variables (backend)
-
-```
-SUPABASE_URL=
-SUPABASE_SERVICE_ROLE_KEY=
-OPENAI_API_KEY=
-TWILIO_ACCOUNT_SID=
-TWILIO_AUTH_TOKEN=
-LIVEKIT_API_KEY=
-LIVEKIT_API_SECRET=
-UPSTASH_REDIS_REST_URL=
-UPSTASH_REDIS_REST_TOKEN=
-PADDLE_API_KEY=
-```
+Required env vars: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `OPENAI_API_KEY`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `LIVEKIT_API_KEY`, `UPSTASH_REDIS_REST_URL`, `PADDLE_API_KEY`
 
 ---
 
-## Deployment
+## About Me
 
-- **Frontend** — Auto-deploys to Vercel on push to `main`
-- **Backend** — Google Cloud Run (`asia-south1`), deploy via:
-  ```bash
-  cd backend
-  gcloud run deploy voicory-backend --source . --region asia-south1
-  ```
+I'm **Vishwas Verma** — an AI Product Leader who builds and ships AI products end-to-end.
+
+Voicory is my proof of work: I identified the problem (businesses losing leads to voicemail), designed the product, made every architectural call, and shipped it to production solo.
+
+I'm looking for roles where I can lead AI product strategy — working with engineering, customers, and data to define what gets built and why.
+
+📩 [vishwasvermapvt@gmail.com](mailto:vishwasvermapvt@gmail.com) · [LinkedIn](https://linkedin.com/in/vishwasverma)
 
 ---
 
-## License
-
-Private — all rights reserved. Not open source.
+*Private repository — source shared for recruitment purposes.*
