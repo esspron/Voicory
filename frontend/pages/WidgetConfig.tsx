@@ -22,7 +22,6 @@ import {
   Plus,
   Trash,
   ArrowSquareOut,
-  Lightning,
 } from '@phosphor-icons/react';
 import { supabase } from '../services/supabase';
 import { getAssistant } from '../services/voicoryService';
@@ -106,12 +105,13 @@ export default function WidgetConfig() {
   // State
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
   const [assistant, setAssistant] = useState<any>(null);
   const [settings, setSettings] = useState<WidgetSettings>(DEFAULT_SETTINGS);
   const [publicKey, setPublicKey] = useState<ApiKeyInfo | null>(null);
   const [newDomain, setNewDomain] = useState('');
   const [activeTab, setActiveTab] = useState<'embed' | 'appearance' | 'behavior' | 'security'>('embed');
-  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewOpen] = useState(false);
   
   // Fetch data
   useEffect(() => {
@@ -178,10 +178,12 @@ export default function WidgetConfig() {
     if (!assistantId) return;
     
     setSaving(true);
+    setSaveSuccess(false);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
       
+      // Save to Supabase directly
       const { error } = await supabase
         .from('widget_settings' as any)
         .upsert({
@@ -205,7 +207,38 @@ export default function WidgetConfig() {
         });
       
       if (error) throw error;
-      
+
+      // Also sync to backend API
+      const { data: session } = await supabase.auth.getSession();
+      const token = session?.session?.access_token;
+      if (token) {
+        const apiUrl = (import.meta as any).env.VITE_API_URL || 'https://voicory-backend-783942490798.asia-south1.run.app/api';
+        await fetch(`${apiUrl}/widget/settings/${assistantId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            mode: settings.mode,
+            position: settings.position,
+            theme: settings.theme,
+            size: settings.size,
+            colors: settings.colors,
+            customText: settings.customText,
+            avatarUrl: settings.avatarUrl,
+            showBranding: settings.showBranding,
+            autoOpen: settings.autoOpen,
+            autoOpenDelay: settings.autoOpenDelay,
+            soundEffects: settings.soundEffects,
+            zIndex: settings.zIndex,
+            allowedDomains: settings.allowedDomains,
+          }),
+        }).catch(err => logger.error('Backend sync error: ' + err.message));
+      }
+
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
       logger.info('Widget settings saved');
     } catch (err) {
       logger.error('Error saving widget settings');
@@ -213,40 +246,38 @@ export default function WidgetConfig() {
       setSaving(false);
     }
   };
+
+  // Reset to defaults
+  const resetToDefaults = () => {
+    setSettings({ ...DEFAULT_SETTINGS });
+  };
+
+  // Preview widget in new tab
+  const previewInNewTab = () => {
+    const backendUrl = (import.meta as any).env.VITE_API_URL?.replace('/api', '') || 'https://voicory-backend-783942490798.asia-south1.run.app';
+    window.open(`${backendUrl}/api/widget/preview/${assistantId}`, '_blank');
+  };
   
-  // Generate embed code
+  // Backend URL — use env var if set, fallback to production Cloud Run URL
+  const BACKEND_URL = (import.meta as any).env.VITE_API_URL?.replace('/api', '') || 'https://voicory-backend-783942490798.asia-south1.run.app';
+
+  // Generate embed code using correct backend URL and data-attributes pattern
   const generateEmbedCode = () => {
-    if (!publicKey || !assistantId) return '';
-    
-    const config: any = {
-      apiKey: publicKey.key,
-      assistantId,
-    };
-    
-    // Add non-default settings
-    if (settings.mode !== 'both') config.mode = settings.mode;
-    if (settings.position !== 'bottom-right') config.position = settings.position;
-    if (settings.theme !== 'dark') config.theme = settings.theme;
-    if (settings.size !== 'medium') config.size = settings.size;
-    if (Object.keys(settings.colors).length > 0) config.colors = settings.colors;
-    if (Object.keys(settings.customText).length > 0) config.text = settings.customText;
-    if (settings.avatarUrl) config.avatarUrl = settings.avatarUrl;
-    if (!settings.showBranding) config.showBranding = false;
-    if (settings.autoOpen) {
-      config.autoOpen = true;
-      if (settings.autoOpenDelay !== 3000) config.autoOpenDelay = settings.autoOpenDelay;
-    }
-    if (!settings.soundEffects) config.soundEffects = false;
-    if (settings.zIndex !== 999999) config.zIndex = settings.zIndex;
-    if (assistant?.name) config.assistantName = assistant.name;
-    
-    const configStr = JSON.stringify(config, null, 2);
-    
-    return `<!-- Voicory Widget -->
-<script>
-  window.VoicoryConfig = ${configStr};
-</script>
-<script src="https://cdn.voicory.com/widget/v1/voicory-widget.iife.js" async></script>`;
+    if (!assistantId) return '';
+
+    // Build data-attributes from non-default settings
+    const dataAttrs: string[] = [];
+    dataAttrs.push(`data-assistant-id='${assistantId}'`);
+    dataAttrs.push(`data-theme='${settings.theme}'`);
+    if (settings.mode !== 'both') dataAttrs.push(`data-mode='${settings.mode}'`);
+    if (settings.position !== 'bottom-right') dataAttrs.push(`data-position='${settings.position}'`);
+    if (settings.size !== 'medium') dataAttrs.push(`data-size='${settings.size}'`);
+    if (settings.colors.primary) dataAttrs.push(`data-primary-color='${settings.colors.primary}'`);
+    if (settings.avatarUrl) dataAttrs.push(`data-avatar-url='${settings.avatarUrl}'`);
+    if (!settings.showBranding) dataAttrs.push(`data-show-branding='false'`);
+    if (settings.autoOpen) dataAttrs.push(`data-auto-open='true'`);
+
+    return `<!-- Voicory Widget -->\n<script src='${BACKEND_URL}/widget.js'\n  ${dataAttrs.join('\n  ')}\n  async></script>`;
   };
   
   // Generate NPM code
@@ -319,22 +350,6 @@ widget.sendMessage('Hello!');`;
     );
   }
   
-  // No API key warning
-  const NoApiKey = () => (
-    <Card className="p-8 text-center">
-      <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-amber-500/20 to-amber-600/10 flex items-center justify-center">
-        <Lightning size={32} weight="fill" className="text-amber-500" />
-      </div>
-      <h3 className="text-lg font-semibold text-textMain mb-2">API Key Required</h3>
-      <p className="text-textMuted mb-4">
-        You need a public API key to use the widget. Create one in your API Keys settings.
-      </p>
-      <Button onClick={() => navigate('/api-keys')}>
-        Go to API Keys
-      </Button>
-    </Card>
-  );
-  
   return (
     <div className="flex-1 p-6 lg:p-8">
       <div className="max-w-5xl mx-auto space-y-6">
@@ -357,9 +372,19 @@ widget.sendMessage('Hello!');`;
               Embed this assistant on your website with voice and chat capabilities
             </p>
           </div>
-          <Button onClick={saveSettings} loading={saving}>
-            Save Changes
-          </Button>
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="sm" onClick={resetToDefaults}>
+              Reset to Defaults
+            </Button>
+            <Button variant="outline" size="sm" onClick={previewInNewTab}>
+              <Eye size={16} />
+              Preview
+            </Button>
+            <Button onClick={saveSettings} loading={saving}>
+              {saveSuccess ? <Check size={16} /> : null}
+              {saveSuccess ? 'Saved!' : 'Save Changes'}
+            </Button>
+          </div>
         </div>
         
         {/* Tabs */}
@@ -385,11 +410,15 @@ widget.sendMessage('Hello!');`;
           ))}
         </div>
         
-        {/* No API Key Warning */}
-        {!publicKey && <NoApiKey />}
+        {/* No API Key Warning (only for NPM tab) */}
+        {!publicKey && activeTab === 'embed' && (
+          <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-sm text-amber-400">
+            <strong>Note:</strong> Create a public API key in API Keys settings to use the NPM package integration.
+          </div>
+        )}
         
         {/* Content */}
-        {publicKey && (
+        {(publicKey || activeTab !== 'embed' || true) && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Settings Panel */}
             <div className="lg:col-span-2 space-y-6">
@@ -781,10 +810,10 @@ widget.sendMessage('Hello!');`;
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => setPreviewOpen(!previewOpen)}
+                    onClick={previewInNewTab}
                   >
-                    <Eye size={16} />
-                    {previewOpen ? 'Hide' : 'Show'}
+                    <ArrowSquareOut size={16} />
+                    Open Preview
                   </Button>
                 </div>
                 

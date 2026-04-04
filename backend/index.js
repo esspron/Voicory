@@ -500,6 +500,7 @@ app.use('/api/lead-scoring', leadScoringRoutes);
 app.use('/api/appointments', appointmentsRoutes);
 app.use('/api/livekit', livekitRoutes);
 app.use('/api/analytics', require('./routes/analytics'));
+app.use('/api/widget', require('./routes/widget'));
 app.use('/api/payments', paymentsRoutes);
 app.use('/api/crawler', crawlerRoutes);
 app.use('/api/coupons', couponsRoutes);

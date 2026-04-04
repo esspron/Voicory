@@ -574,4 +574,282 @@ async function trackWidgetUsage(userId, assistantId, sessionId, tokensUsed) {
   }
 }
 
+/**
+ * Save widget settings (upsert)
+ * PUT /api/widget/:assistantId/config
+ * Auth: Bearer token (user session)
+ */
+router.put('/settings/:assistantId', async (req, res) => {
+  try {
+    const { assistantId } = req.params;
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Authorization required', code: 'UNAUTHORIZED' });
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+
+    // Verify user via Supabase JWT
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    if (authError || !user) {
+      return res.status(401).json({ error: 'Invalid token', code: 'INVALID_TOKEN' });
+    }
+
+    // Verify assistant ownership
+    const { data: assistant, error: assistantError } = await supabase
+      .from('assistants')
+      .select('id')
+      .eq('id', assistantId)
+      .eq('user_id', user.id)
+      .single();
+
+    if (assistantError || !assistant) {
+      return res.status(404).json({ error: 'Assistant not found', code: 'ASSISTANT_NOT_FOUND' });
+    }
+
+    const {
+      mode, position, theme, size, colors, customText,
+      avatarUrl, showBranding, autoOpen, autoOpenDelay,
+      soundEffects, zIndex, allowedDomains,
+    } = req.body;
+
+    const { error: upsertError } = await supabase
+      .from('widget_settings')
+      .upsert({
+        assistant_id: assistantId,
+        user_id: user.id,
+        mode: mode || 'both',
+        position: position || 'bottom-right',
+        theme: theme || 'dark',
+        size: size || 'medium',
+        colors: colors || {},
+        custom_text: customText || {},
+        avatar_url: avatarUrl || null,
+        show_branding: showBranding !== undefined ? showBranding : true,
+        auto_open: autoOpen || false,
+        auto_open_delay: autoOpenDelay || 3000,
+        sound_effects: soundEffects !== undefined ? soundEffects : true,
+        z_index: zIndex || 999999,
+        allowed_domains: allowedDomains || [],
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'assistant_id' });
+
+    if (upsertError) {
+      console.error('Error saving widget settings:', upsertError);
+      throw upsertError;
+    }
+
+    res.json({ success: true, assistantId });
+  } catch (error) {
+    console.error('Error saving widget settings:', error);
+    res.status(500).json({ error: 'Failed to save settings', code: 'SAVE_FAILED' });
+  }
+});
+
+/**
+ * Public widget preview endpoint (no auth — used for iframe preview)
+ * GET /api/widget/preview/:assistantId
+ */
+router.get('/preview/:assistantId', async (req, res) => {
+  try {
+    const { assistantId } = req.params;
+
+    const { data: assistant } = await supabase
+      .from('assistants')
+      .select('id, name, first_message')
+      .eq('id', assistantId)
+      .single();
+
+    const { data: settings } = await supabase
+      .from('widget_settings')
+      .select('*')
+      .eq('assistant_id', assistantId)
+      .single();
+
+    const backendUrl = process.env.BACKEND_URL || 'https://voicory-backend-783942490798.asia-south1.run.app';
+    const primaryColor = settings?.colors?.primary || '#0ea5e9';
+    const theme = settings?.theme || 'dark';
+    const greeting = settings?.custom_text?.greeting || assistant?.first_message || 'Hi! How can I help you today?';
+    const assistantName = assistant?.name || 'AI Assistant';
+    const bg = theme === 'light' ? '#ffffff' : '#0f172a';
+    const textColor = theme === 'light' ? '#0f172a' : '#f8fafc';
+    const mutedColor = theme === 'light' ? '#64748b' : '#94a3b8';
+    const borderColor = theme === 'light' ? '#e2e8f0' : 'rgba(255,255,255,0.1)';
+
+    // Serve a preview HTML page showing the widget in demo mode
+    res.setHeader('Content-Type', 'text/html');
+    res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Widget Preview — ${assistantName}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #1e293b;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+    .preview-label {
+      position: fixed;
+      top: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(255,255,255,0.1);
+      color: #94a3b8;
+      padding: 6px 16px;
+      border-radius: 999px;
+      font-size: 12px;
+      backdrop-filter: blur(8px);
+    }
+    .widget-wrapper {
+      position: fixed;
+      ${(settings?.position || 'bottom-right').includes('bottom') ? 'bottom: 24px' : 'top: 24px'};
+      ${(settings?.position || 'bottom-right').includes('right') ? 'right: 24px' : 'left: 24px'};
+    }
+    .widget-bubble {
+      display: flex;
+      flex-direction: column;
+      background: ${bg};
+      border: 1px solid ${borderColor};
+      border-radius: 20px;
+      overflow: hidden;
+      width: ${settings?.size === 'small' ? '320px' : settings?.size === 'large' ? '440px' : '380px'};
+      box-shadow: 0 25px 50px rgba(0,0,0,0.5);
+      margin-bottom: 16px;
+    }
+    .widget-header {
+      padding: 16px;
+      border-bottom: 1px solid ${borderColor};
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .widget-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, ${primaryColor}, ${primaryColor}aa);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+    .widget-header-info { flex: 1; }
+    .widget-name { font-weight: 600; color: ${textColor}; font-size: 14px; }
+    .widget-status { display: flex; align-items: center; gap: 4px; margin-top: 2px; }
+    .status-dot { width: 6px; height: 6px; border-radius: 50%; background: #22c55e; }
+    .status-text { font-size: 11px; color: ${mutedColor}; }
+    .widget-body { padding: 16px; min-height: 180px; }
+    .greeting-bubble {
+      background: ${theme === 'light' ? '#f1f5f9' : 'rgba(255,255,255,0.05)'};
+      padding: 12px 16px;
+      border-radius: 12px 12px 12px 4px;
+      font-size: 13px;
+      color: ${textColor};
+      max-width: 80%;
+    }
+    .widget-input-area {
+      padding: 12px 16px;
+      border-top: 1px solid ${borderColor};
+      display: flex;
+      gap: 8px;
+    }
+    .widget-input {
+      flex: 1;
+      background: ${theme === 'light' ? '#f8fafc' : 'rgba(255,255,255,0.05)'};
+      border: 1px solid ${borderColor};
+      border-radius: 12px;
+      padding: 10px 14px;
+      font-size: 13px;
+      color: ${textColor};
+      outline: none;
+    }
+    .widget-input::placeholder { color: ${mutedColor}; }
+    .send-btn {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, ${primaryColor}, ${primaryColor}dd);
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+    .launcher-btn {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, ${primaryColor}, ${primaryColor}cc);
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 8px 24px ${primaryColor}55;
+      margin-left: auto;
+    }
+    .preview-badge {
+      position: fixed;
+      top: 12px;
+      right: 12px;
+      background: ${primaryColor}33;
+      color: ${primaryColor};
+      padding: 4px 12px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 600;
+      border: 1px solid ${primaryColor}44;
+    }
+  </style>
+</head>
+<body>
+  <div class="preview-label">🔍 Widget Preview Mode — ${assistantName}</div>
+  <div class="preview-badge">PREVIEW</div>
+  <div class="widget-wrapper">
+    <div class="widget-bubble">
+      <div class="widget-header">
+        <div class="widget-avatar">🤖</div>
+        <div class="widget-header-info">
+          <div class="widget-name">${assistantName}</div>
+          <div class="widget-status">
+            <div class="status-dot"></div>
+            <span class="status-text">Online</span>
+          </div>
+        </div>
+      </div>
+      <div class="widget-body">
+        <div class="greeting-bubble">${greeting}</div>
+      </div>
+      <div class="widget-input-area">
+        <input class="widget-input" placeholder="${settings?.custom_text?.inputPlaceholder || 'Type a message...'}" disabled />
+        <button class="send-btn">➤</button>
+      </div>
+    </div>
+    <button class="launcher-btn">💬</button>
+  </div>
+  <script>
+    // Note: this is a visual preview only.
+    // The actual widget is loaded via the embed snippet on your website.
+    console.log('Voicory Widget Preview — ${assistantName}');
+  </script>
+</body>
+</html>`);
+  } catch (error) {
+    console.error('Preview error:', error);
+    res.status(500).send('<h1>Preview unavailable</h1>');
+  }
+});
+
 module.exports = router;
