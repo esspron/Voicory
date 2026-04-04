@@ -390,7 +390,7 @@ const strictLimiter = rateLimit({
 
 app.use('/api/', apiLimiter);
 app.use('/api/test-chat', strictLimiter);
-app.use('/api/twilio', strictLimiter);
+// Note: /api/twilio is NOT rate-limited with strictLimiter — Twilio webhooks need unrestricted access
 
 // ============================================
 // MODULAR ROUTES - Use centralized AssistantProcessor

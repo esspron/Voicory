@@ -14,7 +14,8 @@ const BASE_URL = 'https://voicory-backend-783942490798.asia-south1.run.app';
 
 // A real userId that exists in Supabase with a phone number + assistant configured
 // For CI: override via env var TEST_TWILIO_USER_ID
-const TEST_USER_ID = process.env.TEST_TWILIO_USER_ID || 'test-user-id-placeholder';
+// Default: Vishwas's user ID (has "Bacha" assistant in draft state)
+const TEST_USER_ID = process.env.TEST_TWILIO_USER_ID || '60ab39c1-7170-4013-9764-d732f7196c95';
 const TEST_PHONE_TO = process.env.TEST_TWILIO_PHONE_TO || '+15005550006'; // Twilio test number
 const TEST_PHONE_FROM = process.env.TEST_TWILIO_PHONE_FROM || '+15005550001';
 
@@ -109,7 +110,7 @@ test.describe('POST /api/twilio/:userId/voice', () => {
 
   test('returns TwiML with fallback message for unknown phone number', async () => {
     const ctx = await request.newContext();
-    const res = await ctx.post(`${BASE_URL}/api/twilio/nonexistent-user-999/voice`, {
+    const res = await ctx.post(`${BASE_URL}/api/twilio/00000000-0000-0000-0000-000000000000/voice`, {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       data: buildVoicePayload({ To: '+19999999999' }).toString(),
     });
@@ -212,7 +213,7 @@ test.describe('POST /api/twilio/:userId/voice/gather', () => {
     const ctx = await request.newContext();
     const callSid = `CA${Math.random().toString(36).substring(2, 34)}`;
 
-    const res = await ctx.post(`${BASE_URL}/api/twilio/unknown-user-xyz/voice/gather`, {
+    const res = await ctx.post(`${BASE_URL}/api/twilio/00000000-0000-0000-0000-000000000001/voice/gather`, {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       data: buildGatherPayload('Hello', callSid).toString(),
     });

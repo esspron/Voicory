@@ -202,8 +202,9 @@ router.post('/import-direct', verifySupabaseAuth, async (req, res) => {
 
         // Configure Twilio webhook URL to point to our backend with user-specific path
         // Each user gets their own webhook URL for security and isolation
-        const webhookUrl = `https://callyy-production.up.railway.app/api/webhooks/twilio/${userId}/voice`;
-        const statusCallbackUrl = `https://callyy-production.up.railway.app/api/webhooks/twilio/${userId}/status`;
+        const backendBase = process.env.BACKEND_URL || 'https://voicory-backend-783942490798.asia-south1.run.app';
+        const webhookUrl = `${backendBase}/api/webhooks/twilio/${userId}/voice`;
+        const statusCallbackUrl = `${backendBase}/api/webhooks/twilio/${userId}/status`;
 
         // Update the phone number in Twilio to use our webhook
         const updateUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/IncomingPhoneNumbers/${phoneNumberSid}.json`;
@@ -935,7 +936,7 @@ router.post('/test-call', async (req, res) => {
         const client = twilio(accountSid, authToken);
 
         // Build webhook URL for this user
-        const backendUrl = process.env.BACKEND_URL || 'https://backendvoicory-732127099858.asia-south1.run.app';
+        const backendUrl = process.env.BACKEND_URL || 'https://voicory-backend-783942490798.asia-south1.run.app';
         const webhookUrl = `${backendUrl}/api/twilio/${phoneData.user_id}/voice`;
         const statusCallbackUrl = `${backendUrl}/api/twilio/${phoneData.user_id}/status`;
 

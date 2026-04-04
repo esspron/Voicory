@@ -171,7 +171,7 @@ async function placeCall(dialerInstance, lead) {
     }
     
     // Get backend URL for webhook
-    const backendUrl = process.env.BACKEND_URL || 'https://backendvoicory-732127099858.asia-south1.run.app';
+    const backendUrl = process.env.BACKEND_URL || 'https://voicory-backend-783942490798.asia-south1.run.app';
     
     // Create call log entry
     const { data: callLog, error: logError } = await supabase

@@ -593,7 +593,7 @@ router.all('/voice-handler', async (req, res) => {
             .single();
         
         // Build the voice agent connect URL (assuming you have a voice agent service)
-        const voiceAgentUrl = process.env.VOICE_AGENT_URL || `https://backendvoicory-732127099858.asia-south1.run.app/api/twilio/connect`;
+        const voiceAgentUrl = process.env.VOICE_AGENT_URL || `https://voicory-backend-783942490798.asia-south1.run.app/api/twilio/connect`;
         
         // Connect to voice agent with context
         const twiml = `
