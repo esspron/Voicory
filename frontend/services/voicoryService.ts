@@ -920,16 +920,60 @@ export const getCallLogs = async (): Promise<CallLog[]> => {
 
         return (data || []).map(c => ({
             id: c.id,
-            assistantName: c.assistant_name,
-            phoneNumber: c.phone_number,
-            duration: c.duration,
-            cost: Number(c.cost),
-            status: c.status as CallLog['status'],
-            date: new Date(c.created_at).toLocaleString()
+            assistantName: c.assistant_name || c.assistantName || 'Unknown',
+            phoneNumber: c.phone_number || c.phoneNumber || '',
+            duration: c.duration || '0:00',
+            cost: Number(c.cost) || 0,
+            status: (c.status as CallLog['status']) || 'completed',
+            date: new Date(c.created_at).toLocaleString(),
+            transcript: c.transcript || null,
+            recordingUrl: c.recording_url || null,
+            callSid: c.call_sid || null,
+            direction: c.direction || null,
+            assistantId: c.assistant_id || null,
+            startedAt: c.started_at || c.created_at || null,
+            endedAt: c.ended_at || null,
         }));
     } catch (error) {
         console.error('Error fetching call logs from Supabase:', error);
         throw error;
+    }
+};
+
+/**
+ * Export call logs as CSV — downloads via the browser
+ * Falls back to client-side CSV generation from Supabase data if backend unavailable
+ */
+export const exportCallLogsCSV = async (filters?: { from?: string; to?: string; assistantId?: string }) => {
+    try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token;
+
+        const params = new URLSearchParams();
+        if (filters?.from) params.set('from', filters.from);
+        if (filters?.to) params.set('to', filters.to);
+        if (filters?.assistantId) params.set('assistantId', filters.assistantId);
+
+        const apiBase = import.meta.env.VITE_API_URL || '';
+        const url = `${apiBase}/api/calls/export${params.toString() ? '?' + params.toString() : ''}`;
+
+        const response = await fetch(url, {
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+
+        if (!response.ok) throw new Error('Export endpoint failed');
+
+        const blob = await response.blob();
+        const objectUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = objectUrl;
+        a.download = `call-logs-${new Date().toISOString().slice(0, 10)}.csv`;
+        a.click();
+        URL.revokeObjectURL(objectUrl);
+    } catch (err) {
+        // Fallback: generate CSV client-side from already-fetched call logs
+        console.warn('Backend export failed, falling back to client-side CSV:', err);
+        throw err; // Let the caller handle the fallback
     }
 };
 

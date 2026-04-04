@@ -241,6 +241,14 @@ export interface CallLog {
     cost: number;
     status: 'completed' | 'failed' | 'ongoing';
     date: string;
+    // Extended fields for recording playback, transcript modal, export
+    transcript?: string | null;
+    recordingUrl?: string | null;
+    callSid?: string | null;
+    direction?: string | null;
+    assistantId?: string | null;
+    startedAt?: string | null;
+    endedAt?: string | null;
 }
 
 export interface Customer {
