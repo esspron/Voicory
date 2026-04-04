@@ -136,19 +136,69 @@ This isn't a tutorial project or a weekend hack. It's a **production SaaS produc
 
 ## Local Setup
 
+### 1. Clone
+
 ```bash
 git clone https://github.com/esspron/Voicory && cd Voicory
-
-# Frontend
-cd frontend && npm install && npm run dev
-
-# Backend
-cd backend && npm install
-# copy .env.example → .env, fill in keys
-node index.js
 ```
 
-Required env vars: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `OPENAI_API_KEY`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `LIVEKIT_API_KEY`, `UPSTASH_REDIS_REST_URL`, `PADDLE_API_KEY`
+### 2. Backend
+
+```bash
+cd backend
+npm install
+
+# Copy the env template and fill in your keys
+cp .env.example .env
+```
+
+Minimum required keys in `.env`:
+
+```env
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=
+OPENAI_API_KEY=
+TWILIO_ACCOUNT_SID=
+TWILIO_AUTH_TOKEN=
+LIVEKIT_API_KEY=
+LIVEKIT_API_SECRET=
+UPSTASH_REDIS_REST_URL=
+UPSTASH_REDIS_REST_TOKEN=
+PADDLE_API_KEY=
+```
+
+```bash
+node index.js
+# API running at http://localhost:8080
+```
+
+### 3. Database
+
+Run migrations in order against your Supabase project:
+
+```bash
+# Using Supabase CLI
+supabase db push
+
+# Or apply manually in Supabase SQL Editor:
+# Run each file in backend/supabase/migrations/ in sequence (001 → 019)
+```
+
+> The migrations create all tables: `assistants`, `call_logs`, `customer_memories`, `knowledge_bases`, `crm_integrations`, `appointments`, `call_costs`, `integration_logs`, and more.
+
+### 4. Frontend
+
+```bash
+cd frontend
+npm install
+
+# Create env file with your Supabase public keys
+cp .env.example .env.local
+# Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY
+
+npm run dev
+# App running at http://localhost:5173
+```
 
 ---
 
@@ -161,7 +211,3 @@ Voicory is my proof of work: I identified the problem (businesses losing leads t
 I'm looking for roles where I can lead AI product strategy — working with engineering, customers, and data to define what gets built and why.
 
 📩 [vishwasvermapvt@gmail.com](mailto:vishwasvermapvt@gmail.com) · [LinkedIn](https://linkedin.com/in/vishwasverma)
-
----
-
-*Private repository — source shared for recruitment purposes.*
