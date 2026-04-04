@@ -41,6 +41,7 @@ app.use(cors({
     credentials: true
 }));
 app.use(express.json());
+app.use(express.urlencoded({ extended: true })); // Required for Twilio webhook form-encoded payloads
 
 const supabaseUrl = process.env.SUPABASE_URL;
 // Use service role key for backend operations (bypasses RLS)
