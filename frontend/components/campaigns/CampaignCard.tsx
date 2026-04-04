@@ -5,10 +5,13 @@ import {
     CalendarBlank, 
     Play, 
     Pause, 
+    StopCircle,
     CheckCircle,
     Clock,
     TrendUp,
-    Lightning
+    Lightning,
+    Copy,
+    Trash
 } from '@phosphor-icons/react';
 import type { OutboundCampaign } from '../../types';
 
@@ -17,9 +20,12 @@ interface CampaignCardProps {
     onClick: () => void;
     onStart?: () => void;
     onPause?: () => void;
+    onStop?: () => void;
+    onDuplicate?: () => void;
+    onDelete?: () => void;
 }
 
-export function CampaignCard({ campaign, onClick, onStart, onPause }: CampaignCardProps) {
+export function CampaignCard({ campaign, onClick, onStart, onPause, onStop, onDuplicate, onDelete }: CampaignCardProps) {
     const getStatusColor = (status: string) => {
         switch (status) {
             case 'active': return 'bg-green-500/20 text-green-400 border-green-500/30';
@@ -149,6 +155,18 @@ export function CampaignCard({ campaign, onClick, onStart, onPause }: CampaignCa
                         <Pause size={16} weight="fill" />
                     </button>
                 )}
+                {(campaign.status === 'active' || campaign.status === 'paused') && onStop && (
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onStop();
+                        }}
+                        className="p-2 text-red-400 hover:bg-red-500/20 rounded-lg transition-colors"
+                        title="Stop campaign"
+                    >
+                        <StopCircle size={16} weight="fill" />
+                    </button>
+                )}
                 {(campaign.status === 'draft' || campaign.status === 'paused') && onStart && (
                     <button
                         onClick={(e) => {
@@ -159,6 +177,30 @@ export function CampaignCard({ campaign, onClick, onStart, onPause }: CampaignCa
                         title="Start campaign"
                     >
                         <Play size={16} weight="fill" />
+                    </button>
+                )}
+                {onDuplicate && (
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onDuplicate();
+                        }}
+                        className="p-2 text-textMuted hover:text-textMain hover:bg-white/10 rounded-lg transition-colors"
+                        title="Duplicate campaign"
+                    >
+                        <Copy size={16} />
+                    </button>
+                )}
+                {onDelete && (
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onDelete();
+                        }}
+                        className="p-2 text-red-400/60 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                        title="Delete campaign"
+                    >
+                        <Trash size={16} />
                     </button>
                 )}
             </div>

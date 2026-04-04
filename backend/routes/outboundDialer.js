@@ -743,4 +743,115 @@ router.post('/status-callback', async (req, res) => {
     }
 });
 
+/**
+ * Duplicate a campaign (copies all settings, resets stats, status=draft)
+ * POST /api/outbound-dialer/campaigns/:id/duplicate
+ */
+router.post('/campaigns/:id/duplicate', verifySupabaseAuth, async (req, res) => {
+    try {
+        const original = await getCampaign(req.userId, req.params.id);
+        if (!original) {
+            return res.status(404).json({ error: 'Campaign not found' });
+        }
+
+        // Build duplicate data — strip identity + stats fields
+        const {
+            id, userId, createdAt, updatedAt, startedAt, completedAt,
+            totalLeads, leadsPending, leadsCompleted,
+            callsMade, callsAnswered, callsVoicemail, callsNoAnswer, callsFailed,
+            appointmentsBooked, totalTalkTimeSeconds,
+            assistant, phoneNumber,
+            ...rest
+        } = original;
+
+        const duplicateData = {
+            ...rest,
+            name: `${rest.name} (Copy)`,
+            status: 'draft',
+            start_date: rest.startDate,
+            end_date: rest.endDate,
+            call_days: rest.callDays,
+            call_start_time: rest.callStartTime,
+            call_end_time: rest.callEndTime,
+            max_calls_per_hour: rest.maxCallsPerHour,
+            max_calls_per_day: rest.maxCallsPerDay,
+            max_concurrent_calls: rest.maxConcurrentCalls,
+            max_attempts: rest.maxAttempts,
+            retry_delay_hours: rest.retryDelayHours,
+            ring_timeout_seconds: rest.ringTimeoutSeconds,
+            campaign_type: rest.campaignType,
+            assistant_id: rest.assistantId,
+            phone_number_id: rest.phoneNumberId,
+        };
+
+        const campaign = await createCampaign(req.userId, duplicateData);
+        res.json({ success: true, campaign });
+    } catch (error) {
+        console.error('Error duplicating campaign:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+/**
+ * Export campaign call results as CSV
+ * GET /api/outbound-dialer/campaigns/:id/export
+ */
+router.get('/campaigns/:id/export', verifySupabaseAuth, async (req, res) => {
+    try {
+        // Verify campaign belongs to user
+        const campaign = await getCampaign(req.userId, req.params.id);
+        if (!campaign) {
+            return res.status(404).json({ error: 'Campaign not found' });
+        }
+
+        // Fetch leads with call outcomes
+        const { data: leads, error } = await supabase
+            .from('campaign_leads')
+            .select('*')
+            .eq('campaign_id', req.params.id)
+            .eq('user_id', req.userId)
+            .order('created_at', { ascending: true });
+
+        if (error) throw error;
+
+        // Build CSV
+        const headers = [
+            'First Name', 'Last Name', 'Phone Number', 'Email', 'Company',
+            'Status', 'Outcome', 'Disposition', 'Call Attempts',
+            'Last Call At', 'Appointment Date', 'Notes', 'Lead Score'
+        ];
+
+        const rows = (leads || []).map(lead => [
+            lead.first_name || '',
+            lead.last_name || '',
+            lead.phone_number || '',
+            lead.email || '',
+            lead.company || '',
+            lead.status || '',
+            lead.outcome || '',
+            lead.disposition || '',
+            lead.call_attempts || 0,
+            lead.last_call_at || '',
+            lead.appointment_date || '',
+            (lead.notes || '').replace(/,/g, ';').replace(/\n/g, ' '),
+            lead.lead_score || ''
+        ]);
+
+        const csvLines = [
+            headers.join(','),
+            ...rows.map(row => row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))
+        ];
+
+        const csvContent = csvLines.join('\n');
+        const filename = `campaign-${campaign.name.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-export.csv`;
+
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.send(csvContent);
+    } catch (error) {
+        console.error('Error exporting campaign:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 module.exports = router;

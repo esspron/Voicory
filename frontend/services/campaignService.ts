@@ -261,6 +261,38 @@ export async function stopCampaign(id: string, complete = false): Promise<Outbou
     return mapCampaign(data.campaign);
 }
 
+export async function duplicateCampaign(id: string): Promise<OutboundCampaign> {
+    const response = await authFetch(`/api/outbound-dialer/campaigns/${id}/duplicate`, {
+        method: 'POST'
+    });
+    const data = await response.json();
+    
+    if (!response.ok) {
+        throw new Error(data.error || 'Failed to duplicate campaign');
+    }
+    
+    return mapCampaign(data.campaign);
+}
+
+export async function exportCampaignCSV(id: string, campaignName: string): Promise<void> {
+    const response = await authFetch(`/api/outbound-dialer/campaigns/${id}/export`);
+    
+    if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to export campaign');
+    }
+    
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `campaign-${campaignName.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-export.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
 export async function getDialerStatus(campaignId: string): Promise<DialerStatus> {
     const response = await authFetch(`/api/outbound-dialer/campaigns/${campaignId}/dialer-status`);
     const data = await response.json();

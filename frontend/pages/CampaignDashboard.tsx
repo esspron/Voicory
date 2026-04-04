@@ -4,9 +4,13 @@ import {
     ArrowLeft,
     Play,
     Pause,
+    StopCircle,
     UploadSimple,
     PencilSimple,
-    Gear
+    Gear,
+    Copy,
+    DownloadSimple,
+    Trash
 } from '@phosphor-icons/react';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
@@ -133,6 +137,59 @@ export default function CampaignDashboard() {
             loadCampaign();
         } catch (err) {
             console.error('Failed to resume campaign:', err);
+        } finally {
+            setIsActionLoading(false);
+        }
+    };
+
+    const handleStopCampaign = async () => {
+        if (!id) return;
+        if (!confirm('Stop this campaign? It will be marked as stopped and no more calls will be made.')) return;
+        setIsActionLoading(true);
+        try {
+            await campaignService.stopCampaign(id, true);
+            loadCampaign();
+        } catch (err) {
+            console.error('Failed to stop campaign:', err);
+        } finally {
+            setIsActionLoading(false);
+        }
+    };
+
+    const handleDuplicateCampaign = async () => {
+        if (!id) return;
+        setIsActionLoading(true);
+        try {
+            const newCampaign = await campaignService.duplicateCampaign(id);
+            navigate(`/campaigns/${newCampaign.id}/edit`);
+        } catch (err) {
+            console.error('Failed to duplicate campaign:', err);
+        } finally {
+            setIsActionLoading(false);
+        }
+    };
+
+    const handleExportCSV = async () => {
+        if (!id || !campaign) return;
+        setIsActionLoading(true);
+        try {
+            await campaignService.exportCampaignCSV(id, campaign.name);
+        } catch (err) {
+            console.error('Failed to export campaign:', err);
+        } finally {
+            setIsActionLoading(false);
+        }
+    };
+
+    const handleDeleteCampaign = async () => {
+        if (!id) return;
+        if (!confirm('Delete this campaign permanently? This cannot be undone.')) return;
+        setIsActionLoading(true);
+        try {
+            await campaignService.deleteCampaign(id);
+            navigate('/campaigns');
+        } catch (err) {
+            console.error('Failed to delete campaign:', err);
         } finally {
             setIsActionLoading(false);
         }
@@ -282,20 +339,46 @@ export default function CampaignDashboard() {
                             Start Campaign
                         </Button>
                     ) : campaign.status === 'active' ? (
-                        <Button variant="secondary" onClick={handlePauseCampaign} loading={isActionLoading}>
-                            <Pause size={18} className="mr-2" weight="fill" />
-                            Pause
-                        </Button>
+                        <>
+                            <Button variant="secondary" onClick={handlePauseCampaign} loading={isActionLoading}>
+                                <Pause size={18} className="mr-2" weight="fill" />
+                                Pause
+                            </Button>
+                            <Button variant="destructive" onClick={handleStopCampaign} loading={isActionLoading}>
+                                <StopCircle size={18} className="mr-2" weight="fill" />
+                                Stop
+                            </Button>
+                        </>
                     ) : campaign.status === 'paused' ? (
-                        <Button onClick={handleResumeCampaign} loading={isActionLoading}>
-                            <Play size={18} className="mr-2" weight="fill" />
-                            Resume
-                        </Button>
+                        <>
+                            <Button onClick={handleResumeCampaign} loading={isActionLoading}>
+                                <Play size={18} className="mr-2" weight="fill" />
+                                Resume
+                            </Button>
+                            <Button variant="destructive" onClick={handleStopCampaign} loading={isActionLoading}>
+                                <StopCircle size={18} className="mr-2" weight="fill" />
+                                Stop
+                            </Button>
+                        </>
                     ) : null}
+                    
+                    <Button variant="outline" onClick={handleExportCSV} loading={isActionLoading} title="Export results as CSV">
+                        <DownloadSimple size={18} className="mr-2" />
+                        Export
+                    </Button>
+
+                    <Button variant="outline" onClick={handleDuplicateCampaign} loading={isActionLoading} title="Duplicate campaign">
+                        <Copy size={18} className="mr-2" />
+                        Duplicate
+                    </Button>
                     
                     <Button variant="outline" onClick={() => navigate(`/campaigns/${id}/edit`)}>
                         <PencilSimple size={18} className="mr-2" />
                         Edit
+                    </Button>
+
+                    <Button variant="ghost-destructive" onClick={handleDeleteCampaign} loading={isActionLoading} title="Delete campaign">
+                        <Trash size={18} />
                     </Button>
                 </div>
             </div>

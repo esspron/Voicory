@@ -69,6 +69,35 @@ export default function Campaigns() {
         }
     };
 
+    const handleStopCampaign = async (campaignId: string) => {
+        if (!confirm('Stop this campaign? No more calls will be made.')) return;
+        try {
+            await campaignService.stopCampaign(campaignId, true);
+            loadCampaigns();
+        } catch (err) {
+            console.error('Failed to stop campaign:', err);
+        }
+    };
+
+    const handleDuplicateCampaign = async (campaignId: string) => {
+        try {
+            const newCampaign = await campaignService.duplicateCampaign(campaignId);
+            navigate(`/campaigns/${newCampaign.id}/edit`);
+        } catch (err) {
+            console.error('Failed to duplicate campaign:', err);
+        }
+    };
+
+    const handleDeleteCampaign = async (campaignId: string) => {
+        if (!confirm('Delete this campaign permanently? This cannot be undone.')) return;
+        try {
+            await campaignService.deleteCampaign(campaignId);
+            loadCampaigns();
+        } catch (err) {
+            console.error('Failed to delete campaign:', err);
+        }
+    };
+
     // Filter campaigns by search term
     const filteredCampaigns = campaigns.filter(campaign => {
         if (!searchTerm) return true;
@@ -215,6 +244,9 @@ export default function Campaigns() {
                             onClick={() => navigate(`/campaigns/${campaign.id}`)}
                             onStart={() => handleStartCampaign(campaign.id)}
                             onPause={() => handlePauseCampaign(campaign.id)}
+                            onStop={() => handleStopCampaign(campaign.id)}
+                            onDuplicate={() => handleDuplicateCampaign(campaign.id)}
+                            onDelete={() => handleDeleteCampaign(campaign.id)}
                         />
                     ))}
                 </div>
