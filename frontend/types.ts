@@ -254,6 +254,10 @@ export interface Customer {
     hasMemory?: boolean;
     lastInteraction?: string;
     interactionCount?: number;
+    // CRM sync fields
+    source?: string;
+    crm_provider?: string;
+    last_synced_at?: string;
 }
 
 // ============================================

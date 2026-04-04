@@ -487,6 +487,7 @@ const paymentsRoutes = require('./routes/payments');
 const crawlerRoutes = require('./routes/crawler');
 const couponsRoutes = require('./routes/coupons');
 const integrationsRoutes = require('./routes/integrations');
+const customersRoutes = require('./routes/customers');
 
 app.use('/api', testChatRoutes);
 app.use('/api/twilio', twilioRoutes);
@@ -503,6 +504,7 @@ app.use('/api/payments', paymentsRoutes);
 app.use('/api/crawler', crawlerRoutes);
 app.use('/api/coupons', couponsRoutes);
 app.use('/api/integrations', integrationsRoutes);
+app.use('/api/customers', customersRoutes);
 app.use('/api/calls', require('./routes/calls'));
 
 // ============================================

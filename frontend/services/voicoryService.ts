@@ -726,12 +726,42 @@ export const getCustomers = async (): Promise<Customer[]> => {
             email: c.email,
             phoneNumber: c.phone_number,
             variables: (c.variables as Record<string, string>) || {},
-            createdAt: c.created_at
+            createdAt: c.created_at,
+            hasMemory: c.has_memory,
+            lastInteraction: c.last_interaction,
+            interactionCount: c.interaction_count,
+            source: c.source,
+            crm_provider: c.crm_provider,
+            last_synced_at: c.last_synced_at,
         }));
     } catch (error) {
         console.error('Error fetching customers from Supabase:', error);
         throw error;
     }
+};
+
+/**
+ * Sync customers from connected CRM integrations
+ */
+export const syncCustomersFromCRM = async (): Promise<{ synced: number; failed: number; providers: { provider: string; synced: number; failed: number }[] }> => {
+    const response = await authFetch('/api/customers/sync-from-crm', { method: 'POST' });
+    if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to sync from CRM');
+    }
+    return response.json();
+};
+
+/**
+ * Get CRM sync status (last sync per provider)
+ */
+export const getCRMSyncStatus = async (): Promise<{ syncStatus: { provider: string; synced_count: number; failed_count: number; status: string; error: string | null; created_at: string }[] }> => {
+    const response = await authFetch('/api/customers/sync-status');
+    if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to get sync status');
+    }
+    return response.json();
 };
 
 /**

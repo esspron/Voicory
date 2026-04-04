@@ -3,7 +3,7 @@ import { Plus, MagnifyingGlass, DotsThree, Trash, X, FloppyDisk, PencilSimple, U
 import React, { useEffect, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 
-import { getCustomers, createCustomer, updateCustomer, deleteCustomer, createBulkCustomers, getCustomerMemory, getCustomerConversations, getCustomerInsights, getCustomerWhatsAppMessages, WhatsAppMessage } from '../services/voicoryService';
+import { getCustomers, createCustomer, updateCustomer, deleteCustomer, createBulkCustomers, getCustomerMemory, getCustomerConversations, getCustomerInsights, getCustomerWhatsAppMessages, WhatsAppMessage, syncCustomersFromCRM } from '../services/voicoryService';
 import { Customer, CustomerMemory, CustomerConversation, CustomerInsight } from '../types';
 
 const Customers: React.FC = () => {
@@ -26,6 +26,7 @@ const Customers: React.FC = () => {
     
     // Bulk upload state
     const [bulkUploading, setBulkUploading] = useState(false);
+    const [syncing, setSyncing] = useState(false);
     const [bulkError, setBulkError] = useState<string | null>(null);
     const [bulkSuccess, setBulkSuccess] = useState<string | null>(null);
     const [parsedCustomers, setParsedCustomers] = useState<Omit<Customer, 'id' | 'createdAt'>[]>([]);
@@ -212,6 +213,20 @@ const Customers: React.FC = () => {
         setParsedCustomers([]);
         setCsvPreview([]);
         setIsBulkModalOpen(true);
+    };
+
+    const handleSyncFromCRM = async () => {
+        setSyncing(true);
+        try {
+            const result = await syncCustomersFromCRM();
+            await loadCustomers();
+            const providerSummary = result.providers.map((p: { provider: string; synced: number; failed: number }) => `${p.provider}: ${p.synced} synced`).join(', ');
+            alert(`CRM sync complete! ${result.synced} contacts synced. ${providerSummary}`);
+        } catch (err) {
+            alert(`CRM sync failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+        } finally {
+            setSyncing(false);
+        }
     };
 
     const handleBulkModalClose = () => {
@@ -426,6 +441,15 @@ const Customers: React.FC = () => {
                             <Upload size={18} weight="bold" />
                             Bulk Upload
                         </button>
+                        <button
+                            onClick={handleSyncFromCRM}
+                            disabled={syncing}
+                            className="flex items-center gap-2 px-4 py-2.5 bg-surface/80 backdrop-blur-sm border border-border/50 text-textMain font-medium rounded-xl text-sm hover:border-blue-400/50 hover:text-blue-400 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Sync contacts from connected CRM integrations"
+                        >
+                            <ArrowsClockwise size={18} weight="bold" className={syncing ? 'animate-spin' : ''} />
+                            {syncing ? 'Syncing...' : 'Sync from CRM'}
+                        </button>
                         <button 
                             onClick={handleAdd}
                             className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-primary to-primary/80 text-black font-semibold rounded-xl text-sm hover:shadow-lg hover:shadow-primary/25 hover:scale-[1.02] transition-all duration-300"
@@ -492,7 +516,14 @@ const Customers: React.FC = () => {
                                             <User size={18} weight="duotone" className="text-primary" />
                                         </div>
                                         <div>
-                                            <div className="text-sm font-medium text-textMain group-hover:text-primary transition-colors">{customer.name}</div>
+                                            <div className="flex items-center gap-2">
+                                                <div className="text-sm font-medium text-textMain group-hover:text-primary transition-colors">{customer.name}</div>
+                                                {customer.source && customer.source !== 'voicory' && (
+                                                    <span className="px-1.5 py-0.5 rounded-full bg-blue-400/10 border border-blue-400/30 text-[10px] font-medium text-blue-400 uppercase tracking-wide">
+                                                        {customer.crm_provider === 'followupboss' ? 'FUB' : customer.crm_provider === 'liondesk' ? 'LionDesk' : customer.source}
+                                                    </span>
+                                                )}
+                                            </div>
                                             <div className="text-xs text-textMuted">Added {customer.createdAt}</div>
                                         </div>
                                     </div>
