@@ -3,6 +3,26 @@ const cors = require('cors');
 const { createClient } = require('@supabase/supabase-js');
 const axios = require('axios');
 const OpenAI = require('openai');
+const crypto = require('crypto');
+
+// ============================================
+// PROCESS-LEVEL CRASH PROTECTION
+// ============================================
+process.on('uncaughtException', (err) => {
+  console.error(JSON.stringify({
+    timestamp: new Date().toISOString(),
+    event: 'uncaughtException',
+    message: err.message,
+    stack: err.stack
+  }));
+});
+process.on('unhandledRejection', (reason) => {
+  console.error(JSON.stringify({
+    timestamp: new Date().toISOString(),
+    event: 'unhandledRejection',
+    message: String(reason)
+  }));
+});
 
 // Only load .env file in development (Railway injects env vars directly)
 if (process.env.NODE_ENV !== 'production') {
@@ -42,6 +62,30 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true })); // Required for Twilio webhook form-encoded payloads
+
+// ============================================
+// REQUEST ID + SLOW REQUEST LOGGING MIDDLEWARE
+// ============================================
+app.use((req, res, next) => {
+  req.requestId = crypto.randomUUID();
+  res.setHeader('x-request-id', req.requestId);
+  req._startTime = Date.now();
+  res.on('finish', () => {
+    const duration = Date.now() - req._startTime;
+    if (duration > 2000) {
+      console.warn(JSON.stringify({
+        timestamp: new Date().toISOString(),
+        event: 'slow_request',
+        requestId: req.requestId,
+        method: req.method,
+        url: req.originalUrl,
+        status: res.statusCode,
+        duration_ms: duration
+      }));
+    }
+  });
+  next();
+});
 
 const supabaseUrl = process.env.SUPABASE_URL;
 // Use service role key for backend operations (bypasses RLS)
@@ -360,9 +404,45 @@ app.get('/', (req, res) => {
     });
 });
 
-// Health check for Railway
-app.get('/health', (req, res) => {
-    res.json({ status: 'healthy' });
+// Health check for Railway/Cloud Run — enhanced with dependency checks
+app.get('/health', async (req, res) => {
+  const checks = {};
+  let status = 'healthy';
+
+  // Check Supabase
+  try {
+    const { error } = await supabase.rpc('version').single().throwOnError().catch(async () => {
+      // Fallback: simple table query
+      return await supabase.from('assistants').select('id').limit(1);
+    });
+    checks.supabase = error ? 'error' : 'ok';
+    if (error) status = 'degraded';
+  } catch (e) {
+    checks.supabase = 'error';
+    status = 'degraded';
+  }
+
+  // Check Redis
+  try {
+    const { getRedis } = require('./services/cache');
+    const redis = getRedis();
+    if (redis) {
+      await redis.ping();
+      checks.redis = 'ok';
+    } else {
+      checks.redis = 'not configured';
+    }
+  } catch (e) {
+    checks.redis = 'error';
+    status = 'degraded';
+  }
+
+  res.json({
+    status,
+    uptime_seconds: Math.floor(process.uptime()),
+    timestamp: new Date().toISOString(),
+    checks
+  });
 });
 
 
@@ -1360,10 +1440,57 @@ app.get('/test-db', async (req, res) => {
   }
 });
 
+// ============================================
+// ADMIN METRICS ENDPOINT
+// ============================================
+app.get('/api/admin/metrics', async (req, res) => {
+  const passkey = req.headers['x-admin-passkey'];
+  if (!process.env.ADMIN_PASSKEY || passkey !== process.env.ADMIN_PASSKEY) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayIso = today.toISOString();
+
+  try {
+    const [callsResult, costsResult, assistantsResult] = await Promise.allSettled([
+      supabase.from('call_logs').select('id', { count: 'exact', head: true }).gte('created_at', todayIso),
+      supabase.from('call_costs').select('credits_deducted').gte('created_at', todayIso),
+      supabase.from('assistants').select('id', { count: 'exact', head: true }).eq('is_active', true)
+    ]);
+
+    const callsToday = callsResult.status === 'fulfilled' ? (callsResult.value.count || 0) : null;
+    const creditsToday = costsResult.status === 'fulfilled'
+      ? (costsResult.value.data || []).reduce((sum, r) => sum + (r.credits_deducted || 0), 0)
+      : null;
+    const activeAssistants = assistantsResult.status === 'fulfilled' ? (assistantsResult.value.count || 0) : null;
+
+    res.json({
+      timestamp: new Date().toISOString(),
+      calls_today: callsToday,
+      credits_deducted_today: creditsToday,
+      active_assistants: activeAssistants
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Global error handler
 app.use((err, req, res, next) => {
-  console.error('[Global Error Handler]', err.stack || err);
-  res.status(err.status || 500).json({ error: err.message || 'Internal server error' });
+  const status = err.status || 500;
+  console.error(JSON.stringify({
+    timestamp: new Date().toISOString(),
+    event: 'unhandled_error',
+    requestId: req.requestId,
+    method: req.method,
+    url: req.originalUrl,
+    status,
+    message: err.message,
+    stack: err.stack
+  }));
+  res.status(status).json({ error: err.message || 'Internal server error' });
 });
 
 app.listen(port, () => {
