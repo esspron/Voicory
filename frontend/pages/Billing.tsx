@@ -615,7 +615,7 @@ const Billing: React.FC = () => {
                                                 <td className={`py-3 text-sm font-medium text-right ${
                                                     tx.amount >= 0 ? 'text-emerald-400' : 'text-red-400'
                                                 }`}>
-                                                    {tx.amount >= 0 ? '+' : ''}${tx.amount.toFixed(2)}
+                                                    {tx.amount >= 0 ? '+' : ''}{Math.abs(tx.amount) < 0.01 && tx.amount !== 0 ? tx.amount.toFixed(6) : tx.amount.toFixed(4)} cr
                                                 </td>
                                                 <td className="py-3 text-sm text-textMuted text-right">
                                                     ${tx.balanceAfter.toFixed(2)}
