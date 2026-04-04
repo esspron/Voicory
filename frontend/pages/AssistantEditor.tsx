@@ -1,7 +1,7 @@
 import {
     FloppyDisk, Play,
     Globe, X, Check, ChatCircle, Phone, CircleNotch,
-    Trash, Translate, Lightning, Copy
+    Trash, Translate, Lightning, Copy, CopySimple, SpeakerHigh, SpeakerSlash
 } from '@phosphor-icons/react';
 import React, { useEffect, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
@@ -25,9 +25,10 @@ import { getAssistantIntegrations, saveAssistantIntegrations } from '../services
 import type { REScript } from '../types/reScripts';
 import { useAuth } from '../contexts/AuthContext';
 import { useClipboard } from '../hooks';
+import { authFetch } from '../lib/api';
 import { supabase } from '../services/supabase';
 import { logger } from '../lib/logger';
-import { getAssistant, getVoices, createAssistant, updateAssistant, deleteAssistant } from '../services/voicoryService';
+import { getAssistant, getVoices, createAssistant, updateAssistant, deleteAssistant, duplicateAssistant } from '../services/voicoryService';
 import {
     Assistant, Voice, AssistantInput, MemoryConfig,
     LanguageSettings, StyleSettings, StyleMode,
@@ -178,6 +179,9 @@ const AssistantEditor: React.FC = () => {
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [showPromptGenerator, setShowPromptGenerator] = useState(false);
     const [deleting, setDeleting] = useState(false);
+    const [duplicating, setDuplicating] = useState(false);
+    const [previewingVoice, setPreviewingVoice] = useState(false);
+    const previewAudioRef = useRef<HTMLAudioElement | null>(null);
     const [showChatSidebar, setShowChatSidebar] = useState(false);
     const [showVoiceCallPreview, setShowVoiceCallPreview] = useState(false);
     
@@ -498,6 +502,71 @@ const AssistantEditor: React.FC = () => {
         }
     };
 
+    const handleDuplicate = async () => {
+        if (!assistantId || duplicating) return;
+        setDuplicating(true);
+        try {
+            const copy = await duplicateAssistant(assistantId);
+            if (copy) {
+                navigate(`/assistants/${copy.id}`, { replace: false });
+            }
+        } catch (error) {
+            console.error('Error duplicating assistant:', error);
+            alert('Failed to duplicate assistant. Please try again.');
+        } finally {
+            setDuplicating(false);
+        }
+    };
+
+    const handlePreviewVoice = async () => {
+        if (!formData.voiceId || previewingVoice) return;
+
+        // Stop any currently playing preview
+        if (previewAudioRef.current) {
+            previewAudioRef.current.pause();
+            previewAudioRef.current = null;
+            setPreviewingVoice(false);
+            return;
+        }
+
+        setPreviewingVoice(true);
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            const token = session?.access_token;
+
+            const apiUrl = import.meta.env.VITE_API_URL || '';
+            const res = await fetch(`${apiUrl}/api/assistants/preview-voice`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                },
+                body: JSON.stringify({
+                    voice_id: formData.voiceId,
+                    model_id: formData.elevenlabsModelId || 'eleven_turbo_v2_5',
+                    text: `Hello! I'm ${formData.name}. How can I help you today?`,
+                }),
+            });
+
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error((err as {error?: string}).error || 'Preview failed');
+            }
+
+            const { audio } = await res.json() as { audio: string };
+            previewAudioRef.current = new Audio(audio);
+            previewAudioRef.current.play().catch(console.error);
+            previewAudioRef.current.onended = () => {
+                previewAudioRef.current = null;
+                setPreviewingVoice(false);
+            };
+        } catch (error) {
+            console.error('Error previewing voice:', error);
+            setPreviewingVoice(false);
+            alert('Voice preview failed. Check ElevenLabs API key or voice selection.');
+        }
+    };
+
     // Handle saving with updated knowledge base IDs (for link/unlink operation)
     const handleSaveWithKnowledgeBaseIds = async (updatedKnowledgeBaseIds: string[]) => {
         if (saving || !assistantId) return;
@@ -734,6 +803,34 @@ const AssistantEditor: React.FC = () => {
                             title="Delete assistant"
                         >
                             <Trash size={16} weight="bold" className="group-hover:scale-110 transition-transform" />
+                        </button>
+                    )}
+                    {/* Duplicate button - only show for existing assistants */}
+                    {assistantId && (
+                        <button
+                            onClick={handleDuplicate}
+                            disabled={saving || duplicating}
+                            className="group flex items-center gap-2 px-3 py-2.5 bg-surface/50 border border-white/10 rounded-xl text-sm text-textMuted hover:bg-white/5 hover:border-white/20 hover:text-textMain transition-all disabled:opacity-50"
+                            title="Duplicate assistant"
+                        >
+                            {duplicating ? <CircleNotch size={16} weight="bold" className="animate-spin" /> : <CopySimple size={16} weight="bold" className="group-hover:scale-110 transition-transform" />}
+                        </button>
+                    )}
+                    {/* Preview Voice button - only show when a voice is selected */}
+                    {formData.voiceId && (
+                        <button
+                            onClick={handlePreviewVoice}
+                            disabled={saving}
+                            className={`group flex items-center gap-2 px-3 py-2.5 border rounded-xl text-sm transition-all disabled:opacity-50 ${previewingVoice
+                                ? 'bg-primary/20 border-primary/40 text-primary'
+                                : 'bg-surface/50 border-white/10 text-textMuted hover:bg-white/5 hover:border-white/20 hover:text-textMain'
+                            }`}
+                            title={previewingVoice ? 'Stop preview' : 'Preview voice'}
+                        >
+                            {previewingVoice
+                                ? <SpeakerSlash size={16} weight="bold" className="animate-pulse" />
+                                : <SpeakerHigh size={16} weight="bold" className="group-hover:scale-110 transition-transform" />
+                            }
                         </button>
                     )}
                     {/* Test - goes to Tests tab for test cases */}
