@@ -411,10 +411,7 @@ app.get('/health', async (req, res) => {
 
   // Check Supabase
   try {
-    const { error } = await supabase.rpc('version').single().throwOnError().catch(async () => {
-      // Fallback: simple table query
-      return await supabase.from('assistants').select('id').limit(1);
-    });
+    const { error } = await supabase.from('assistants').select('id').limit(1);
     checks.supabase = error ? 'error' : 'ok';
     if (error) status = 'degraded';
   } catch (e) {
