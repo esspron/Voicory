@@ -1,19 +1,21 @@
-import { MagnifyingGlass, CaretDown, CaretUp, Sparkle, Lightning, Microphone, Robot, Database, Cloud, ChartLine, Phone, Plug, Plugs, CircleNotch } from '@phosphor-icons/react';
-import React, { useState, useEffect } from 'react';
+import { MagnifyingGlass, CaretDown, CaretUp, Sparkle, Lightning, Microphone, Robot, Database, Cloud, ChartLine, Phone, Plug, Plugs, CircleNotch, PlugsConnected } from '@phosphor-icons/react';
+import React, { useState, useEffect, useMemo } from 'react';
 
 import { CRMConfigModal, CRMIntegrationCard } from '@/components/crm';
+import ProviderConfigModal from '@/components/integrations/ProviderConfigModal';
 import {
-  getIntegrations,
-  CRM_PROVIDERS_LIST,
-  type CRMIntegration,
-  type CRMProvider,
+    getIntegrations,
+    CRM_PROVIDERS_LIST,
+    type CRMIntegration,
+    type CRMProvider,
 } from '@/services/crmService';
+import { getProviderConfig } from '@/services/providerConfigService';
 import { logger } from '@/lib/logger';
 
 interface Provider {
     name: string;
     description: string;
-    icon: string; // In a real app, this might be a component or image URL
+    icon: string;
     isNew?: boolean;
     isDeprecated?: boolean;
 }
@@ -23,10 +25,32 @@ interface Category {
     providers: Provider[];
 }
 
-const ProviderCard: React.FC<{ provider: Provider }> = ({ provider }) => (
-    <div className="group bg-surface/50 backdrop-blur-sm border border-white/[0.06] rounded-2xl p-5 hover:border-primary/30 hover:bg-white/[0.02] transition-all duration-300 cursor-pointer h-full flex flex-col">
+// Derive a slug from a provider display name
+function toSlug(name: string): string {
+    return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+}
+
+// ProviderCard — clickable, shows connected state
+const ProviderCard: React.FC<{
+    provider: Provider;
+    isConnected: boolean;
+    onClick: () => void;
+}> = ({ provider, isConnected, onClick }) => (
+    <div
+        onClick={onClick}
+        className={`group bg-surface/50 backdrop-blur-sm border rounded-2xl p-5 transition-all duration-300 cursor-pointer h-full flex flex-col
+        ${isConnected
+            ? 'border-primary/30 bg-primary/5 hover:border-primary/50'
+            : 'border-white/[0.06] hover:border-primary/30 hover:bg-white/[0.02]'
+        }`}
+    >
         <div className="mb-4">
-            <div className="w-12 h-12 bg-gradient-to-br from-white/10 to-white/5 rounded-xl flex items-center justify-center text-xl font-bold text-primary border border-white/10 group-hover:border-primary/30 group-hover:shadow-lg group-hover:shadow-primary/10 transition-all duration-300">
+            <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl font-bold border transition-all duration-300
+                ${isConnected
+                    ? 'bg-primary/20 border-primary/30 text-primary'
+                    : 'bg-gradient-to-br from-white/10 to-white/5 text-primary border-white/10 group-hover:border-primary/30 group-hover:shadow-lg group-hover:shadow-primary/10'
+                }`}
+            >
                 {provider.icon ? <img src={provider.icon} alt={provider.name} className="w-6 h-6" /> : provider.name[0]}
             </div>
         </div>
@@ -35,24 +59,34 @@ const ProviderCard: React.FC<{ provider: Provider }> = ({ provider }) => (
             {provider.isDeprecated && (
                 <span className="text-[10px] bg-red-500/10 text-red-400 px-1.5 py-0.5 rounded-full border border-red-500/20">Deprecated</span>
             )}
+            {isConnected && (
+                <span className="text-[10px] bg-green-500/10 text-green-400 px-1.5 py-0.5 rounded-full border border-green-500/20 flex items-center gap-1">
+                    <PlugsConnected size={10} weight="bold" /> Connected
+                </span>
+            )}
         </div>
         <p className="text-xs text-textMuted/80 leading-relaxed flex-1">
             {provider.description}
         </p>
         <div className="mt-4 pt-3 border-t border-white/5">
-            <span className="text-[10px] text-primary/60 font-medium uppercase tracking-wider group-hover:text-primary transition-colors">
-                Configure →
+            <span className={`text-[10px] font-medium uppercase tracking-wider transition-colors ${isConnected ? 'text-green-400' : 'text-primary/60 group-hover:text-primary'}`}>
+                {isConnected ? 'Configure →' : 'Connect →'}
             </span>
         </div>
     </div>
 );
 
-const CategorySection: React.FC<{ category: Category; icon: React.ElementType }> = ({ category, icon: Icon }) => {
+const CategorySection: React.FC<{
+    category: Category;
+    icon: React.ElementType;
+    connectedSet: Set<string>;
+    onProviderClick: (provider: Provider) => void;
+}> = ({ category, icon: Icon, connectedSet, onProviderClick }) => {
     const [isExpanded, setIsExpanded] = useState(true);
 
     return (
         <div className="mb-8">
-            <button 
+            <button
                 onClick={() => setIsExpanded(!isExpanded)}
                 className="group flex items-center gap-3 mb-5 w-full hover:opacity-80 transition-opacity"
             >
@@ -71,11 +105,16 @@ const CategorySection: React.FC<{ category: Category; icon: React.ElementType }>
                     )}
                 </div>
             </button>
-            
+
             {isExpanded && (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pl-11">
                     {category.providers.map((provider) => (
-                        <ProviderCard key={provider.name} provider={provider} />
+                        <ProviderCard
+                            key={provider.name}
+                            provider={provider}
+                            isConnected={connectedSet.has(toSlug(provider.name))}
+                            onClick={() => onProviderClick(provider)}
+                        />
                     ))}
                 </div>
             )}
@@ -90,6 +129,14 @@ const Integrations: React.FC = () => {
     const [selectedProvider, setSelectedProvider] = useState<CRMProvider | null>(null);
     const [selectedIntegration, setSelectedIntegration] = useState<CRMIntegration | undefined>(undefined);
     const [showCrmModal, setShowCrmModal] = useState(false);
+
+    // Generic provider modal state
+    const [providerModal, setProviderModal] = useState<{ name: string; id: string } | null>(null);
+    // Track which provider slugs are connected (loaded lazily)
+    const [connectedProviders, setConnectedProviders] = useState<Set<string>>(new Set());
+
+    // Search state
+    const [searchQuery, setSearchQuery] = useState('');
 
     // Load CRM integrations
     useEffect(() => {
@@ -138,6 +185,31 @@ const Integrations: React.FC = () => {
             setCrmIntegrations(prev => prev.filter(i => i.id !== selectedIntegration.id));
         }
         setShowCrmModal(false);
+    };
+
+    // Open generic provider modal and pre-load its connection status
+    const handleProviderClick = async (provider: Provider) => {
+        const slug = toSlug(provider.name);
+        setProviderModal({ name: provider.name, id: slug });
+        // Lazy-load connection status for this provider
+        try {
+            const cfg = await getProviderConfig(slug);
+            if (cfg?.isConnected) {
+                setConnectedProviders(prev => new Set([...prev, slug]));
+            }
+        } catch {
+            // ignore
+        }
+    };
+
+    const handleProviderConnectionChange = (isConnected: boolean) => {
+        if (!providerModal) return;
+        setConnectedProviders(prev => {
+            const next = new Set(prev);
+            if (isConnected) next.add(providerModal.id);
+            else next.delete(providerModal.id);
+            return next;
+        });
     };
 
     const categories: Category[] = [
@@ -239,6 +311,23 @@ const Integrations: React.FC = () => {
         "Observability Providers": ChartLine,
     };
 
+    // Filter categories based on search query
+    const filteredCategories = useMemo(() => {
+        if (!searchQuery.trim()) return categories;
+        const q = searchQuery.toLowerCase();
+        return categories
+            .map(cat => ({
+                ...cat,
+                providers: cat.providers.filter(
+                    p => p.name.toLowerCase().includes(q) || p.description.toLowerCase().includes(q)
+                ),
+            }))
+            .filter(cat => cat.providers.length > 0 || cat.title.toLowerCase().includes(q));
+    }, [searchQuery]);
+
+    const totalProviders = categories.reduce((acc, cat) => acc + cat.providers.length, 0);
+    const totalConnected = connectedProviders.size + crmIntegrations.filter(i => i.isConnected).length;
+
     return (
         <div className="max-w-7xl mx-auto mb-20">
             {/* Header */}
@@ -252,12 +341,14 @@ const Integrations: React.FC = () => {
                         <p className="text-sm text-textMuted">Connect your favorite tools and services</p>
                     </div>
                 </div>
-                
+
                 <div className="relative w-72">
                     <MagnifyingGlass size={18} weight="bold" className="absolute left-4 top-1/2 -translate-y-1/2 text-textMuted" />
-                    <input 
-                        type="text" 
-                        placeholder="Search integrations..." 
+                    <input
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="Search integrations..."
                         className="w-full bg-surface/50 backdrop-blur-sm border border-white/10 rounded-xl pl-11 pr-4 py-3 text-sm text-textMain outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20 placeholder:text-textMuted/50 transition-all"
                     />
                 </div>
@@ -268,7 +359,7 @@ const Integrations: React.FC = () => {
                 <div className="flex items-center gap-2">
                     <Lightning size={16} weight="fill" className="text-primary" />
                     <span className="text-sm text-textMuted">
-                        <span className="font-semibold text-textMain">{categories.reduce((acc, cat) => acc + cat.providers.length, 0)}</span> integrations available
+                        <span className="font-semibold text-textMain">{totalProviders}</span> integrations available
                     </span>
                 </div>
                 <div className="h-4 w-px bg-white/10" />
@@ -282,57 +373,69 @@ const Integrations: React.FC = () => {
                 <div className="flex items-center gap-2">
                     <Plugs size={16} weight="fill" className="text-green-400" />
                     <span className="text-sm text-textMuted">
-                        <span className="font-semibold text-textMain">{crmIntegrations.filter(i => i.isConnected).length}</span> CRMs connected
+                        <span className="font-semibold text-textMain">{totalConnected}</span> connected
                     </span>
                 </div>
             </div>
 
             {/* CRM Integrations Section */}
-            <div className="mb-10">
-                <div className="flex items-center gap-3 mb-5">
-                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center border border-white/10">
-                        <Plugs size={16} weight="duotone" className="text-primary" />
+            {!searchQuery && (
+                <div className="mb-10">
+                    <div className="flex items-center gap-3 mb-5">
+                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center border border-white/10">
+                            <Plugs size={16} weight="duotone" className="text-primary" />
+                        </div>
+                        <h3 className="text-base font-semibold text-textMain">CRM Integrations</h3>
+                        <span className="text-xs text-textMuted bg-white/5 px-2 py-0.5 rounded-full border border-white/10">
+                            {CRM_PROVIDERS_LIST.length} available
+                        </span>
                     </div>
-                    <h3 className="text-base font-semibold text-textMain">CRM Integrations</h3>
-                    <span className="text-xs text-textMuted bg-white/5 px-2 py-0.5 rounded-full border border-white/10">
-                        {CRM_PROVIDERS_LIST.length} available
-                    </span>
+
+                    {crmLoading ? (
+                        <div className="flex items-center justify-center py-12">
+                            <CircleNotch size={24} className="animate-spin text-primary" />
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pl-11">
+                            {CRM_PROVIDERS_LIST.map((provider) => {
+                                const integration = crmIntegrations.find(i => i.provider === provider.id);
+                                return (
+                                    <CRMIntegrationCard
+                                        key={provider.id}
+                                        provider={provider}
+                                        integration={integration}
+                                        onConnect={() => handleConnectCRM(provider.id)}
+                                        onConfigure={() => integration && handleConfigureCRM(integration)}
+                                    />
+                                );
+                            })}
+                        </div>
+                    )}
                 </div>
-                
-                {crmLoading ? (
-                    <div className="flex items-center justify-center py-12">
-                        <CircleNotch size={24} className="animate-spin text-primary" />
-                    </div>
-                ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pl-11">
-                        {CRM_PROVIDERS_LIST.map((provider) => {
-                            const integration = crmIntegrations.find(i => i.provider === provider.id);
-                            return (
-                                <CRMIntegrationCard
-                                    key={provider.id}
-                                    provider={provider}
-                                    integration={integration}
-                                    onConnect={() => handleConnectCRM(provider.id)}
-                                    onConfigure={() => integration && handleConfigureCRM(integration)}
-                                />
-                            );
-                        })}
-                    </div>
-                )}
-            </div>
+            )}
 
             {/* Divider */}
-            <div className="border-t border-white/5 my-8" />
+            {!searchQuery && <div className="border-t border-white/5 my-8" />}
 
-            <div className="space-y-2">
-                {categories.map((category) => (
-                    <CategorySection 
-                        key={category.title} 
-                        category={category} 
-                        icon={categoryIcons[category.title] || Plug}
-                    />
-                ))}
-            </div>
+            {/* Category sections */}
+            {filteredCategories.length === 0 ? (
+                <div className="text-center py-16 text-textMuted">
+                    <MagnifyingGlass size={32} className="mx-auto mb-3 opacity-40" />
+                    <p>No integrations found for "{searchQuery}"</p>
+                </div>
+            ) : (
+                <div className="space-y-2">
+                    {filteredCategories.map((category) => (
+                        <CategorySection
+                            key={category.title}
+                            category={category}
+                            icon={categoryIcons[category.title] || Plug}
+                            connectedSet={connectedProviders}
+                            onProviderClick={handleProviderClick}
+                        />
+                    ))}
+                </div>
+            )}
 
             {/* CRM Config Modal */}
             {selectedProvider && (
@@ -343,6 +446,17 @@ const Integrations: React.FC = () => {
                     onClose={() => setShowCrmModal(false)}
                     onSuccess={handleCRMSuccess}
                     onDelete={handleCRMDelete}
+                />
+            )}
+
+            {/* Generic Provider Config Modal */}
+            {providerModal && (
+                <ProviderConfigModal
+                    isOpen={true}
+                    providerName={providerModal.name}
+                    providerId={providerModal.id}
+                    onClose={() => setProviderModal(null)}
+                    onConnectionChange={handleProviderConnectionChange}
                 />
             )}
         </div>
