@@ -14,6 +14,7 @@ const { verifySupabaseAuth } = require('../lib/auth');
 const { validateTwilioVoiceParams, validateTwilioGatherBody, sanitizePromptInput } = require('../middleware/inputValidation');
 const { pushCallToAllCRMs } = require('../services/crm');
 const { calculateCallCost, logCostToSupabase } = require('../services/costTracking');
+const { executeHTTPTrigger } = require('../services/httpIntegrationExecutor');
 
 // ============================================
 // TWILIO PHONE NUMBER IMPORT
@@ -506,6 +507,14 @@ router.post('/:userId/voice', validateTwilioVoiceParams, async (req, res) => {
             console.log('📝 Call logged:', callLog?.id);
         }
 
+        // Fire call_started HTTP integrations (non-blocking)
+        executeHTTPTrigger(assistant.id, 'call_started', {
+            callSid: callData.CallSid,
+            phoneNumber: callData.From,
+            to: callData.To,
+            call_date: new Date().toISOString(),
+        });
+
         // Respond with first message and open speech gather for AI conversation loop
         res.type('text/xml');
         res.send(`
@@ -665,6 +674,14 @@ router.post('/:userId/voice/gather', validateTwilioVoiceParams, validateTwilioGa
         // Add AI response to history
         conversationHistory.push({ role: 'assistant', content: aiResponse });
 
+        // Fire custom_trigger HTTP integrations if AI response contains trigger phrase (non-blocking)
+        executeHTTPTrigger(assistant.id, 'custom_trigger', {
+            callSid: CallSid,
+            phoneNumber: From,
+            aiResponse,
+            call_date: new Date().toISOString(),
+        });
+
         // Persist conversation history to call log
         await supabase
             .from('call_logs')
@@ -795,6 +812,17 @@ router.post('/:userId/status', async (req, res) => {
                         .catch(err => {
                             console.error('❌ CRM sync error:', err.message);
                         });
+
+                    // Fire call_ended HTTP integrations (non-blocking)
+                    executeHTTPTrigger(callLog.assistant_id, 'call_ended', {
+                        callSid: statusData.CallSid,
+                        phoneNumber: statusData.From || callLog.from_number,
+                        duration: parseInt(statusData.CallDuration) || 0,
+                        transcript: callLog.transcript || '',
+                        summary: callLog.summary || '',
+                        disposition: mappedStatus,
+                        call_date: callLog.started_at,
+                    });
 
                     // Save memory after call ends (async, don't block webhook response)
                     const callerPhone = statusData.From || callLog.from_number;

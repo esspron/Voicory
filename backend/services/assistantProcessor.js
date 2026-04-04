@@ -10,6 +10,7 @@ const { getCachedAssistant } = require('./assistant');
 const { searchKnowledgeBase, formatRAGContext } = require('./rag');
 const { resolveTemplateVariables } = require('./template');
 const { formatMemoryForPrompt } = require('./memory');
+const { executeHTTPTrigger } = require('./httpIntegrationExecutor');
 
 // ============================================
 // CONFIGURATION DEFAULTS
@@ -145,6 +146,18 @@ async function processMessage(options) {
         };
 
         console.log(`[AssistantProcessor] Response generated (${usage.totalTokens} tokens)`);
+
+        // Fire on_message HTTP integrations for messaging channels (non-blocking)
+        if (assistantId && channel !== 'calls') {
+            executeHTTPTrigger(assistantId, 'on_message', {
+                ai_response: response,
+                message,
+                channel,
+                customer_name: customer?.name || '',
+                phone_number: customer?.phone_number || customer?.phone || '',
+                email: customer?.email || '',
+            });
+        }
 
         return { response, usage, error: null };
 
