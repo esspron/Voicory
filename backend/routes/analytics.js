@@ -76,3 +76,74 @@ router.get('/model-usage', async (req, res) => {
 });
 
 module.exports = router;
+
+// GET /api/analytics/monthly-report?month=YYYY-MM
+// Returns a CSV of all credit transactions + call costs for the given month
+// Auth: Bearer token required (Supabase JWT)
+const { verifySupabaseAuth } = require('../lib/auth');
+
+router.get('/monthly-report', verifySupabaseAuth, async (req, res) => {
+  try {
+    const { month } = req.query;
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ success: false, error: 'Unauthorized' });
+
+    // Validate / default month
+    const reportMonth = month && /^\d{4}-\d{2}$/.test(month)
+      ? month
+      : new Date().toISOString().slice(0, 7);
+
+    const startDate = `${reportMonth}-01T00:00:00.000Z`;
+    const endDate = new Date(new Date(startDate).setMonth(new Date(startDate).getMonth() + 1)).toISOString();
+
+    const supabase = getSupabase();
+
+    // Fetch credit transactions for the month
+    const { data: txns, error: txErr } = await supabase
+      .from('credit_transactions')
+      .select('created_at, transaction_type, description, amount, balance_after')
+      .eq('user_id', userId)
+      .gte('created_at', startDate)
+      .lt('created_at', endDate)
+      .order('created_at', { ascending: true });
+
+    if (txErr) throw new Error(txErr.message);
+
+    // Fetch call costs for the month
+    const { data: costs, error: costErr } = await supabase
+      .from('call_costs')
+      .select('created_at, model, input_tokens, output_tokens, total_cost_usd, margin_usd')
+      .eq('user_id', userId)
+      .gte('created_at', startDate)
+      .lt('created_at', endDate)
+      .order('created_at', { ascending: true });
+
+    if (costErr) throw new Error(costErr.message);
+
+    // Build CSV
+    const rows = [];
+    rows.push('date,type,description,amount_usd,balance_after_usd,model,input_tokens,output_tokens,cost_usd,margin_usd');
+
+    for (const tx of (txns || [])) {
+      const date = new Date(tx.created_at).toISOString().slice(0, 10);
+      const desc = `"${(tx.description || '').replace(/"/g, '""')}"`;
+      rows.push([date, tx.transaction_type, desc, tx.amount, tx.balance_after, '', '', '', '', ''].join(','));
+    }
+
+    for (const c of (costs || [])) {
+      const date = new Date(c.created_at).toISOString().slice(0, 10);
+      const desc = `"Call cost - ${(c.model || 'unknown').replace(/"/g, '""')}"`;
+      rows.push([date, 'usage', desc, -Math.abs(c.total_cost_usd || 0), '', c.model || '', c.input_tokens || 0, c.output_tokens || 0, c.total_cost_usd || 0, c.margin_usd || 0].join(','));
+    }
+
+    const csv = rows.join('\n');
+
+    res.set({
+      'Content-Type': 'text/csv',
+      'Content-Disposition': `attachment; filename="voicory-report-${reportMonth}.csv"`,
+    });
+    res.send(csv);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});

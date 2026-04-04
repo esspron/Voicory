@@ -6,6 +6,7 @@ import AddOnConfirmationDialog from '../../components/billing/AddOnConfirmationD
 import ApplyCouponModal from '../../components/billing/ApplyCouponModal';
 import BuyCreditsModal from '../../components/billing/BuyCreditsModal';
 import { useAuth } from '../../contexts/AuthContext';
+import { authFetch } from '../../lib/api';
 import { 
     AddonType, 
     ADDON_PRICING, 
@@ -23,6 +24,7 @@ import {
     BillingStatus,
     initializePaddle
 } from '../../services/paddleService';
+import { getAutoReloadSettings, updateAutoReloadSettings, AutoReloadSettings } from '../../services/paymentService';
 import { getUserProfile } from '../../services/voicoryService';
 import { UserProfile } from '../../types';
 
@@ -71,7 +73,8 @@ const BillingAndAddons: React.FC = () => {
     const [showAddonDialog, setShowAddonDialog] = useState(false);
     
     // Other states
-    const [autoReloadEnabled, setAutoReloadEnabled] = useState(false);
+    const [autoReloadSettings, setAutoReloadSettings] = useState<AutoReloadSettings | null>(null);
+    const autoReloadEnabled = autoReloadSettings?.enabled ?? false;
     const [isTransactionHistoryOpen, setIsTransactionHistoryOpen] = useState(false);
 
     // Modal State
@@ -101,13 +104,14 @@ const BillingAndAddons: React.FC = () => {
                 // Initialize Paddle for checkout
                 await initializePaddle();
                 
-                const [profile, summary, txns, billingStatusResult, addons, addonHistory] = await Promise.all([
+                const [profile, summary, txns, billingStatusResult, addons, addonHistory, reloadSettings] = await Promise.all([
                     getUserProfile(),
                     getUsageSummary(30),
                     getCreditTransactions(20),
                     getBillingStatus(),
                     getActiveAddons(),
-                    getAddonBillingHistory(10)
+                    getAddonBillingHistory(10),
+                    getAutoReloadSettings()
                 ]);
                 setUserProfile(profile);
                 setUsageSummary(summary);
@@ -115,6 +119,7 @@ const BillingAndAddons: React.FC = () => {
                 setBillingStatus(billingStatusResult);
                 setActiveAddons(addons);
                 setAddonBillingHistory(addonHistory);
+                setAutoReloadSettings(reloadSettings);
             } catch (error) {
                 console.error('Error fetching billing data:', error);
             } finally {
@@ -225,6 +230,31 @@ const BillingAndAddons: React.FC = () => {
         setTransactions(txns);
         setShowCouponModal(false);
     };
+
+    // Download monthly report as CSV
+    const [isDownloading, setIsDownloading] = React.useState(false);
+    const handleDownloadStatement = React.useCallback(async () => {
+        setIsDownloading(true);
+        try {
+            const month = new Date().toISOString().slice(0, 7);
+            const response = await authFetch(`/api/analytics/monthly-report?month=${month}`);
+            if (!response.ok) throw new Error('Download failed');
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `voicory-report-${month}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            console.error('Failed to download statement:', err);
+            alert('Could not download report. Please try again.');
+        } finally {
+            setIsDownloading(false);
+        }
+    }, []);
 
     if (loading) {
         return (
@@ -649,7 +679,11 @@ const BillingAndAddons: React.FC = () => {
                             <h3 className="text-xl font-semibold text-textMain">Auto Reload</h3>
                         </div>
                         <button
-                            onClick={() => setAutoReloadEnabled(!autoReloadEnabled)}
+                            onClick={async () => {
+                                const newEnabled = !autoReloadEnabled;
+                                setAutoReloadSettings(s => s ? { ...s, enabled: newEnabled } : { enabled: newEnabled, reloadAmount: 500, threshold: 100 });
+                                await updateAutoReloadSettings({ enabled: newEnabled });
+                            }}
                             className={`w-11 h-6 rounded-full relative transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary/50 ${autoReloadEnabled ? 'bg-primary' : 'bg-surfaceHover border border-border'}`}
                         >
                             <div className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-all duration-200 shadow-sm ${autoReloadEnabled ? 'left-6' : 'left-1'}`} />
@@ -663,7 +697,12 @@ const BillingAndAddons: React.FC = () => {
                                 <span className="absolute left-3 top-2.5 text-textMuted text-sm">$</span>
                                 <input
                                     type="number"
-                                    defaultValue={10}
+                                    value={autoReloadSettings?.reloadAmount ?? 500}
+                                    onChange={async (e) => {
+                                        const v = Number(e.target.value);
+                                        setAutoReloadSettings(s => s ? { ...s, reloadAmount: v } : { enabled: false, reloadAmount: v, threshold: 100 });
+                                        await updateAutoReloadSettings({ reloadAmount: v });
+                                    }}
                                     className="w-full bg-surface border border-border rounded-lg pl-7 pr-3 py-2.5 text-sm text-textMain outline-none focus:border-primary"
                                 />
                             </div>
@@ -674,7 +713,12 @@ const BillingAndAddons: React.FC = () => {
                                 <span className="absolute left-3 top-2.5 text-textMuted text-sm">$</span>
                                 <input
                                     type="number"
-                                    defaultValue={10}
+                                    value={autoReloadSettings?.threshold ?? 100}
+                                    onChange={async (e) => {
+                                        const v = Number(e.target.value);
+                                        setAutoReloadSettings(s => s ? { ...s, threshold: v } : { enabled: false, reloadAmount: 500, threshold: v });
+                                        await updateAutoReloadSettings({ threshold: v });
+                                    }}
                                     className="w-full bg-surface border border-border rounded-lg pl-7 pr-3 py-2.5 text-sm text-textMain outline-none focus:border-primary"
                                 />
                             </div>
@@ -698,13 +742,14 @@ const BillingAndAddons: React.FC = () => {
                             />
                             <h3 className="text-lg font-semibold text-textMain">Credit Transaction History</h3>
                         </div>
-                        <div
-                            onClick={(e) => e.stopPropagation()}
-                            className="flex items-center gap-2 text-xs font-medium text-textMain border border-border hover:bg-surfaceHover px-3 py-1.5 rounded-lg transition-colors"
+                        <button
+                            onClick={(e) => { e.stopPropagation(); handleDownloadStatement(); }}
+                            disabled={isDownloading}
+                            className="flex items-center gap-2 text-xs font-medium text-textMain border border-border hover:bg-surfaceHover px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
                         >
                             <DownloadSimple size={14} />
-                            Download Monthly Statement
-                        </div>
+                            {isDownloading ? 'Downloading...' : 'Download Monthly Statement'}
+                        </button>
                     </button>
                     {isTransactionHistoryOpen && <div className="p-6">
                         <p className="text-xs text-textMuted mb-4">Recent credit transactions including purchases and usage.</p>

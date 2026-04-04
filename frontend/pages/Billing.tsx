@@ -1,10 +1,11 @@
 import { CreditCard, Check, Warning, DownloadSimple, Plus, Info, PencilSimple, Lightning, CurrencyDollar, ArrowClockwise, Receipt, CaretRight, Ticket } from '@phosphor-icons/react';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 import ApplyCouponModal from '../components/billing/ApplyCouponModal';
 import BuyCreditsModal from '../components/billing/BuyCreditsModal';
 import { Button } from '../components/ui/Button';
+import { authFetch } from '../lib/api';
 import { 
     getUsageSummary, 
     getCreditTransactions, 
@@ -109,9 +110,33 @@ const Billing: React.FC = () => {
         setShowCouponModal(false);
     };
 
+    // Download monthly report as CSV
+    const [isDownloading, setIsDownloading] = useState(false);
+    const handleDownloadStatement = useCallback(async () => {
+        setIsDownloading(true);
+        try {
+            const month = new Date().toISOString().slice(0, 7);
+            const response = await authFetch(`/api/analytics/monthly-report?month=${month}`);
+            if (!response.ok) throw new Error('Download failed');
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `voicory-report-${month}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            console.error('Failed to download statement:', err);
+            alert('Could not download report. Please try again.');
+        } finally {
+            setIsDownloading(false);
+        }
+    }, []);
+
     // Handle auto reload toggle
-    const handleAutoReloadToggle = async (enabled: boolean) => {
-        const newSettings = { ...autoReloadSettings, enabled };
+    const handleAutoReloadToggle = async (enabled: boolean) => {        const newSettings = { ...autoReloadSettings, enabled };
         setAutoReloadSettings(newSettings as AutoReloadSettings);
         await updateAutoReloadSettings({ enabled });
     };
@@ -519,9 +544,9 @@ const Billing: React.FC = () => {
                             <Receipt size={20} weight="bold" className="text-textMuted" />
                             <h3 className="text-lg font-semibold text-textMain">Credit Purchase History</h3>
                         </div>
-                        <Button variant="secondary" size="sm" className="gap-2">
+                        <Button variant="secondary" size="sm" className="gap-2" onClick={handleDownloadStatement} disabled={isDownloading}>
                             <DownloadSimple size={14} weight="bold" />
-                            Download Statement
+                            {isDownloading ? 'Downloading...' : 'Download Statement'}
                         </Button>
                     </div>
                     <div className="p-6">
