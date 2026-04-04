@@ -372,6 +372,59 @@ async function refreshTokenIfNeeded(integration) {
 }
 
 /**
+ * Get all active CRM integrations for a workspace (from generic integrations table)
+ * Used for wiring CRM into call-end and WhatsApp flows
+ */
+async function getCrmIntegrations(workspaceId) {
+    const { data, error } = await supabase
+        .from('integrations')
+        .select('*')
+        .eq('workspace_id', workspaceId)
+        .eq('category', 'crm')
+        .eq('is_active', true);
+    if (error) throw new Error(`Failed to get CRM integrations: ${error.message}`);
+    return data || [];
+}
+
+/**
+ * Lookup a contact in a CRM by phone number.
+ * Returns { contactName, notes } or null if not found.
+ */
+async function lookupContact(integration, phoneNumber) {
+    try {
+        const decrypted = decryptIntegrationCredentials(integration);
+        const provider = integration.provider;
+
+        if (provider === 'followupboss') {
+            const apiKey = decrypted.api_key;
+            if (!apiKey) return null;
+            const result = await followupboss.findPersonByPhone(apiKey, phoneNumber);
+            if (!result) return null;
+            return {
+                contactName: [result.firstName, result.lastName].filter(Boolean).join(' ') || null,
+                notes: result.background || null,
+            };
+        }
+
+        if (provider === 'liondesk') {
+            const accessToken = decrypted.access_token;
+            if (!accessToken) return null;
+            const result = await liondesk.findContactByPhone(accessToken, phoneNumber);
+            if (!result) return null;
+            return {
+                contactName: [result.first_name, result.last_name].filter(Boolean).join(' ') || null,
+                notes: result.notes || null,
+            };
+        }
+
+        return null;
+    } catch (err) {
+        console.warn(`[CRM] lookupContact failed for ${integration.provider}:`, err.message);
+        return null;
+    }
+}
+
+/**
  * Raw update without encryption (for internal use with already encrypted data)
  */
 async function updateIntegrationRaw(integrationId, updateData) {
@@ -409,6 +462,10 @@ module.exports = {
     pushCallToCRM,
     pushCallToAllCRMs,
     logSync,
+
+    // Helpers
+    getCrmIntegrations,
+    lookupContact,
     
     // OAuth
     refreshTokenIfNeeded,

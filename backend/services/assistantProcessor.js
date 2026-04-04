@@ -11,6 +11,7 @@ const { searchKnowledgeBase, formatRAGContext } = require('./rag');
 const { resolveTemplateVariables } = require('./template');
 const { formatMemoryForPrompt } = require('./memory');
 const { executeHTTPTrigger } = require('./httpIntegrationExecutor');
+const { getUserIntegrations, lookupContact } = require('./crm');
 
 // ============================================
 // CONFIGURATION DEFAULTS
@@ -80,6 +81,24 @@ async function processMessage(options) {
         return { error: 'AI service not available', response: null, usage: null };
     }
 
+    // ===== CRM CONTACT LOOKUP (async, inject context if found) =====
+    let crmContext = null;
+    if (userId && customer?.phone_number) {
+        try {
+            const crmIntegrations = await getUserIntegrations(userId);
+            for (const integration of crmIntegrations) {
+                const contact = await lookupContact(integration, customer.phone_number);
+                if (contact) {
+                    crmContext = contact;
+                    break;
+                }
+            }
+        } catch (crmErr) {
+            // Non-blocking — never fail the call due to CRM lookup issues
+            console.warn('[CRM] Contact lookup failed:', crmErr.message);
+        }
+    }
+
     try {
         // ===== STEP 1: Get Assistant Configuration =====
         const assistant = await resolveAssistantConfig(assistantId, assistantConfig, channel);
@@ -105,6 +124,11 @@ async function processMessage(options) {
             if (memoryContext) {
                 systemPrompt += memoryContext;
             }
+        }
+
+        // ===== STEP 5b: Inject CRM Contact Context (if found) =====
+        if (crmContext) {
+            systemPrompt += `\n\n[CRM CONTEXT]\nContact Name: ${crmContext.contactName || 'Unknown'}\n${crmContext.notes ? `Notes: ${crmContext.notes}` : ''}\nUse this to personalize your response.`;
         }
 
         // ===== STEP 6: Add RAG Context (Knowledge Base) =====

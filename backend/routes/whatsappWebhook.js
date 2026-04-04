@@ -9,6 +9,7 @@ const { getCachedWhatsAppConfig, getCachedAssistant } = require('../services/ass
 const { isMessageProcessed, markMessageProcessed, cacheDelete } = require('../services/cache');
 const { processMessage } = require('../services/assistantProcessor');
 const { getCustomerMemory } = require('../services/memory');
+const { pushCallToAllCRMs } = require('../services/crm');
 
 // ============================================
 // WHATSAPP WEBHOOK ENDPOINTS
@@ -442,6 +443,27 @@ async function processWithAI(config, message, contact) {
 
         // === WHATSAPP-SPECIFIC: Send reply ===
         await sendWhatsAppReply(config, message.from, aiResponse, customerId);
+
+        // === CRM SYNC: Push WhatsApp conversation to CRM integrations (non-blocking) ===
+        setImmediate(async () => {
+            try {
+                const callDataForCRM = {
+                    phoneNumber: '+' + message.from,
+                    direction: 'inbound',
+                    duration: 0,
+                    outcome: 'whatsapp',
+                    summary: `WhatsApp: ${currentMsgText?.substring(0, 100)}`,
+                    transcript: `User: ${currentMsgText}\nAssistant: ${aiResponse}`,
+                    startedAt: new Date().toISOString(),
+                    endedAt: new Date().toISOString(),
+                    callSid: message.id,
+                    assistantName: assistant.name || 'AI Assistant',
+                };
+                await pushCallToAllCRMs(config.user_id, callDataForCRM);
+            } catch (crmErr) {
+                console.error('[CRM] WhatsApp push failed:', crmErr.message);
+            }
+        });
         
         // === WHATSAPP-SPECIFIC: Memory analysis ===
         if (assistant.memory_enabled && customerId) {
