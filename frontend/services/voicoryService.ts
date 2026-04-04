@@ -711,16 +711,17 @@ export const getAssistantCallLogs = async (assistantId: string): Promise<CallLog
 /**
  * Get all customers from Supabase
  */
-export const getCustomers = async (): Promise<Customer[]> => {
+export const getCustomers = async (search?: string): Promise<Customer[]> => {
     try {
-        const { data, error } = await supabase
-            .from('customers')
-            .select('*')
-            .order('created_at', { ascending: false });
-
-        if (error) throw error;
-
-        return (data || []).map(c => ({
+        // Use backend API so search (ILIKE) happens server-side
+        const params = search ? `?search=${encodeURIComponent(search)}` : '';
+        const response = await authFetch(`/api/customers${params}`);
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err.error || 'Failed to fetch customers');
+        }
+        const { customers } = await response.json();
+        return (customers || []).map((c: any) => ({
             id: c.id,
             name: c.name,
             email: c.email,
@@ -733,11 +734,67 @@ export const getCustomers = async (): Promise<Customer[]> => {
             source: c.source,
             crm_provider: c.crm_provider,
             last_synced_at: c.last_synced_at,
+            last_called_at: c.last_called_at,
         }));
     } catch (error) {
-        console.error('Error fetching customers from Supabase:', error);
+        console.error('Error fetching customers:', error);
         throw error;
     }
+};
+
+/**
+ * Export all customers as CSV (triggers download)
+ */
+export const exportCustomersCSV = async (): Promise<void> => {
+    const apiBase = (import.meta as any).env.VITE_API_URL || '';
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    const response = await fetch(`${apiBase}/api/customers/export`, {
+        headers: { Authorization: `Bearer ${token}` }
+    });
+    if (!response.ok) {
+        throw new Error('Failed to export customers');
+    }
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `customers_export_${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+};
+
+/**
+ * Import customers from a CSV File object via multipart upload
+ * Returns { imported: N, skipped: N, errors: string[] }
+ */
+export const importCustomersCSV = async (file: File): Promise<{ imported: number; skipped: number; errors: string[] }> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await authFetch('/api/customers/import', { method: 'POST', body: formData });
+    if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to import customers');
+    }
+    return response.json();
+};
+
+/**
+ * Bulk delete customers by IDs
+ */
+export const bulkDeleteCustomers = async (ids: string[]): Promise<{ deleted: number }> => {
+    const response = await authFetch('/api/customers/bulk-delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids })
+    });
+    if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to delete customers');
+    }
+    return response.json();
 };
 
 /**

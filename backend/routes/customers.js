@@ -2,36 +2,281 @@
  * Customers Routes
  *
  * Handles customer listing and CRM sync endpoints:
- * - GET  /api/customers          — List customers for authenticated user
+ * - GET  /api/customers              — List customers for authenticated user (supports ?search=)
+ * - GET  /api/customers/export       — Export customers as CSV
+ * - POST /api/customers/import       — Import customers from CSV file (multipart/form-data)
+ * - POST /api/customers/bulk-delete  — Bulk delete customers by IDs
  * - POST /api/customers/sync-from-crm — Pull contacts from connected CRMs and upsert
  * - GET  /api/customers/sync-status   — Last sync status per provider
  */
 
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
 const { supabase } = require('../config');
 const { verifySupabaseAuth } = require('../lib/auth');
 const { decrypt } = require('../lib/crypto');
+
+// multer: memory storage for CSV parsing
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max
+    fileFilter: (req, file, cb) => {
+        if (file.mimetype === 'text/csv' || file.originalname.endsWith('.csv')) {
+            cb(null, true);
+        } else {
+            cb(new Error('Only CSV files are allowed'));
+        }
+    }
+});
 
 // All routes require auth
 router.use(verifySupabaseAuth);
 
 // ============================================
 // GET /api/customers
+// Supports optional ?search= query (ILIKE on name, email, phone_number)
 // ============================================
 router.get('/', async (req, res) => {
     try {
         const userId = req.user.id;
-        const { data, error } = await supabase
+        const { search } = req.query;
+
+        let query = supabase
             .from('customers')
-            .select('id, name, email, phone_number, variables, created_at, updated_at, has_memory, last_interaction, interaction_count, source, crm_provider, last_synced_at')
+            .select('id, name, email, phone_number, variables, created_at, updated_at, has_memory, last_interaction, interaction_count, source, crm_provider, last_synced_at, last_called_at')
             .eq('user_id', userId)
             .order('created_at', { ascending: false });
+
+        if (search && search.trim()) {
+            const term = `%${search.trim()}%`;
+            query = query.or(`name.ilike.${term},email.ilike.${term},phone_number.ilike.${term}`);
+        }
+
+        const { data, error } = await query;
 
         if (error) throw error;
         res.json({ customers: data || [] });
     } catch (err) {
         console.error('GET /api/customers error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ============================================
+// GET /api/customers/export
+// Returns CSV of all customers for authenticated user
+// ============================================
+router.get('/export', async (req, res) => {
+    try {
+        const userId = req.user.id;
+
+        const { data, error } = await supabase
+            .from('customers')
+            .select('id, name, email, phone_number, variables, source, created_at, last_called_at')
+            .eq('user_id', userId)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        const customers = data || [];
+
+        // Build CSV rows
+        const headers = ['id', 'name', 'email', 'phone_number', 'source', 'created_at', 'last_called_at'];
+        const rows = [headers.join(',')];
+
+        for (const c of customers) {
+            const row = [
+                csvEscape(c.id || ''),
+                csvEscape(c.name || ''),
+                csvEscape(c.email || ''),
+                csvEscape(c.phone_number || ''),
+                csvEscape(c.source || ''),
+                csvEscape(c.created_at || ''),
+                csvEscape(c.last_called_at || ''),
+            ];
+            rows.push(row.join(','));
+        }
+
+        const csvContent = rows.join('\n');
+        const filename = `customers_export_${new Date().toISOString().split('T')[0]}.csv`;
+
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.send(csvContent);
+    } catch (err) {
+        console.error('GET /api/customers/export error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Helper: escape a value for CSV
+function csvEscape(val) {
+    const str = String(val);
+    if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+        return `"${str.replace(/"/g, '""')}"`;
+    }
+    return str;
+}
+
+// Helper: parse CSV text into array of objects (rows as object keyed by header)
+function parseCSVText(text) {
+    const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n').filter(l => l.trim());
+    if (lines.length < 2) return { headers: [], rows: [] };
+
+    const parseRow = (line) => {
+        const result = [];
+        let current = '';
+        let inQuotes = false;
+        for (let i = 0; i < line.length; i++) {
+            const ch = line[i];
+            if (ch === '"') {
+                if (inQuotes && line[i + 1] === '"') { current += '"'; i++; }
+                else inQuotes = !inQuotes;
+            } else if (ch === ',' && !inQuotes) {
+                result.push(current.trim());
+                current = '';
+            } else {
+                current += ch;
+            }
+        }
+        result.push(current.trim());
+        return result;
+    };
+
+    const headers = parseRow(lines[0]).map(h => h.toLowerCase().trim());
+    const rows = lines.slice(1).map(line => {
+        const cells = parseRow(line);
+        const obj = {};
+        headers.forEach((h, i) => { obj[h] = cells[i] || ''; });
+        return obj;
+    });
+
+    return { headers, rows };
+}
+
+// ============================================
+// POST /api/customers/import
+// Accepts multipart/form-data with field "file" (CSV)
+// Returns { imported: N, skipped: N, errors: [] }
+// ============================================
+router.post('/import', upload.single('file'), async (req, res) => {
+    try {
+        const userId = req.user.id;
+
+        if (!req.file) {
+            return res.status(400).json({ error: 'No CSV file uploaded. Use field name "file".' });
+        }
+
+        const text = req.file.buffer.toString('utf-8');
+        const { headers, rows } = parseCSVText(text);
+
+        if (!headers.length || !rows.length) {
+            return res.status(400).json({ error: 'CSV file is empty or has no data rows.' });
+        }
+
+        // Detect required column indices
+        const nameIdx = headers.find(h => h === 'name');
+        const phoneIdx = headers.find(h => h === 'phone_number' || h === 'phone' || h === 'phonenumber');
+        const emailIdx = headers.find(h => h === 'email');
+
+        if (!nameIdx || !phoneIdx) {
+            return res.status(400).json({ error: 'CSV must contain at minimum: name, phone_number (or phone) columns.' });
+        }
+
+        const toImport = [];
+        const errors = [];
+
+        for (let i = 0; i < rows.length; i++) {
+            const row = rows[i];
+            const name = (row['name'] || '').trim();
+            const phone = (row['phone_number'] || row['phone'] || row['phonenumber'] || '').trim();
+            const email = emailIdx ? (row['email'] || '').trim() : null;
+
+            if (!name || !phone) {
+                errors.push(`Row ${i + 2}: missing name or phone_number`);
+                continue;
+            }
+
+            // Parse var_ columns into variables object
+            const variables = {};
+            for (const h of headers) {
+                if (h.startsWith('var_')) {
+                    const val = (row[h] || '').trim();
+                    if (val) variables[h.replace('var_', '')] = val;
+                }
+            }
+
+            toImport.push({ name, email: email || null, phone_number: phone, variables, user_id: userId });
+        }
+
+        if (toImport.length === 0) {
+            return res.status(400).json({ error: 'No valid rows to import.', imported: 0, skipped: rows.length, errors });
+        }
+
+        // Upsert in batches of 100 (conflict on user_id + phone_number)
+        let imported = 0;
+        let skipped = 0;
+        const batchSize = 100;
+
+        for (let i = 0; i < toImport.length; i += batchSize) {
+            const batch = toImport.slice(i, i + batchSize);
+            const { data, error: dbErr } = await supabase
+                .from('customers')
+                .upsert(batch, {
+                    onConflict: 'user_id,phone_number',
+                    ignoreDuplicates: false
+                })
+                .select('id');
+
+            if (dbErr) {
+                // Partial failure — try row by row
+                for (const row of batch) {
+                    const { error: rowErr } = await supabase.from('customers').upsert(row, { onConflict: 'user_id,phone_number', ignoreDuplicates: false });
+                    if (rowErr) {
+                        errors.push(`Failed to import ${row.name} (${row.phone_number}): ${rowErr.message}`);
+                        skipped++;
+                    } else {
+                        imported++;
+                    }
+                }
+            } else {
+                imported += (data || batch).length;
+            }
+        }
+
+        res.json({ imported, skipped: skipped + (rows.length - toImport.length), errors: errors.slice(0, 20) });
+    } catch (err) {
+        console.error('POST /api/customers/import error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ============================================
+// POST /api/customers/bulk-delete
+// Body: { ids: string[] }
+// ============================================
+router.post('/bulk-delete', async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { ids } = req.body;
+
+        if (!Array.isArray(ids) || ids.length === 0) {
+            return res.status(400).json({ error: 'ids must be a non-empty array' });
+        }
+
+        // Only delete customers belonging to this user
+        const { error, count } = await supabase
+            .from('customers')
+            .delete({ count: 'exact' })
+            .eq('user_id', userId)
+            .in('id', ids);
+
+        if (error) throw error;
+
+        res.json({ deleted: count || ids.length });
+    } catch (err) {
+        console.error('POST /api/customers/bulk-delete error:', err);
         res.status(500).json({ error: err.message });
     }
 });

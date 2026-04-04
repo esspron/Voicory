@@ -1,19 +1,25 @@
 
 import { Plus, MagnifyingGlass, DotsThree, Trash, X, FloppyDisk, PencilSimple, Upload, DownloadSimple, Table, Warning, CheckCircle, Brain, ChatCircle, ChartLineUp, Lightbulb, Clock, Phone, User, Heart, CaretRight, CircleNotch, Calendar, Target, WarningCircle, WhatsappLogo, Sparkle, UsersThree, ArrowsClockwise } from '@phosphor-icons/react';
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 
-import { getCustomers, createCustomer, updateCustomer, deleteCustomer, createBulkCustomers, getCustomerMemory, getCustomerConversations, getCustomerInsights, getCustomerWhatsAppMessages, WhatsAppMessage, syncCustomersFromCRM } from '../services/voicoryService';
+import { getCustomers, createCustomer, updateCustomer, deleteCustomer, createBulkCustomers, getCustomerMemory, getCustomerConversations, getCustomerInsights, getCustomerWhatsAppMessages, WhatsAppMessage, syncCustomersFromCRM, exportCustomersCSV, importCustomersCSV, bulkDeleteCustomers } from '../services/voicoryService';
 import { Customer, CustomerMemory, CustomerConversation, CustomerInsight } from '../types';
 
 const Customers: React.FC = () => {
     const [customers, setCustomers] = useState<Customer[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
+    const [searchDebounced, setSearchDebounced] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [exporting, setExporting] = useState(false);
+    
+    // Bulk selection state
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+    const [bulkDeleting, setBulkDeleting] = useState(false);
     
     // Customer Details Modal State
     const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
@@ -31,6 +37,7 @@ const Customers: React.FC = () => {
     const [bulkSuccess, setBulkSuccess] = useState<string | null>(null);
     const [parsedCustomers, setParsedCustomers] = useState<Omit<Customer, 'id' | 'createdAt'>[]>([]);
     const [csvPreview, setCsvPreview] = useState<string[][]>([]);
+    const [csvFile, setCsvFile] = useState<File | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     
     // Form State
@@ -42,24 +49,35 @@ const Customers: React.FC = () => {
     });
     const [tempVariables, setTempVariables] = useState<{key: string, value: string}[]>([]);
 
-    const loadCustomers = async () => {
+    // Debounce search
+    useEffect(() => {
+        const timer = setTimeout(() => setSearchDebounced(searchQuery), 350);
+        return () => clearTimeout(timer);
+    }, [searchQuery]);
+
+    const loadCustomers = useCallback(async (search?: string) => {
         try {
             setLoading(true);
-            const data = await getCustomers();
+            const data = await getCustomers(search);
             setCustomers(data);
             setError(null);
         } catch (err) {
             console.error('Failed to load customers:', err);
-            // Don't show error, just leave empty state
             setCustomers([]);
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
 
     useEffect(() => {
         loadCustomers();
     }, []);
+
+    // Re-fetch when debounced search changes
+    useEffect(() => {
+        loadCustomers(searchDebounced || undefined);
+        setSelectedIds(new Set()); // clear selection on search
+    }, [searchDebounced]);
 
     const handleEdit = (customer: Customer) => {
         setCurrentCustomer(customer);
@@ -142,7 +160,7 @@ const Customers: React.FC = () => {
                 });
 
                 if (success) {
-                    await loadCustomers(); // Reload to get fresh data
+                    await loadCustomers(searchDebounced || undefined);
                     setIsModalOpen(false);
                 } else {
                     setError('Failed to update customer. Please try again.');
@@ -157,7 +175,7 @@ const Customers: React.FC = () => {
                 });
 
                 if (newCustomer) {
-                    await loadCustomers(); // Reload to get fresh data
+                    await loadCustomers(searchDebounced || undefined);
                     setIsModalOpen(false);
                 } else {
                     setError('Failed to create customer. Please try again.');
@@ -179,7 +197,7 @@ const Customers: React.FC = () => {
         try {
             const success = await deleteCustomer(id);
             if (success) {
-                await loadCustomers(); // Reload to get fresh data
+                await loadCustomers(searchDebounced || undefined);
             } else {
                 alert('Failed to delete customer. Please try again.');
             }
@@ -212,14 +230,56 @@ const Customers: React.FC = () => {
         setBulkSuccess(null);
         setParsedCustomers([]);
         setCsvPreview([]);
+        setCsvFile(null);
         setIsBulkModalOpen(true);
+    };
+
+    const handleExportCSV = async () => {
+        try {
+            setExporting(true);
+            await exportCustomersCSV();
+        } catch (err) {
+            alert(`Export failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+        } finally {
+            setExporting(false);
+        }
+    };
+
+    const handleBulkDelete = async () => {
+        if (selectedIds.size === 0) return;
+        if (!confirm(`Are you sure you want to delete ${selectedIds.size} customer${selectedIds.size > 1 ? 's' : ''}? This cannot be undone.`)) return;
+        try {
+            setBulkDeleting(true);
+            await bulkDeleteCustomers(Array.from(selectedIds));
+            setSelectedIds(new Set());
+            await loadCustomers(searchDebounced || undefined);
+        } catch (err) {
+            alert(`Bulk delete failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+        } finally {
+            setBulkDeleting(false);
+        }
+    };
+
+    const toggleSelectAll = () => {
+        if (selectedIds.size === customers.length) {
+            setSelectedIds(new Set());
+        } else {
+            setSelectedIds(new Set(customers.map(c => c.id)));
+        }
+    };
+
+    const toggleSelectOne = (id: string) => {
+        const next = new Set(selectedIds);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        setSelectedIds(next);
     };
 
     const handleSyncFromCRM = async () => {
         setSyncing(true);
         try {
             const result = await syncCustomersFromCRM();
-            await loadCustomers();
+            await loadCustomers(searchDebounced || undefined);
             const providerSummary = result.providers.map((p: { provider: string; synced: number; failed: number }) => `${p.provider}: ${p.synced} synced`).join(', ');
             alert(`CRM sync complete! ${result.synced} contacts synced. ${providerSummary}`);
         } catch (err) {
@@ -235,6 +295,7 @@ const Customers: React.FC = () => {
         setBulkSuccess(null);
         setParsedCustomers([]);
         setCsvPreview([]);
+        setCsvFile(null);
         if (fileInputRef.current) {
             fileInputRef.current.value = '';
         }
@@ -297,6 +358,8 @@ const Customers: React.FC = () => {
             return;
         }
 
+        setCsvFile(file);
+
         const reader = new FileReader();
         reader.onload = (e) => {
             try {
@@ -313,8 +376,8 @@ const Customers: React.FC = () => {
                 const emailIndex = headers.indexOf('email');
                 const phoneIndex = headers.findIndex(h => h === 'phone_number' || h === 'phone' || h === 'phonenumber');
 
-                if (nameIndex === -1 || emailIndex === -1 || phoneIndex === -1) {
-                    setBulkError('CSV must have columns: name, email, and phone_number (or phone)');
+                if (nameIndex === -1 || phoneIndex === -1) {
+                    setBulkError('CSV must have columns: name, and phone_number (or phone)');
                     return;
                 }
 
@@ -329,15 +392,14 @@ const Customers: React.FC = () => {
 
                 dataRows.forEach((row, rowIndex) => {
                     const name = row[nameIndex]?.trim();
-                    const email = row[emailIndex]?.trim();
+                    const email = emailIndex !== -1 ? row[emailIndex]?.trim() : '';
                     const phoneNumber = row[phoneIndex]?.trim();
 
-                    if (!name || !email || !phoneNumber) {
-                        errors.push(`Row ${rowIndex + 2}: Missing required field (name, email, or phone)`);
+                    if (!name || !phoneNumber) {
+                        errors.push(`Row ${rowIndex + 2}: Missing required field (name or phone)`);
                         return;
                     }
 
-                    // Parse variables
                     const variables: Record<string, string> = {};
                     varColumns.forEach(({ header, index }) => {
                         const value = row[index]?.trim();
@@ -347,7 +409,7 @@ const Customers: React.FC = () => {
                         }
                     });
 
-                    customers.push({ name, email, phoneNumber, variables });
+                    customers.push({ name, email: email || '', phoneNumber, variables });
                 });
 
                 if (errors.length > 0) {
@@ -355,7 +417,7 @@ const Customers: React.FC = () => {
                 }
 
                 setParsedCustomers(customers);
-                setCsvPreview(rows.slice(0, 6)); // Show header + first 5 rows
+                setCsvPreview(rows.slice(0, 6));
             } catch (err) {
                 setBulkError('Failed to parse CSV file. Please check the format.');
                 console.error('CSV parse error:', err);
@@ -370,7 +432,7 @@ const Customers: React.FC = () => {
     };
 
     const handleBulkUpload = async () => {
-        if (parsedCustomers.length === 0) {
+        if (!csvFile || parsedCustomers.length === 0) {
             setBulkError('No valid customers to upload');
             return;
         }
@@ -379,27 +441,27 @@ const Customers: React.FC = () => {
             setBulkUploading(true);
             setBulkError(null);
 
-            const result = await createBulkCustomers(parsedCustomers);
+            // Use backend CSV import endpoint
+            const result = await importCustomersCSV(csvFile);
 
-            if (result.success > 0) {
-                setBulkSuccess(`Successfully added ${result.success} customer${result.success > 1 ? 's' : ''}`);
-                if (result.failed > 0) {
-                    setBulkError(`${result.failed} customer${result.failed > 1 ? 's' : ''} failed to upload`);
+            if (result.imported > 0) {
+                setBulkSuccess(`Successfully imported ${result.imported} customer${result.imported > 1 ? 's' : ''}${result.skipped > 0 ? ` (${result.skipped} skipped)` : ''}`);
+                if (result.errors && result.errors.length > 0) {
+                    setBulkError(`${result.errors.length} row(s) had errors:\n${result.errors.slice(0, 3).join('\n')}`);
                 }
-                await loadCustomers();
-                
-                // Clear form after successful upload
+                await loadCustomers(searchDebounced || undefined);
+
                 setTimeout(() => {
-                    if (result.failed === 0) {
+                    if (!result.errors || result.errors.length === 0) {
                         handleBulkModalClose();
                     }
                 }, 2000);
             } else {
-                setBulkError(`Failed to upload customers: ${result.errors.join(', ')}`);
+                setBulkError(`Failed to import customers${result.errors?.length ? `: ${result.errors[0]}` : ''}`);
             }
         } catch (err) {
             console.error('Bulk upload error:', err);
-            setBulkError('An error occurred during upload');
+            setBulkError(`Upload failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
         } finally {
             setBulkUploading(false);
         }
@@ -427,12 +489,21 @@ const Customers: React.FC = () => {
                     </div>
                     <div className="flex items-center gap-3">
                         <button 
-                            onClick={loadCustomers}
+                            onClick={() => loadCustomers(searchDebounced || undefined)}
                             disabled={loading}
                             className="p-2.5 bg-surface/80 backdrop-blur-sm border border-border/50 text-textMuted rounded-xl hover:text-primary hover:border-primary/50 transition-all duration-300 disabled:opacity-50"
                             title="Refresh"
                         >
                             <ArrowsClockwise size={18} weight="bold" className={loading ? 'animate-spin' : ''} />
+                        </button>
+                        <button 
+                            onClick={handleExportCSV}
+                            disabled={exporting}
+                            className="flex items-center gap-2 px-4 py-2.5 bg-surface/80 backdrop-blur-sm border border-border/50 text-textMain font-medium rounded-xl text-sm hover:border-green-400/50 hover:text-green-400 transition-all duration-300 disabled:opacity-50"
+                            title="Export all customers as CSV"
+                        >
+                            {exporting ? <CircleNotch size={18} weight="bold" className="animate-spin" /> : <DownloadSimple size={18} weight="bold" />}
+                            Export CSV
                         </button>
                         <button 
                             onClick={handleBulkModalOpen}
@@ -472,13 +543,44 @@ const Customers: React.FC = () => {
                             onChange={(e) => setSearchQuery(e.target.value)}
                             className="bg-transparent outline-none text-sm text-textMain w-full placeholder:text-textMuted"
                         />
+                        {searchQuery && (
+                            <button onClick={() => setSearchQuery('')} className="text-textMuted hover:text-textMain">
+                                <X size={16} weight="bold" />
+                            </button>
+                        )}
                     </div>
+
+                    {/* Bulk Action Bar */}
+                    {selectedIds.size > 0 && (
+                        <div className="px-4 py-3 bg-red-500/10 border-b border-red-500/20 flex items-center justify-between">
+                            <span className="text-sm text-red-400 font-medium">
+                                {selectedIds.size} customer{selectedIds.size > 1 ? 's' : ''} selected
+                            </span>
+                            <button
+                                onClick={handleBulkDelete}
+                                disabled={bulkDeleting}
+                                className="flex items-center gap-2 px-4 py-2 bg-red-500/20 border border-red-500/40 text-red-400 rounded-xl text-sm font-medium hover:bg-red-500/30 transition-all duration-200 disabled:opacity-50"
+                            >
+                                {bulkDeleting ? <CircleNotch size={16} weight="bold" className="animate-spin" /> : <Trash size={16} weight="bold" />}
+                                {bulkDeleting ? 'Deleting...' : `Delete ${selectedIds.size} Selected`}
+                            </button>
+                        </div>
+                    )}
 
                     {/* Table Header */}
                     <div className="grid grid-cols-12 gap-4 p-4 border-b border-border/50 text-xs font-semibold text-textMuted uppercase tracking-wider bg-background/30">
-                        <div className="col-span-3 pl-2">Name</div>
+                        <div className="col-span-1 flex items-center">
+                            <input
+                                type="checkbox"
+                                checked={customers.length > 0 && selectedIds.size === customers.length}
+                                onChange={toggleSelectAll}
+                                className="w-4 h-4 rounded accent-primary cursor-pointer"
+                                title="Select all"
+                            />
+                        </div>
+                        <div className="col-span-3">Name</div>
                         <div className="col-span-3">Contact</div>
-                        <div className="col-span-4">Context Variables</div>
+                        <div className="col-span-3">Context Variables</div>
                         <div className="col-span-2 text-right">Actions</div>
                     </div>
 
@@ -495,22 +597,32 @@ const Customers: React.FC = () => {
                                     <UsersThree size={40} weight="duotone" className="text-primary" />
                                 </div>
                                 <h3 className="text-lg font-semibold text-textMain mb-2">No customers found</h3>
-                                <p className="text-textMuted text-sm mb-6">Click "Add Customer" to get started.</p>
-                                <button
-                                    onClick={handleAdd}
-                                    className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-primary to-primary/80 text-black font-semibold rounded-xl hover:shadow-lg hover:shadow-primary/25 transition-all duration-300"
-                                >
-                                    <Plus size={18} weight="bold" />
-                                    Add Your First Customer
-                                </button>
+                                <p className="text-textMuted text-sm mb-6">{searchQuery ? 'Try a different search term.' : 'Click "Add Customer" to get started.'}</p>
+                                {!searchQuery && (
+                                    <button
+                                        onClick={handleAdd}
+                                        className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-primary to-primary/80 text-black font-semibold rounded-xl hover:shadow-lg hover:shadow-primary/25 transition-all duration-300"
+                                    >
+                                        <Plus size={18} weight="bold" />
+                                        Add Your First Customer
+                                    </button>
+                                )}
                             </div>
                         ) : customers.map(customer => (
                             <div 
                                 key={customer.id} 
-                                className="grid grid-cols-12 gap-4 p-4 items-center hover:bg-surfaceHover/50 transition-all duration-200 group cursor-pointer"
+                                className={`grid grid-cols-12 gap-4 p-4 items-center hover:bg-surfaceHover/50 transition-all duration-200 group cursor-pointer ${selectedIds.has(customer.id) ? 'bg-primary/5' : ''}`}
                                 onClick={() => handleViewDetails(customer)}
                             >
-                                <div className="col-span-3 pl-2">
+                                <div className="col-span-1" onClick={(e) => e.stopPropagation()}>
+                                    <input
+                                        type="checkbox"
+                                        checked={selectedIds.has(customer.id)}
+                                        onChange={() => toggleSelectOne(customer.id)}
+                                        className="w-4 h-4 rounded accent-primary cursor-pointer"
+                                    />
+                                </div>
+                                <div className="col-span-3">
                                     <div className="flex items-center gap-3">
                                         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
                                             <User size={18} weight="duotone" className="text-primary" />
@@ -532,7 +644,7 @@ const Customers: React.FC = () => {
                                     <div className="text-sm text-textMain">{customer.email}</div>
                                     <div className="text-xs text-textMuted font-mono">{customer.phoneNumber}</div>
                                 </div>
-                                <div className="col-span-4">
+                                <div className="col-span-3">
                                     <div className="flex flex-wrap gap-2">
                                         {Object.entries(customer.variables).slice(0, 3).map(([k, v]) => (
                                             <span key={k} className="px-2 py-1 rounded-lg bg-background/50 border border-border/50 text-[10px] text-textMuted flex items-center gap-1">
