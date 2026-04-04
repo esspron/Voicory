@@ -60,6 +60,9 @@ export interface Voice {
     // Audio preview URL
     previewUrl?: string;
     
+    // Custom voice flag
+    isCustom?: boolean;
+    
     // Timestamps
     createdAt?: string;
     updatedAt?: string;

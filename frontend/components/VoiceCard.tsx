@@ -1,7 +1,8 @@
-import { DotsThree, Copy, Star, Check, CurrencyDollar, Lightning, Sparkle, Clock } from '@phosphor-icons/react';
+import { DotsThree, Copy, Star, Check, CurrencyDollar, Lightning, Sparkle, Clock, CircleNotch, Wrench } from '@phosphor-icons/react';
 import React from 'react';
 
 import { Voice } from '../types';
+import { previewVoice } from '../services/voicoryService';
 
 import VoiceSamplePlayer from './VoiceSamplePlayer';
 
@@ -19,11 +20,32 @@ interface VoiceCardProps {
 
 const VoiceCard: React.FC<VoiceCardProps> = ({ voice, onSelect }) => {
     const [copied, setCopied] = React.useState(false);
+    const [previewUrl, setPreviewUrl] = React.useState<string | undefined>(voice.previewUrl ?? undefined);
+    const [loadingPreview, setLoadingPreview] = React.useState(false);
+    const [previewError, setPreviewError] = React.useState<string | null>(null);
     
     const copyVoiceId = () => {
-        navigator.clipboard.writeText(voice.elevenlabsVoiceId);
+        navigator.clipboard.writeText(voice.elevenlabsVoiceId || voice.providerVoiceId || voice.id);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
+    };
+
+    // Generate a TTS preview via backend when user hovers over the player area
+    // or when the voice has no previewUrl
+    const handleRequestPreview = async () => {
+        if (previewUrl || loadingPreview) return;
+        setLoadingPreview(true);
+        setPreviewError(null);
+        try {
+            const voiceId = voice.elevenlabsVoiceId || voice.providerVoiceId || voice.id;
+            const provider = voice.ttsProvider === 'openai' ? 'openai' : 'elevenlabs';
+            const url = await previewVoice(voiceId, provider);
+            setPreviewUrl(url);
+        } catch (err: any) {
+            setPreviewError(err.message || 'Preview unavailable');
+        } finally {
+            setLoadingPreview(false);
+        }
     };
 
     return (
@@ -35,6 +57,13 @@ const VoiceCard: React.FC<VoiceCardProps> = ({ voice, onSelect }) => {
                     Featured
                 </div>
             )}
+            {/* Custom Voice Badge */}
+            {voice.isCustom && (
+                <div className="absolute -top-2.5 -left-2.5 bg-gradient-to-r from-violet-500 to-purple-500 text-white text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1 shadow-lg shadow-violet-500/25">
+                    <Wrench size={10} weight="fill" />
+                    Custom
+                </div>
+            )}
 
             {/* Header */}
             <div className="flex justify-between items-start mb-3">
@@ -44,7 +73,6 @@ const VoiceCard: React.FC<VoiceCardProps> = ({ voice, onSelect }) => {
                         <span className="px-2 py-0.5 rounded-full bg-white/5 border border-white/10">{voice.gender}</span>
                         <span className="text-white/20">•</span>
                         <span>{voice.accent}</span>
-                        {/* Pricing Tier Badge */}
                         {voice.pricingTier && TIER_CONFIG[voice.pricingTier] ? (
                             <>
                                 <span className="text-white/20">•</span>
@@ -67,20 +95,29 @@ const VoiceCard: React.FC<VoiceCardProps> = ({ voice, onSelect }) => {
                 </p>
             )}
 
-            {/* Sample Player */}
-            <div className="mb-4">
-                <VoiceSamplePlayer 
-                    previewUrl={voice.previewUrl}
-                    defaultLanguage={voice.primaryLanguage}
-                    compact
-                />
+            {/* Sample Player — loads preview on demand */}
+            <div className="mb-4" onMouseEnter={handleRequestPreview}>
+                {loadingPreview ? (
+                    <div className="flex items-center gap-2 text-xs text-textMuted py-2">
+                        <CircleNotch size={14} className="animate-spin text-primary" />
+                        Generating preview…
+                    </div>
+                ) : previewError ? (
+                    <div className="text-xs text-textMuted/50 py-2">{previewError}</div>
+                ) : (
+                    <VoiceSamplePlayer
+                        previewUrl={previewUrl}
+                        defaultLanguage={voice.primaryLanguage}
+                        compact
+                    />
+                )}
             </div>
 
             {/* Tags */}
             <div className="flex flex-wrap gap-1.5 mb-4">
                 {voice.tags.slice(0, 3).map(tag => (
-                    <span 
-                        key={tag} 
+                    <span
+                        key={tag}
                         className="text-[10px] font-medium bg-primary/10 border border-primary/20 px-2 py-0.5 rounded-full text-primary/80"
                     >
                         {tag}
@@ -110,18 +147,18 @@ const VoiceCard: React.FC<VoiceCardProps> = ({ voice, onSelect }) => {
                     <span className="text-xs text-textMuted">/min</span>
                 </div>
                 <div className="flex items-center gap-2">
-                    <button 
+                    <button
                         onClick={copyVoiceId}
                         className={`p-2 rounded-lg transition-all ${
-                            copied 
-                                ? 'bg-emerald-500/20 text-emerald-400' 
+                            copied
+                                ? 'bg-emerald-500/20 text-emerald-400'
                                 : 'hover:bg-white/5 text-textMuted hover:text-textMain opacity-0 group-hover:opacity-100'
                         }`}
                         title="Copy Voice ID"
                     >
                         {copied ? <Check size={14} weight="bold" /> : <Copy size={14} />}
                     </button>
-                    <button 
+                    <button
                         onClick={() => onSelect?.(voice)}
                         className="px-4 py-2 bg-gradient-to-r from-primary to-primary/80 text-black text-xs font-semibold rounded-xl hover:shadow-lg hover:shadow-primary/25 transition-all hover:-translate-y-0.5"
                     >
@@ -134,3 +171,5 @@ const VoiceCard: React.FC<VoiceCardProps> = ({ voice, onSelect }) => {
 };
 
 export default VoiceCard;
+
+

@@ -256,16 +256,89 @@ const mapVoiceSampleFromDB = (s: any): VoiceSample => ({
  */
 export const getVoices = async (): Promise<Voice[]> => {
     try {
-        // Use RPC function to bypass schema cache issues
+        // Prefer backend API which returns DB voices + custom voices + fallback list
+        const response = await authFetch('/api/voices');
+        if (response.ok) {
+            const data = await response.json();
+            return (data.voices || []) as Voice[];
+        }
+        // Fallback: direct Supabase RPC
         const { data, error } = await supabase.rpc('get_all_voices');
-
         if (error) throw error;
-
         return (data || []).map(mapVoiceFromDB);
     } catch (error) {
-        console.error('Error fetching voices from Supabase:', error);
+        console.error('Error fetching voices:', error);
         throw error;
     }
+};
+
+/**
+ * Generate a TTS preview for a voice
+ * Returns a base64 data URI playable in an <audio> element
+ */
+export const previewVoice = async (
+    voiceId: string,
+    provider: 'elevenlabs' | 'openai' = 'elevenlabs',
+    text?: string
+): Promise<string> => {
+    const response = await authFetch('/api/voices/preview', {
+        method: 'POST',
+        body: JSON.stringify({ voice_id: voiceId, provider, text }),
+    });
+    if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || 'Preview generation failed');
+    }
+    const data = await response.json();
+    return data.audio_url as string;
+};
+
+/**
+ * Assign a voice to an assistant
+ */
+export const assignVoiceToAssistant = async (
+    voiceId: string,
+    assistantId: string
+): Promise<void> => {
+    const response = await authFetch(`/api/voices/${voiceId}/assign`, {
+        method: 'POST',
+        body: JSON.stringify({ assistant_id: assistantId }),
+    });
+    if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to assign voice');
+    }
+};
+
+/**
+ * Upload a custom voice for ElevenLabs cloning
+ * Returns the newly created custom voice record
+ */
+export const uploadCustomVoice = async (
+    file: File,
+    name: string,
+    description?: string,
+    gender?: string
+): Promise<{ id: string; name: string; elevenlabsVoiceId: string }> => {
+    const token = await import('../lib/api').then(m => m.getAuthToken());
+    const form = new FormData();
+    form.append('file', file);
+    form.append('name', name);
+    if (description) form.append('description', description);
+    if (gender) form.append('gender', gender);
+
+    const { API } = await import('../lib/constants');
+    const response = await fetch(`${API.BACKEND_URL}/api/voices/custom`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: form,
+    });
+    if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || 'Custom voice upload failed');
+    }
+    const data = await response.json();
+    return data.voice || { id: '', name, elevenlabsVoiceId: data.voice_id || '' };
 };
 
 /**

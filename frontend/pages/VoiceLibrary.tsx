@@ -1,11 +1,11 @@
-import { MagnifyingGlass, Star, Microphone, Sparkle, FunnelSimple, X, SpeakerHigh, GenderIntersex, Translate, CircleNotch } from '@phosphor-icons/react';
-import React, { useEffect, useState, useMemo } from 'react';
+import { MagnifyingGlass, Star, Microphone, Sparkle, FunnelSimple, X, SpeakerHigh, CircleNotch, Upload, CloudArrowUp, Check, Robot } from '@phosphor-icons/react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 
 import { FadeIn } from '../components/ui/FadeIn';
 import Select, { type SelectOption } from '../components/ui/Select';
 import VoiceCard from '../components/VoiceCard';
-import { getVoices } from '../services/voicoryService';
-import { Voice } from '../types';
+import { getVoices, assignVoiceToAssistant, uploadCustomVoice, getAssistants } from '../services/voicoryService';
+import { Voice, Assistant } from '../types';
 
 // Skeleton loader component
 const VoiceCardSkeleton = () => (
@@ -40,6 +40,269 @@ const TIER_LABELS: Record<string, string> = {
     'spark': 'Spark',
 };
 
+// ─── Assign Voice Modal ──────────────────────────────────────────────────────
+interface AssignVoiceModalProps {
+    voice: Voice;
+    onClose: () => void;
+    onAssigned: (assistantName: string) => void;
+}
+
+const AssignVoiceModal: React.FC<AssignVoiceModalProps> = ({ voice, onClose, onAssigned }) => {
+    const [assistants, setAssistants] = useState<Assistant[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [assigning, setAssigning] = useState<string | null>(null);
+    const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        getAssistants()
+            .then(setAssistants)
+            .catch(() => setError('Failed to load assistants'))
+            .finally(() => setLoading(false));
+    }, []);
+
+    const handleAssign = async (assistant: Assistant) => {
+        setAssigning(assistant.id);
+        setError(null);
+        try {
+            await assignVoiceToAssistant(voice.id, assistant.id);
+            onAssigned(assistant.name);
+        } catch (err: any) {
+            setError(err.message || 'Assignment failed');
+            setAssigning(null);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+            <div
+                className="bg-surface border border-white/10 rounded-2xl p-6 w-full max-w-md shadow-2xl"
+                onClick={e => e.stopPropagation()}
+            >
+                <div className="flex items-center justify-between mb-4">
+                    <div>
+                        <h2 className="text-lg font-semibold text-textMain">Assign Voice</h2>
+                        <p className="text-xs text-textMuted mt-0.5">Select an assistant to use <span className="text-primary">{voice.name}</span></p>
+                    </div>
+                    <button onClick={onClose} className="p-2 rounded-lg hover:bg-white/5 text-textMuted hover:text-textMain transition-all">
+                        <X size={18} weight="bold" />
+                    </button>
+                </div>
+
+                {loading && (
+                    <div className="flex items-center justify-center py-10 text-textMuted">
+                        <CircleNotch size={24} className="animate-spin mr-2" />
+                        Loading assistants…
+                    </div>
+                )}
+
+                {error && <p className="text-sm text-red-400 mb-4">{error}</p>}
+
+                {!loading && assistants.length === 0 && (
+                    <p className="text-sm text-textMuted text-center py-8">No assistants found. Create one first.</p>
+                )}
+
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {assistants.map(a => (
+                        <button
+                            key={a.id}
+                            onClick={() => handleAssign(a)}
+                            disabled={!!assigning}
+                            className="w-full flex items-center gap-3 p-3 rounded-xl border border-white/[0.06] hover:border-primary/30 hover:bg-primary/5 text-left transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                        >
+                            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                                {assigning === a.id ? (
+                                    <CircleNotch size={16} className="animate-spin text-primary" />
+                                ) : (
+                                    <Robot size={16} weight="duotone" className="text-primary" />
+                                )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-textMain truncate">{a.name}</p>
+                                <p className="text-xs text-textMuted truncate">{a.description || 'No description'}</p>
+                            </div>
+                            {assigning === a.id && (
+                                <span className="text-xs text-primary">Assigning…</span>
+                            )}
+                        </button>
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// ─── Custom Voice Upload Modal ────────────────────────────────────────────────
+interface UploadVoiceModalProps {
+    onClose: () => void;
+    onUploaded: () => void;
+}
+
+const UploadVoiceModal: React.FC<UploadVoiceModalProps> = ({ onClose, onUploaded }) => {
+    const [name, setName] = useState('');
+    const [description, setDescription] = useState('');
+    const [gender, setGender] = useState<SelectOption>({ value: 'Neutral', label: 'Neutral' });
+    const [file, setFile] = useState<File | null>(null);
+    const [uploading, setUploading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [success, setSuccess] = useState(false);
+    const fileRef = useRef<HTMLInputElement>(null);
+
+    const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const f = e.target.files?.[0] || null;
+        if (f && f.size > 20 * 1024 * 1024) {
+            setError('File must be under 20 MB');
+            return;
+        }
+        setFile(f);
+        setError(null);
+    };
+
+    const handleDrop = (e: React.DragEvent) => {
+        e.preventDefault();
+        const f = e.dataTransfer.files?.[0] || null;
+        if (f) {
+            setFile(f);
+            setError(null);
+        }
+    };
+
+    const handleUpload = async () => {
+        if (!name.trim()) { setError('Please enter a name'); return; }
+        if (!file) { setError('Please select an audio file'); return; }
+
+        setUploading(true);
+        setError(null);
+        try {
+            await uploadCustomVoice(file, name.trim(), description.trim() || undefined, gender.value);
+            setSuccess(true);
+            setTimeout(() => {
+                onUploaded();
+                onClose();
+            }, 1500);
+        } catch (err: any) {
+            setError(err.message || 'Upload failed');
+        } finally {
+            setUploading(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+            <div
+                className="bg-surface border border-white/10 rounded-2xl p-6 w-full max-w-lg shadow-2xl"
+                onClick={e => e.stopPropagation()}
+            >
+                <div className="flex items-center justify-between mb-5">
+                    <div>
+                        <h2 className="text-lg font-semibold text-textMain">Clone Custom Voice</h2>
+                        <p className="text-xs text-textMuted mt-0.5">Upload a clear audio sample — ElevenLabs will clone it</p>
+                    </div>
+                    <button onClick={onClose} className="p-2 rounded-lg hover:bg-white/5 text-textMuted hover:text-textMain transition-all">
+                        <X size={18} weight="bold" />
+                    </button>
+                </div>
+
+                <div className="space-y-4">
+                    {/* Name */}
+                    <div>
+                        <label className="block text-xs font-medium text-textMuted mb-1.5">Voice Name *</label>
+                        <input
+                            type="text"
+                            value={name}
+                            onChange={e => setName(e.target.value)}
+                            placeholder="e.g. Rahul Custom"
+                            className="w-full px-4 py-2.5 bg-background/50 border border-white/10 rounded-xl text-textMain placeholder-textMuted/50 focus:outline-none focus:border-primary/50 text-sm"
+                        />
+                    </div>
+
+                    {/* Description */}
+                    <div>
+                        <label className="block text-xs font-medium text-textMuted mb-1.5">Description</label>
+                        <input
+                            type="text"
+                            value={description}
+                            onChange={e => setDescription(e.target.value)}
+                            placeholder="e.g. My cloned voice for sales calls"
+                            className="w-full px-4 py-2.5 bg-background/50 border border-white/10 rounded-xl text-textMain placeholder-textMuted/50 focus:outline-none focus:border-primary/50 text-sm"
+                        />
+                    </div>
+
+                    {/* Gender */}
+                    <div>
+                        <label className="block text-xs font-medium text-textMuted mb-1.5">Gender</label>
+                        <Select
+                            value={gender}
+                            onChange={setGender}
+                            options={[
+                                { value: 'Male', label: 'Male' },
+                                { value: 'Female', label: 'Female' },
+                                { value: 'Neutral', label: 'Neutral' },
+                            ]}
+                            className="w-full"
+                        />
+                    </div>
+
+                    {/* File Upload */}
+                    <div>
+                        <label className="block text-xs font-medium text-textMuted mb-1.5">Audio Sample * <span className="text-textMuted/50">(MP3, WAV, OGG · max 20 MB · 1–5 min recommended)</span></label>
+                        <div
+                            className={`border-2 border-dashed rounded-xl p-6 text-center transition-all cursor-pointer ${file ? 'border-primary/40 bg-primary/5' : 'border-white/10 hover:border-white/20'}`}
+                            onDrop={handleDrop}
+                            onDragOver={e => e.preventDefault()}
+                            onClick={() => fileRef.current?.click()}
+                        >
+                            <input ref={fileRef} type="file" accept=".mp3,.wav,.ogg,.webm,.flac,.m4a,audio/*" className="hidden" onChange={handleFile} />
+                            {file ? (
+                                <div className="flex items-center justify-center gap-3">
+                                    <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
+                                        <SpeakerHigh size={16} weight="fill" className="text-primary" />
+                                    </div>
+                                    <div className="text-left">
+                                        <p className="text-sm text-textMain font-medium">{file.name}</p>
+                                        <p className="text-xs text-textMuted">{(file.size / (1024 * 1024)).toFixed(2)} MB</p>
+                                    </div>
+                                    <button
+                                        onClick={e => { e.stopPropagation(); setFile(null); }}
+                                        className="ml-auto p-1 rounded hover:bg-white/10 text-textMuted"
+                                    >
+                                        <X size={14} />
+                                    </button>
+                                </div>
+                            ) : (
+                                <>
+                                    <CloudArrowUp size={32} weight="duotone" className="text-textMuted mx-auto mb-2" />
+                                    <p className="text-sm text-textMuted">Drag & drop or <span className="text-primary">browse</span></p>
+                                </>
+                            )}
+                        </div>
+                    </div>
+
+                    {error && <p className="text-sm text-red-400">{error}</p>}
+                    {success && (
+                        <div className="flex items-center gap-2 text-emerald-400 text-sm">
+                            <Check size={16} weight="bold" />
+                            Voice cloned successfully! Refreshing…
+                        </div>
+                    )}
+
+                    <button
+                        onClick={handleUpload}
+                        disabled={uploading || success}
+                        className="w-full py-3 bg-gradient-to-r from-primary to-primary/80 text-black font-semibold rounded-xl hover:shadow-lg hover:shadow-primary/25 transition-all hover:-translate-y-0.5 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                        {uploading ? (
+                            <><CircleNotch size={18} className="animate-spin" /> Cloning voice…</>
+                        ) : (
+                            <><Upload size={18} weight="bold" /> Clone Voice</>
+                        )}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// ─── Main Component ──────────────────────────────────────────────────────────
 const VoiceLibrary: React.FC = () => {
     const [voices, setVoices] = useState<Voice[]>([]);
     const [loading, setLoading] = useState(true);
@@ -51,6 +314,11 @@ const VoiceLibrary: React.FC = () => {
     const [selectedGender, setSelectedGender] = useState<SelectOption>({ value: 'All', label: 'All Genders' });
     const [selectedTag, setSelectedTag] = useState<SelectOption>({ value: 'All', label: 'All Tags' });
     const [selectedTier, setSelectedTier] = useState<SelectOption>({ value: 'All', label: 'All Tiers' });
+
+    // Modals
+    const [assigningVoice, setAssigningVoice] = useState<Voice | null>(null);
+    const [showUploadModal, setShowUploadModal] = useState(false);
+    const [assignSuccess, setAssignSuccess] = useState<string | null>(null);
 
     useEffect(() => {
         loadVoices();
@@ -93,7 +361,6 @@ const VoiceLibrary: React.FC = () => {
     // Filter voices
     const filteredVoices = useMemo(() => {
         return voices.filter(voice => {
-            // Search filter
             if (searchQuery) {
                 const query = searchQuery.toLowerCase();
                 const matchesSearch =
@@ -104,37 +371,25 @@ const VoiceLibrary: React.FC = () => {
                     (voice.pricingTier && voice.pricingTier.toLowerCase().includes(query));
                 if (!matchesSearch) return false;
             }
-
-            // Language filter
-            if (selectedLanguage.value !== 'All' && !voice.supportedLanguages.includes(selectedLanguage.value)) {
-                return false;
-            }
-
-            // Gender filter
-            if (selectedGender.value !== 'All' && voice.gender !== selectedGender.value) {
-                return false;
-            }
-
-            // Tag filter
-            if (selectedTag.value !== 'All' && !voice.tags.includes(selectedTag.value)) {
-                return false;
-            }
-
-            // Tier filter
-            if (selectedTier.value !== 'All' && voice.pricingTier !== selectedTier.value) {
-                return false;
-            }
-
+            if (selectedLanguage.value !== 'All' && !voice.supportedLanguages.includes(selectedLanguage.value)) return false;
+            if (selectedGender.value !== 'All' && voice.gender !== selectedGender.value) return false;
+            if (selectedTag.value !== 'All' && !voice.tags.includes(selectedTag.value)) return false;
+            if (selectedTier.value !== 'All' && voice.pricingTier !== selectedTier.value) return false;
             return true;
         });
     }, [voices, searchQuery, selectedLanguage, selectedGender, selectedTag, selectedTier]);
 
-    // Separate featured and regular voices
     const featuredVoices = filteredVoices.filter(v => v.isFeatured);
     const regularVoices = filteredVoices.filter(v => !v.isFeatured);
 
     const handleSelectVoice = (voice: Voice) => {
-        console.log('Selected voice:', voice);
+        setAssigningVoice(voice);
+    };
+
+    const handleAssigned = (assistantName: string) => {
+        setAssigningVoice(null);
+        setAssignSuccess(`Voice assigned to "${assistantName}" successfully!`);
+        setTimeout(() => setAssignSuccess(null), 4000);
     };
 
     const clearFilters = () => {
@@ -155,19 +410,52 @@ const VoiceLibrary: React.FC = () => {
                 <div className="absolute bottom-20 left-20 w-80 h-80 bg-violet-500/5 rounded-full blur-3xl" />
             </div>
 
+            {/* Modals */}
+            {assigningVoice && (
+                <AssignVoiceModal
+                    voice={assigningVoice}
+                    onClose={() => setAssigningVoice(null)}
+                    onAssigned={handleAssigned}
+                />
+            )}
+            {showUploadModal && (
+                <UploadVoiceModal
+                    onClose={() => setShowUploadModal(false)}
+                    onUploaded={loadVoices}
+                />
+            )}
+
+            {/* Success toast */}
+            {assignSuccess && (
+                <div className="fixed top-6 right-6 z-50 flex items-center gap-2 bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-sm px-4 py-3 rounded-xl shadow-lg backdrop-blur-sm">
+                    <Check size={16} weight="bold" />
+                    {assignSuccess}
+                </div>
+            )}
+
             <div className="relative p-8 max-w-7xl mx-auto">
                 {/* Header */}
                 <div className="mb-8">
-                    <div className="flex items-center gap-3 mb-3">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/20 to-violet-500/10 flex items-center justify-center border border-white/10">
-                            <Microphone size={20} weight="duotone" className="text-primary" />
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3 mb-3">
+                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/20 to-violet-500/10 flex items-center justify-center border border-white/10">
+                                <Microphone size={20} weight="duotone" className="text-primary" />
+                            </div>
+                            <div>
+                                <h1 className="text-2xl font-bold text-textMain">Voice Library</h1>
+                                <p className="text-sm text-textMuted">
+                                    Explore premium AI voices optimized for Indian languages
+                                </p>
+                            </div>
                         </div>
-                        <div>
-                            <h1 className="text-2xl font-bold text-textMain">Voice Library</h1>
-                            <p className="text-sm text-textMuted">
-                                Explore premium AI voices optimized for Indian languages
-                            </p>
-                        </div>
+                        {/* Custom Voice Upload button */}
+                        <button
+                            onClick={() => setShowUploadModal(true)}
+                            className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-primary/20 to-primary/10 border border-primary/30 text-primary rounded-xl hover:from-primary hover:to-primary/80 hover:text-black hover:border-transparent font-medium text-sm transition-all hover:-translate-y-0.5"
+                        >
+                            <Upload size={16} weight="bold" />
+                            Clone Custom Voice
+                        </button>
                     </div>
                 </div>
 
@@ -192,9 +480,7 @@ const VoiceLibrary: React.FC = () => {
                             <span>Filters:</span>
                         </div>
 
-                        {/* Filter Dropdowns Container */}
                         <div className="flex flex-wrap items-center gap-3">
-                            {/* Language Filter */}
                             <Select
                                 value={selectedLanguage}
                                 onChange={setSelectedLanguage}
@@ -204,8 +490,6 @@ const VoiceLibrary: React.FC = () => {
                                 }))}
                                 className="w-44"
                             />
-
-                            {/* Gender Filter */}
                             <Select
                                 value={selectedGender}
                                 onChange={setSelectedGender}
@@ -215,8 +499,6 @@ const VoiceLibrary: React.FC = () => {
                                 }))}
                                 className="w-40"
                             />
-
-                            {/* Tier Filter */}
                             <Select
                                 value={selectedTier}
                                 onChange={setSelectedTier}
@@ -226,8 +508,6 @@ const VoiceLibrary: React.FC = () => {
                                 }))}
                                 className="w-40"
                             />
-
-                            {/* Tag Filter */}
                             <Select
                                 value={selectedTag}
                                 onChange={setSelectedTag}
@@ -237,8 +517,6 @@ const VoiceLibrary: React.FC = () => {
                                 }))}
                                 className="w-36"
                             />
-
-                            {/* Clear Filters */}
                             {hasActiveFilters && (
                                 <button
                                     onClick={clearFilters}
@@ -250,7 +528,6 @@ const VoiceLibrary: React.FC = () => {
                             )}
                         </div>
 
-                        {/* Results Count */}
                         <div className="ml-auto flex items-center gap-2 text-sm text-textMuted shrink-0">
                             <SpeakerHigh size={14} weight="fill" className="text-primary" />
                             <span>
@@ -298,10 +575,8 @@ const VoiceLibrary: React.FC = () => {
                 {/* Empty State */}
                 {!loading && !error && filteredVoices.length === 0 && (
                     <div className="text-center py-20 relative">
-                        {/* Floating sparkles */}
                         <Sparkle size={16} weight="fill" className="absolute top-8 left-1/4 text-primary/40 animate-pulse" />
                         <Sparkle size={12} weight="fill" className="absolute top-16 right-1/4 text-violet-400/40 animate-pulse" style={{ animationDelay: '0.5s' }} />
-
                         <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-surface to-surface/80 border border-white/10 flex items-center justify-center mx-auto mb-4">
                             <SpeakerHigh size={40} weight="duotone" className="text-textMuted" />
                         </div>
