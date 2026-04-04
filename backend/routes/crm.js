@@ -675,11 +675,91 @@ router.post('/webhooks/followupboss', express.json(), async (req, res) => {
             console.log('Note: crm_webhook_events table may not exist yet:', logError.message);
         }
         
-        // TODO: Process events based on type
-        // - person.created/updated: Sync contact back to our customers table
-        // - note.created: Could sync to customer notes
-        // - call.created: Avoid duplicate if we pushed it
-        
+        // Process events based on type
+        let processError = null;
+        try {
+            const eventType = event.eventType || '';
+            const person = event.person || event.data?.person || {};
+            const note = event.note || event.data?.note || {};
+            const call = event.call || event.data?.call || {};
+
+            if (eventType === 'person.created' || eventType === 'person.updated') {
+                // Upsert contact into customers table
+                const phone = person.phones?.[0]?.value || person.phone || null;
+                const email = person.emails?.[0]?.value || person.email || null;
+                const name = person.name || `${person.firstName || ''} ${person.lastName || ''}`.trim() || null;
+                if (phone || email) {
+                    const { error: upsertError } = await supabase
+                        .from('customers')
+                        .upsert({
+                            phone,
+                            email,
+                            name,
+                            source: 'followupboss',
+                            updated_at: new Date().toISOString(),
+                        }, { onConflict: phone ? 'phone' : 'email', ignoreDuplicates: false });
+                    if (upsertError) {
+                        console.error('FUB person upsert error:', upsertError.message);
+                        processError = upsertError.message;
+                    }
+                }
+            } else if (eventType === 'note.created') {
+                // Try to insert into customer_notes; fall back to console log
+                const noteText = note.body || note.text || JSON.stringify(note);
+                const { error: noteError } = await supabase
+                    .from('customer_notes')
+                    .insert({
+                        source: 'followupboss',
+                        note: noteText,
+                        external_id: note.id ? String(note.id) : null,
+                        created_at: new Date().toISOString(),
+                    });
+                if (noteError) {
+                    // Table may not exist — log and continue
+                    console.log('FUB note.created (customer_notes unavailable):', noteText, noteError.message);
+                }
+            } else if (eventType === 'call.created') {
+                const callSid = call.sid || call.callSid || null;
+                // Check if this call_sid was a recent outbound from us
+                let isOurOutbound = false;
+                if (callSid) {
+                    const { data: recentCall } = await supabase
+                        .from('crm_sync_logs')
+                        .select('id')
+                        .eq('call_sid', callSid)
+                        .limit(1)
+                        .maybeSingle();
+                    if (recentCall) isOurOutbound = true;
+                }
+                if (!isOurOutbound) {
+                    await supabase.from('crm_sync_logs').insert({
+                        provider: 'followupboss',
+                        event_type: 'call.created',
+                        call_sid: callSid,
+                        payload: call,
+                        created_at: new Date().toISOString(),
+                    });
+                } else {
+                    console.log('FUB call.created: skipping outbound call already logged, sid:', callSid);
+                }
+            }
+
+            // Mark event as processed
+            if (logError === null || logError === undefined) {
+                // Only mark if insert succeeded
+            }
+            // Regardless, attempt to mark processed using event_id
+            if (event.id) {
+                await supabase
+                    .from('crm_webhook_events')
+                    .update({ processed: true, processed_at: new Date().toISOString(), error: processError })
+                    .eq('event_id', String(event.id))
+                    .eq('provider', 'followupboss');
+            }
+        } catch (procErr) {
+            console.error('FUB webhook processing error:', procErr.message);
+        }
+
         // Always return 200 quickly to acknowledge receipt
         res.status(200).json({ received: true });
     } catch (error) {
@@ -727,14 +807,166 @@ router.post('/webhooks/liondesk', express.json(), async (req, res) => {
             console.log('Note: crm_webhook_events table may not exist yet:', logError.message);
         }
         
-        // TODO: Process events
-        // - contact.created/updated: Sync to customers
-        // - task.completed: Update our records
-        
+        // Process events based on type
+        let ldProcessError = null;
+        try {
+            const eventType = event.event || event.type || '';
+            const contact = event.contact || event.data?.contact || {};
+            const task = event.task || event.data?.task || {};
+
+            if (eventType === 'contact.created' || eventType === 'contact.updated') {
+                const phone = contact.phone || contact.phone_number || contact.phones?.[0] || null;
+                const email = contact.email || contact.email_address || null;
+                const name = contact.name || `${contact.first_name || ''} ${contact.last_name || ''}`.trim() || null;
+                if (phone || email) {
+                    const { error: upsertError } = await supabase
+                        .from('customers')
+                        .upsert({
+                            phone,
+                            email,
+                            name,
+                            source: 'liondesk',
+                            updated_at: new Date().toISOString(),
+                        }, { onConflict: phone ? 'phone' : 'email', ignoreDuplicates: false });
+                    if (upsertError) {
+                        console.error('LionDesk contact upsert error:', upsertError.message);
+                        ldProcessError = upsertError.message;
+                    }
+                }
+            } else if (eventType === 'task.completed') {
+                await supabase.from('crm_sync_logs').insert({
+                    provider: 'liondesk',
+                    event_type: 'task.completed',
+                    payload: task,
+                    created_at: new Date().toISOString(),
+                });
+            }
+
+            // Mark event as processed
+            const eventId = event.id || `ld_${Date.now()}`;
+            await supabase
+                .from('crm_webhook_events')
+                .update({ processed: true, processed_at: new Date().toISOString(), error: ldProcessError })
+                .eq('event_id', String(eventId))
+                .eq('provider', 'liondesk');
+        } catch (procErr) {
+            console.error('LionDesk webhook processing error:', procErr.message);
+        }
+
         res.status(200).json({ received: true });
     } catch (error) {
         console.error('LionDesk webhook error:', error);
         res.status(200).json({ received: true, error: 'processing_error' });
+    }
+});
+
+// ============================================
+// Background Webhook Processor (internal, no auth)
+// ============================================
+
+/**
+ * POST /api/crm/webhooks/process-pending
+ * Internal endpoint to re-process up to 50 unprocessed webhook events.
+ * Call via cron or internal scheduler — no auth token required.
+ */
+router.post('/webhooks/process-pending', express.json(), async (req, res) => {
+    try {
+        const { data: events, error: fetchError } = await supabase
+            .from('crm_webhook_events')
+            .select('*')
+            .eq('processed', false)
+            .order('received_at', { ascending: true })
+            .limit(50);
+
+        if (fetchError) {
+            return res.status(500).json({ error: fetchError.message });
+        }
+
+        let processed = 0;
+        let failed = 0;
+
+        for (const ev of (events || [])) {
+            try {
+                const payload = ev.payload || {};
+                const provider = ev.provider;
+                const eventType = ev.event_type;
+
+                if (provider === 'followupboss') {
+                    const person = payload.person || payload.data?.person || {};
+                    const note = payload.note || payload.data?.note || {};
+                    const call = payload.call || payload.data?.call || {};
+
+                    if (eventType === 'person.created' || eventType === 'person.updated') {
+                        const phone = person.phones?.[0]?.value || person.phone || null;
+                        const email = person.emails?.[0]?.value || person.email || null;
+                        const name = person.name || `${person.firstName || ''} ${person.lastName || ''}`.trim() || null;
+                        if (phone || email) {
+                            await supabase.from('customers').upsert(
+                                { phone, email, name, source: 'followupboss', updated_at: new Date().toISOString() },
+                                { onConflict: phone ? 'phone' : 'email', ignoreDuplicates: false }
+                            );
+                        }
+                    } else if (eventType === 'note.created') {
+                        const noteText = note.body || note.text || JSON.stringify(note);
+                        const { error: noteErr } = await supabase.from('customer_notes').insert({
+                            source: 'followupboss', note: noteText,
+                            external_id: note.id ? String(note.id) : null,
+                            created_at: new Date().toISOString(),
+                        });
+                        if (noteErr) console.log('process-pending note error:', noteErr.message);
+                    } else if (eventType === 'call.created') {
+                        const callSid = call.sid || call.callSid || null;
+                        if (callSid) {
+                            const { data: existing } = await supabase.from('crm_sync_logs')
+                                .select('id').eq('call_sid', callSid).limit(1).maybeSingle();
+                            if (!existing) {
+                                await supabase.from('crm_sync_logs').insert({
+                                    provider: 'followupboss', event_type: 'call.created',
+                                    call_sid: callSid, payload: call, created_at: new Date().toISOString(),
+                                });
+                            }
+                        }
+                    }
+                } else if (provider === 'liondesk') {
+                    const contact = payload.contact || payload.data?.contact || {};
+                    const task = payload.task || payload.data?.task || {};
+
+                    if (eventType === 'contact.created' || eventType === 'contact.updated') {
+                        const phone = contact.phone || contact.phone_number || null;
+                        const email = contact.email || contact.email_address || null;
+                        const name = contact.name || `${contact.first_name || ''} ${contact.last_name || ''}`.trim() || null;
+                        if (phone || email) {
+                            await supabase.from('customers').upsert(
+                                { phone, email, name, source: 'liondesk', updated_at: new Date().toISOString() },
+                                { onConflict: phone ? 'phone' : 'email', ignoreDuplicates: false }
+                            );
+                        }
+                    } else if (eventType === 'task.completed') {
+                        await supabase.from('crm_sync_logs').insert({
+                            provider: 'liondesk', event_type: 'task.completed',
+                            payload: task, created_at: new Date().toISOString(),
+                        });
+                    }
+                }
+
+                // Mark processed
+                await supabase.from('crm_webhook_events')
+                    .update({ processed: true, processed_at: new Date().toISOString() })
+                    .eq('id', ev.id);
+                processed++;
+            } catch (itemErr) {
+                console.error(`process-pending error for event ${ev.id}:`, itemErr.message);
+                await supabase.from('crm_webhook_events')
+                    .update({ error: itemErr.message })
+                    .eq('id', ev.id);
+                failed++;
+            }
+        }
+
+        res.json({ success: true, processed, failed, total: (events || []).length });
+    } catch (error) {
+        console.error('process-pending fatal error:', error);
+        res.status(500).json({ error: error.message });
     }
 });
 
