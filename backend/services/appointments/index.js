@@ -735,6 +735,11 @@ async function createExternalAppointment(integration, appointmentData) {
             });
 
         case 'google_calendar': {
+            // Guard: if Google OAuth env vars not configured, skip sync gracefully
+            if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+                console.log('[appointments] Google Calendar not configured, skipping sync');
+                return null;
+            }
             // Uses withGoogleTokenRefresh to handle expired access tokens automatically
             const calendarId = integration.external_calendar_id || 'primary';
             return withGoogleTokenRefresh(integration, (token) =>
@@ -778,6 +783,11 @@ async function cancelExternalAppointment(integration, externalEventId, reason) {
             return calendlyService.cancelEvent(credentials.accessToken, externalEventId, reason);
 
         case 'google_calendar': {
+            // Guard: if Google OAuth env vars not configured, skip cancellation gracefully
+            if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+                console.log('[appointments] Google Calendar not configured, skipping cancel sync');
+                return null;
+            }
             // Uses withGoogleTokenRefresh to handle expired access tokens automatically
             const calendarId = integration.external_calendar_id || 'primary';
             return withGoogleTokenRefresh(integration, (token) =>
@@ -817,6 +827,11 @@ async function rescheduleExternalAppointment(integration, externalEventId, newDa
             });
 
         case 'google_calendar': {
+            // Guard: if Google OAuth env vars not configured, skip reschedule sync gracefully
+            if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+                console.log('[appointments] Google Calendar not configured, skipping reschedule sync');
+                return null;
+            }
             // Uses withGoogleTokenRefresh to handle expired access tokens automatically
             const calendarId = integration.external_calendar_id || 'primary';
             return withGoogleTokenRefresh(integration, (token) =>

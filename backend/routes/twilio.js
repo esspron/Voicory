@@ -682,6 +682,39 @@ router.post('/:userId/voice/gather', validateTwilioVoiceParams, validateTwilioGa
             call_date: new Date().toISOString(),
         });
 
+        // Appointment booking detection — keyword-based, non-blocking
+        const APPOINTMENT_KEYWORDS = ['scheduled', 'booked', 'appointment confirmed', "i've set up", 'calendar invite'];
+        const lowerAiResponse = (aiResponse || '').toLowerCase();
+        const appointmentDetected = APPOINTMENT_KEYWORDS.some(kw => lowerAiResponse.includes(kw));
+        if (appointmentDetected) {
+            (async () => {
+                try {
+                    const appointmentSvc = require('../services/appointments');
+                    await supabase.from('appointments').insert({
+                        user_id: userId,
+                        assistant_id: assistant.id,
+                        attendee_phone: From,
+                        call_sid: CallSid,
+                        source: 'call',
+                        title: 'Call Appointment',
+                        appointment_type_name: 'Call Appointment',
+                        status: 'scheduled',
+                        scheduled_at: new Date().toISOString(),
+                        booked_via: 'voice_agent',
+                    });
+                    console.log('[appointments] Auto-created appointment from call keyword detection, CallSid:', CallSid);
+                    // Fire HTTP integration trigger
+                    try {
+                        await executeHTTPTrigger(assistant.id, 'appointment_booked', { callSid: CallSid, assistantId: assistant.id });
+                    } catch (e) {
+                        console.error('[appointments] HTTP integration trigger failed:', e.message);
+                    }
+                } catch (err) {
+                    console.error('[appointments] Appointment creation failed:', err.message);
+                }
+            })();
+        }
+
         // Persist conversation history to call log
         await supabase
             .from('call_logs')

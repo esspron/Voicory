@@ -181,6 +181,28 @@ async function processMessage(options) {
                 phone_number: customer?.phone_number || customer?.phone || '',
                 email: customer?.email || '',
             });
+
+            // Appointment booking detection for messaging channels (fire-and-forget)
+            const APPOINTMENT_KEYWORDS = ['scheduled', 'booked', 'appointment confirmed', "i've set up", 'calendar invite'];
+            const lowerResponse = response.toLowerCase();
+            if (APPOINTMENT_KEYWORDS.some(kw => lowerResponse.includes(kw))) {
+                const { supabase } = require('../config');
+                supabase.from('appointments').insert({
+                    assistant_id: assistantId,
+                    user_id: userId,
+                    attendee_phone: customer?.phone_number || customer?.phone || null,
+                    source: channel,
+                    title: 'Messaging Appointment',
+                    appointment_type_name: 'Messaging Appointment',
+                    status: 'scheduled',
+                    scheduled_at: new Date().toISOString(),
+                    booked_via: channel,
+                }).then(() => {
+                    console.log('[appointments] Auto-created appointment from messaging keyword detection, channel:', channel);
+                }).catch(err => {
+                    console.error('[appointments] Messaging appointment creation failed:', err.message);
+                });
+            }
         }
 
         return { response, usage, error: null };
