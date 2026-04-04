@@ -28,13 +28,17 @@ import { createPortal } from 'react-dom';
 import AddWebPagesModal from '../components/AddWebPagesModal';
 import { FadeIn } from '../components/ui/FadeIn';
 import {
-    getKnowledgeBases,
+    createFileDocument,
+    createTextDocument,
     createKnowledgeBase,
     deleteKnowledgeBase,
+    deleteDocumentViaBackend,
     getDocuments,
-    createTextDocument,
-    createFileDocument,
-    deleteDocument,
+    getKnowledgeBases,
+    getFileDownloadUrl,
+    reindexDocument,
+    uploadFileDocument,
+    ALLOWED_UPLOAD_ACCEPT,
     KnowledgeBase as KnowledgeBaseType,
     KnowledgeBaseDocument,
 } from '../services/knowledgeBaseService';
@@ -102,6 +106,14 @@ const KnowledgeBase: React.FC = () => {
             setSelectedKbDocuments([]);
         }
     }, [selectedKb]);
+
+    // Auto-poll: if any docs are in 'processing' state, refresh every 5s
+    useEffect(() => {
+        const hasProcessing = selectedKbDocuments.some(d => d.processing_status === 'processing');
+        if (!hasProcessing || !selectedKb) return;
+        const timer = setInterval(() => loadDocuments(selectedKb.id), 5000);
+        return () => clearInterval(timer);
+    }, [selectedKbDocuments, selectedKb]);
 
     const loadKnowledgeBases = async () => {
         setIsLoading(true);
@@ -269,15 +281,23 @@ const KnowledgeBase: React.FC = () => {
 
         setIsSaving(true);
         try {
-            await createFileDocument({
-                knowledge_base_id: selectedKb.id,
-                name: file.name,
-                file,
-            });
+            const ext = file.name.split('.').pop()?.toLowerCase() || '';
+            if (['pdf', 'docx', 'doc'].includes(ext)) {
+                // Use backend upload for binary formats — backend extracts text + embeds
+                await uploadFileDocument(selectedKb.id, file);
+            } else {
+                // TXT / JSON / MD — use existing direct Supabase path
+                await createFileDocument({
+                    knowledge_base_id: selectedKb.id,
+                    name: file.name,
+                    file,
+                });
+            }
             await loadDocuments(selectedKb.id);
             await loadKnowledgeBases();
         } catch (error) {
             console.error('Error uploading file:', error);
+            alert('Upload failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
         } finally {
             setIsSaving(false);
             setShowAddDropdown(false);
@@ -289,13 +309,55 @@ const KnowledgeBase: React.FC = () => {
         if (!confirm('Are you sure you want to delete this document?')) return;
 
         try {
-            await deleteDocument(docId);
+            // Use backend delete which also removes embedding + storage
+            await deleteDocumentViaBackend(docId);
             if (selectedKb) {
                 await loadDocuments(selectedKb.id);
                 await loadKnowledgeBases();
             }
         } catch (error) {
             console.error('Error deleting document:', error);
+            alert('Failed to delete document. Please try again.');
+        }
+    };
+
+    const handleReindexDocument = async (docId: string) => {
+        try {
+            const ok = await reindexDocument(docId);
+            if (ok && selectedKb) {
+                // Optimistically mark as processing, then reload after short delay
+                setSelectedKbDocuments(prev =>
+                    prev.map(d => d.id === docId ? { ...d, processing_status: 'processing' } : d)
+                );
+                setTimeout(() => loadDocuments(selectedKb.id), 5000);
+            }
+        } catch (error) {
+            console.error('Error reindexing document:', error);
+            alert('Failed to start reindexing. Please try again.');
+        }
+    };
+
+    const handleDownloadDocument = async (doc: KnowledgeBaseDocument) => {
+        try {
+            if (doc.storage_path) {
+                const url = await getFileDownloadUrl(doc.storage_path);
+                if (url) {
+                    window.open(url, '_blank');
+                    return;
+                }
+            }
+            // Fallback: download text content
+            const content = (doc as any).text_content || (doc as any).content || '';
+            if (content) {
+                const blob = new Blob([content], { type: 'text/plain' });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = `${doc.name}.txt`;
+                a.click();
+                URL.revokeObjectURL(a.href);
+            }
+        } catch (error) {
+            console.error('Error downloading document:', error);
         }
     };
 
@@ -534,14 +596,14 @@ const KnowledgeBase: React.FC = () => {
                                                 </div>
                                                 <div>
                                                     <p className="text-sm font-medium text-textMain">Upload Files</p>
-                                                    <p className="text-xs text-textMuted/60">TXT, JSON, MD up to 100MB</p>
+                                                    <p className="text-xs text-textMuted/60">PDF, DOCX, TXT, JSON, MD up to 20MB</p>
                                                 </div>
                                             </button>
                                             <input
                                                 type="file"
                                                 ref={fileInputRef}
                                                 className="hidden"
-                                                accept=".txt,.json,.md"
+                                                accept=".pdf,.docx,.doc,.txt,.json,.md"
                                                 onChange={handleFileUpload}
                                             />
 
@@ -658,13 +720,33 @@ const KnowledgeBase: React.FC = () => {
                                                 </div>
                                             )}
                                             
-                                            {/* Actions - Always visible download */}
-                                            <button
-                                                className="p-2 text-textMuted/40 hover:text-textMuted transition-colors"
-                                                title="Download document"
-                                            >
-                                                <DownloadSimple size={18} weight="bold" />
-                                            </button>
+                                            {/* Actions */}
+                                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                {/* Re-index */}
+                                                <button
+                                                    onClick={() => handleReindexDocument(doc.id)}
+                                                    className="p-1.5 text-textMuted/40 hover:text-primary hover:bg-primary/10 rounded-lg transition-all"
+                                                    title="Re-index (re-generate embedding)"
+                                                >
+                                                    <Lightning size={16} weight="bold" />
+                                                </button>
+                                                {/* Download */}
+                                                <button
+                                                    onClick={() => handleDownloadDocument(doc)}
+                                                    className="p-1.5 text-textMuted/40 hover:text-textMuted hover:bg-white/5 rounded-lg transition-all"
+                                                    title="Download document"
+                                                >
+                                                    <DownloadSimple size={16} weight="bold" />
+                                                </button>
+                                                {/* Delete */}
+                                                <button
+                                                    onClick={() => handleDeleteDocument(doc.id)}
+                                                    className="p-1.5 text-textMuted/40 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
+                                                    title="Delete document"
+                                                >
+                                                    <Trash size={16} weight="bold" />
+                                                </button>
+                                            </div>
                                         </div>
                                     ))}
                                 </div>
@@ -768,14 +850,14 @@ const KnowledgeBase: React.FC = () => {
                                                 </div>
                                                 <div>
                                                     <p className="text-sm font-medium text-textMain">Upload Files</p>
-                                                    <p className="text-xs text-textMuted/60">File size should be less than 100MB</p>
+                                                    <p className="text-xs text-textMuted/60">PDF, DOCX, TXT, JSON, MD up to 20MB</p>
                                                 </div>
                                             </button>
                                             <input
                                                 type="file"
                                                 ref={fileInputRef}
                                                 className="hidden"
-                                                accept=".txt,.json,.md"
+                                                accept=".pdf,.docx,.doc,.txt,.json,.md"
                                                 onChange={handleTempFileUpload}
                                             />
 

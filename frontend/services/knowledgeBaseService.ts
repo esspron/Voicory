@@ -814,3 +814,120 @@ export const generateKnowledgeBaseEmbeddings = async (knowledgeBaseId: string): 
         return { success: 0, failed: 0 };
     }
 };
+
+// ============================================
+// FILE UPLOAD (PDF / DOCX / TXT) VIA BACKEND
+// ============================================
+
+export const ALLOWED_UPLOAD_EXTENSIONS = ['pdf', 'docx', 'doc', 'txt', 'json', 'md'];
+export const ALLOWED_UPLOAD_ACCEPT = '.pdf,.docx,.doc,.txt,.json,.md';
+
+/**
+ * Upload a file (PDF/DOCX/TXT/etc.) to a knowledge base.
+ * Backend handles text extraction and embedding generation.
+ */
+export const uploadFileDocument = async (
+    knowledgeBaseId: string,
+    file: File,
+    name?: string
+): Promise<KnowledgeBaseDocument | null> => {
+    try {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('knowledge_base_id', knowledgeBaseId);
+        if (name) formData.append('name', name);
+
+        const response = await authFetch('/api/knowledge-base/upload', {
+            method: 'POST',
+            body: formData,
+            // Do NOT set Content-Type — browser sets multipart/form-data with boundary
+        });
+
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({ error: 'Upload failed' }));
+            throw new Error(error.error || 'Upload failed');
+        }
+
+        const result = await response.json();
+        return result.document || null;
+    } catch (error) {
+        console.error('Error uploading file document:', error);
+        throw error;
+    }
+};
+
+// ============================================
+// REINDEX DOCUMENT
+// ============================================
+
+/**
+ * Re-generate embeddings for an existing document.
+ */
+export const reindexDocument = async (documentId: string): Promise<boolean> => {
+    try {
+        const response = await authFetch(`/api/knowledge-base/document/${documentId}/reindex`, {
+            method: 'POST',
+        });
+
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({ error: 'Reindex failed' }));
+            throw new Error(error.error || 'Reindex failed');
+        }
+
+        return true;
+    } catch (error) {
+        console.error('Error reindexing document:', error);
+        return false;
+    }
+};
+
+// ============================================
+// DOCUMENT STATUS POLLING
+// ============================================
+
+export interface DocumentStatus {
+    id: string;
+    name: string;
+    processing_status: ProcessingStatus;
+    processing_error: string | null;
+    character_count: number;
+    has_embedding: boolean;
+    updated_at: string;
+}
+
+/**
+ * Get processing status for a single document.
+ */
+export const getDocumentStatus = async (documentId: string): Promise<DocumentStatus | null> => {
+    try {
+        const response = await authFetch(`/api/knowledge-base/document/${documentId}/status`);
+
+        if (!response.ok) return null;
+
+        return response.json();
+    } catch (error) {
+        console.error('Error getting document status:', error);
+        return null;
+    }
+};
+
+/**
+ * Delete a document via backend (removes embedding + storage file).
+ */
+export const deleteDocumentViaBackend = async (documentId: string): Promise<boolean> => {
+    try {
+        const response = await authFetch(`/api/knowledge-base/document/${documentId}`, {
+            method: 'DELETE',
+        });
+
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({ error: 'Delete failed' }));
+            throw new Error(error.error || 'Delete failed');
+        }
+
+        return true;
+    } catch (error) {
+        console.error('Error deleting document via backend:', error);
+        return false;
+    }
+};
