@@ -69,16 +69,18 @@ const Billing: React.FC = () => {
         fetchData();
     }, []);
 
-    // Generate usage chart data
+    // Generate usage chart data — use real data from API or generate last-30-days fallback
     const usageData = usageSummary?.byDay?.length 
         ? usageSummary.byDay.map(d => ({
             day: d.date,
-            mins: Math.round(d.cost)
+            credits: d.credits_used || 0,
+            cost: d.cost || 0
         }))
-        : Array.from({ length: 30 }, (_, i) => ({
-            day: `2025-11-${i + 1}`,
-            mins: 0
-        }));
+        : Array.from({ length: 30 }, (_, i) => {
+            const d = new Date();
+            d.setDate(d.getDate() - (29 - i));
+            return { day: d.toISOString().slice(0, 10), credits: 0, cost: 0 };
+        });
 
     // Handle payment success
     const handlePaymentSuccess = (result: PaymentResult) => {

@@ -10,6 +10,7 @@ const { isMessageProcessed, markMessageProcessed, cacheDelete } = require('../se
 const { processMessage } = require('../services/assistantProcessor');
 const { getCustomerMemory } = require('../services/memory');
 const { pushCallToAllCRMs } = require('../services/crm');
+const billing = require('../services/billing');
 
 // ============================================
 // WHATSAPP WEBHOOK ENDPOINTS
@@ -387,6 +388,16 @@ async function processWithAI(config, message, contact) {
             timezone: assistant.timezone
         };
 
+        // === PRE-FLIGHT BALANCE CHECK (WhatsApp) ===
+        const { hasCredits: waHasCredits } = await billing.checkBalance(config.user_id);
+        if (!waHasCredits) {
+            console.warn(`[billing] WhatsApp: zero balance for user=${config.user_id}, sending low-credit reply`);
+            await sendWhatsAppReply(config, message.from,
+                'Your AI assistant has run out of credits. Please top up at app.voicory.com',
+                customerId);
+            return;
+        }
+
         // Process message using centralized processor
         const result = await processMessage({
             message: currentMsgText,
@@ -409,36 +420,18 @@ async function processWithAI(config, message, contact) {
             console.log(`RAG used: ${result.documentsFound || 0} documents`);
         }
 
-        // === LOG LLM USAGE ===
+        // === LOG LLM USAGE (central billing service) ===
         if (result.usage?.inputTokens > 0 || result.usage?.outputTokens > 0) {
-            try {
-                const { data: usageResult, error: usageError } = await supabase.rpc('log_llm_usage', {
-                    p_user_id: config.user_id,
-                    p_assistant_id: assistant.id,
-                    p_provider: assistantConfig.llmProvider || 'openai',
-                    p_model: assistantConfig.llmModel || 'gpt-4o',
-                    p_input_tokens: result.usage.inputTokens,
-                    p_output_tokens: result.usage.outputTokens,
-                    p_call_log_id: null,
-                    p_conversation_id: null
-                });
-
-                if (usageError) {
-                    console.error('Failed to log LLM usage:', usageError);
-                } else {
-                    console.log('LLM usage logged:', {
-                        model: assistantConfig.llmModel,
-                        inputTokens: result.usage.inputTokens,
-                        outputTokens: result.usage.outputTokens,
-                        costUSD: usageResult?.cost_usd,
-                        newBalance: usageResult?.balance
-                    });
-                    // Invalidate cached credit balance after usage deduction
-                    await cacheDelete(`credits:${config.user_id}`);
-                }
-            } catch (logError) {
-                console.error('Error logging LLM usage:', logError);
-            }
+            billing.deductMessageCost(config.user_id, {
+                model:        assistantConfig.llmModel || result.usage.model || 'gpt-4o-mini',
+                inputTokens:  result.usage.inputTokens,
+                outputTokens: result.usage.outputTokens,
+                assistantId:  assistant.id,
+                channel:      'whatsapp',
+                callLogId:    null,
+                conversationId: null,
+            }).then(() => cacheDelete(`credits:${config.user_id}`))
+              .catch(e => console.error('[billing] WhatsApp deductMessageCost error:', e.message));
         }
 
         // === WHATSAPP-SPECIFIC: Send reply ===

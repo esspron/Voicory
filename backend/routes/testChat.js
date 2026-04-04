@@ -11,13 +11,15 @@ const { processMessage } = require('../services/assistantProcessor');
 const { getCachedAssistant } = require('../services/assistant');
 const { verifySupabaseAuth } = require('../lib/auth');
 const { validateTestChat, sanitizePromptInput } = require('../middleware/inputValidation');
+const billingGuard = require('../middleware/billingGuard');
+const billing = require('../services/billing');
 
 // ============================================
 // TEST CHAT ENDPOINT - For testing agents in the dashboard
 // Now uses centralized AssistantProcessor (same as WhatsApp, SMS, etc.)
 // PROTECTED: Requires valid Supabase JWT token
 // ============================================
-router.post('/test-chat', verifySupabaseAuth, validateTestChat, async (req, res) => {
+router.post('/test-chat', verifySupabaseAuth, billingGuard, validateTestChat, async (req, res) => {
     try {
         const { 
             message: rawMessage, 
@@ -76,29 +78,28 @@ router.post('/test-chat', verifySupabaseAuth, validateTestChat, async (req, res)
         let balance = null;
 
         if (usage && billingUserId) {
-            try {
-                // Use the RPC function to log usage and deduct credits
-                const { data: usageResult, error: usageError } = await supabase.rpc('log_llm_usage', {
-                    p_user_id: billingUserId,
-                    p_assistant_id: assistantId || null,
-                    p_provider: 'openai',
-                    p_model: usage.model,
-                    p_input_tokens: usage.inputTokens,
-                    p_output_tokens: usage.outputTokens,
-                    p_call_log_id: null,
-                    p_conversation_id: null
-                });
+            // Central billing service — handles balance check, cost calc, atomic deduction
+            const billingResult = await billing.deductMessageCost(billingUserId, {
+                model:       usage.model,
+                inputTokens: usage.inputTokens,
+                outputTokens: usage.outputTokens,
+                assistantId:  assistantId || null,
+                channel:      'test_chat',
+                callLogId:    null,
+                conversationId: null,
+            });
 
-                if (usageError) {
-                    console.error('Failed to log test chat LLM usage:', usageError);
-                } else {
-                    cost = usageResult?.cost_usd;
-                    balance = usageResult?.balance;
-                    console.log(`Test chat billing: ${usage.totalTokens} tokens, cost: $${cost}`);
-                }
-            } catch (billingError) {
-                console.error('Billing error (non-blocking):', billingError.message);
+            if (!billingResult.success && billingResult.reason === 'insufficient_credits') {
+                // Balance was consumed between billingGuard check and actual call — return 402
+                return res.status(402).json({
+                    error:   'insufficient_credits',
+                    message: 'Your credit balance is zero. Please top up to continue.',
+                    balance: 0,
+                });
             }
+
+            cost    = billingResult.cost_usd;
+            balance = billingResult.new_balance;
         }
 
         // Return response with usage info

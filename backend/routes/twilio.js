@@ -15,6 +15,7 @@ const { validateTwilioVoiceParams, validateTwilioGatherBody, sanitizePromptInput
 const { pushCallToAllCRMs } = require('../services/crm');
 const { calculateCallCost, logCostToSupabase } = require('../services/costTracking');
 const { executeHTTPTrigger } = require('../services/httpIntegrationExecutor');
+const billing = require('../services/billing');
 
 // ============================================
 // TWILIO PHONE NUMBER IMPORT
@@ -485,6 +486,19 @@ router.post('/:userId/voice', validateTwilioVoiceParams, async (req, res) => {
         const firstMessage = assistant.first_message || 
             `Hello! Thank you for calling. I'm ${assistant.name || 'your AI assistant'}. How can I help you today?`;
 
+        // === PRE-FLIGHT BALANCE CHECK ===
+        const { hasCredits: twilioHasCredits } = await billing.checkBalance(phoneConfig.user_id);
+        if (!twilioHasCredits) {
+            console.warn(`[billing] Twilio voice: zero balance for user=${phoneConfig.user_id}, blocking call`);
+            res.type('text/xml');
+            return res.send(`
+                <Response>
+                    <Say voice="Polly.Joanna">This service is currently unavailable. Please contact the business.</Say>
+                    <Hangup/>
+                </Response>
+            `);
+        }
+
         // Log the incoming call to the database
         const { data: callLog, error: logError } = await supabase
             .from('call_logs')
@@ -653,23 +667,18 @@ router.post('/:userId/voice/gather', validateTwilioVoiceParams, validateTwilioGa
         const aiResponse = completion.choices[0]?.message?.content || 
             "I'm sorry, I didn't understand that. Could you please repeat?";
 
-        // Track LLM cost for P&L
-        try {
+        // Track LLM cost via central billing service (non-blocking)
+        {
           const _usage = completion.usage || {};
-          const _costData = calculateCallCost({
-            model: assistant.model || 'gpt-4o-mini',
-            inputTokens: _usage.prompt_tokens || 0,
+          billing.deductMessageCost(userId, {
+            model:        assistant.model || 'gpt-4o-mini',
+            inputTokens:  _usage.prompt_tokens  || 0,
             outputTokens: _usage.completion_tokens || 0,
-            creditsCharged: 0,
-          });
-          logCostToSupabase(null, CallSid || null, {
-            ..._costData,
-            model: assistant.model || 'gpt-4o-mini',
-            inputTokens: _usage.prompt_tokens || 0,
-            outputTokens: _usage.completion_tokens || 0,
-          }).catch(e => console.error('[costTracking] async log error:', e.message));
-        } catch (_costErr) {
-          console.error('[costTracking] calculation error:', _costErr.message);
+            assistantId:  assistant.id,
+            channel:      'twilio_voice',
+            callLogId:    null,
+            conversationId: null,
+          }).catch(e => console.error('[billing] Twilio deductMessageCost error:', e.message));
         }
 
         // Add AI response to history
@@ -865,6 +874,18 @@ router.post('/:userId/status', async (req, res) => {
                     if (callerPhone && history.length > 0) {
                         trimAndSaveMemory(callerPhone, agentId, history)
                             .catch(err => console.error('❌ Memory save error:', err.message));
+                    }
+
+                    // === BILLING: Deduct voice call cost at call END ===
+                    const durationSecs = parseInt(statusData.CallDuration) || callLog.duration_seconds || 0;
+                    if (durationSecs > 0 && callLog.user_id) {
+                        billing.deductVoiceCost(callLog.user_id, {
+                            durationMinutes:    durationSecs / 60,
+                            channel:            'twilio',
+                            callSid:            statusData.CallSid,
+                            twilioAccountSid:   statusData.AccountSid || null,
+                            callLogId:          callLog.id || null,
+                        }).catch(e => console.error('[billing] deductVoiceCost error:', e.message));
                     }
                 } catch (crmError) {
                     // Don't fail the webhook if CRM sync fails
