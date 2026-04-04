@@ -142,11 +142,36 @@ async function processMessage(options) {
         const messages = buildMessagesArray(systemPrompt, null, conversationHistory, message);
 
         // ===== STEP 9: Call LLM =====
-        const model = assistant.llm_model || DEFAULTS.LLM_MODEL;
+        // Smart tiered model routing:
+        // - Override: if assistant.llm_model is explicitly set in DB, always use it
+        // - Complex instruction / non-English language → gpt-4o
+        // - RAG context needed → gpt-4o-mini (context window is sufficient)
+        // - Short message (<100 chars), no RAG, no memory → gpt-4o-mini
+        // - Default fallback → gpt-4o-mini
+        let model;
+        if (assistant.llm_model && assistant.llm_model !== DEFAULTS.LLM_MODEL) {
+            // Explicit override from assistant configuration
+            model = assistant.llm_model;
+        } else {
+            const isNonEnglish = assistant.language_settings?.default && assistant.language_settings.default !== 'en' && !assistant.language_settings.default.startsWith('en');
+            const hasComplexInstruction = assistant.instruction && assistant.instruction.length > 2000;
+            const needsRAG = assistant.rag_enabled && assistant.knowledge_base_ids?.length > 0;
+            const needsMemory = assistant.memory_enabled;
+            const isShortMessage = message.length < 100;
+
+            if (isNonEnglish || hasComplexInstruction) {
+                model = 'gpt-4o';
+            } else if (needsRAG || needsMemory || !isShortMessage) {
+                model = 'gpt-4o-mini';
+            } else {
+                model = 'gpt-4o-mini';
+            }
+        }
+
         const temperature = parseFloat(assistant.temperature) || DEFAULTS.TEMPERATURE;
         const maxTokens = parseInt(assistant.max_tokens) || DEFAULTS.MAX_TOKENS;
 
-        console.log(`[AssistantProcessor] Calling ${model} with ${messages.length} messages`);
+        console.log(`[AssistantProcessor] Calling ${model} with ${messages.length} messages (smart routing: isNonEnglish=${assistant.language_settings?.default !== 'en' && !assistant.language_settings?.default?.startsWith('en')}, ragEnabled=${assistant.rag_enabled}, memoryEnabled=${assistant.memory_enabled}, msgLen=${message.length})`);
 
         const completion = await openai.chat.completions.create({
             model,

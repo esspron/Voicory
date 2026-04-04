@@ -55,6 +55,9 @@ export interface WidgetConfig {
   /** Assistant ID to use (required) */
   assistantId: string;
   
+  /** Override backend URL (defaults to https://api.voicory.com, useful for self-hosted or staging) */
+  backendUrl?: string;
+  
   /** Widget mode: 'voice', 'chat', or 'both' */
   mode?: WidgetMode;
   

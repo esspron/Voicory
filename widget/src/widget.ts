@@ -38,8 +38,8 @@ const DEFAULT_CONFIG: Partial<WidgetConfig> = {
   },
 };
 
-// API Base URL
-const API_BASE_URL = 'https://api.voicory.com';
+// API Base URL — can be overridden via config.backendUrl for self-hosted or staging deployments
+const DEFAULT_API_BASE_URL = 'https://api.voicory.com';
 
 /**
  * Generate a unique ID
@@ -641,7 +641,7 @@ export class VoicoryWidget implements VoicoryWidgetInstance {
     
     try {
       // Create session with backend
-      const response = await fetch(`${API_BASE_URL}/api/widget/session`, {
+      const response = await fetch(`${this.config.backendUrl || DEFAULT_API_BASE_URL}/api/widget/session`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -806,7 +806,7 @@ export class VoicoryWidget implements VoicoryWidgetInstance {
     this.scrollToBottom();
     
     try {
-      const response = await fetch(`${API_BASE_URL}/api/widget/message`, {
+      const response = await fetch(`${this.config.backendUrl || DEFAULT_API_BASE_URL}/api/widget/message`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

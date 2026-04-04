@@ -48,6 +48,7 @@ const widget = new VoicoryWidget({
 |--------|------|---------|-------------|
 | `apiKey` | string | *required* | Your Voicory public API key |
 | `assistantId` | string | *required* | The assistant to use |
+| `backendUrl` | string | `'https://api.voicory.com'` | Override backend URL (for self-hosted or staging) |
 | `mode` | 'voice' \| 'chat' \| 'both' | 'both' | Widget interaction mode |
 | `theme` | 'light' \| 'dark' \| 'auto' | 'dark' | Color theme |
 | `position` | 'bottom-right' \| 'bottom-left' \| 'top-right' \| 'top-left' | 'bottom-right' | Widget position |
