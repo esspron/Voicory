@@ -1,7 +1,7 @@
 # Voicory — AI Voice Agent Platform for Businesses
 
 > **Built and shipped solo** by [Vishwas Verma](https://linkedin.com/in/vishwasverma) — AI Product Leader  
-> Live at **[voicory.com](https://voicory.com)** · [Product Demo](#) · [LinkedIn](https://linkedin.com/in/vishwasverma)
+> Live at **[voicory.com](https://voicory.com)** · Product Demo *(Coming Soon)* · [LinkedIn](https://linkedin.com/in/vishwasverma)
 
 ---
 
