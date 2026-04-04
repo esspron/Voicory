@@ -41,6 +41,7 @@ const PhoneNumberConfigModal: React.FC<PhoneNumberConfigModalProps> = ({
     // Config state
     const [inboundEnabled, setInboundEnabled] = useState(phoneNumber.inboundEnabled ?? true);
     const [outboundEnabled, setOutboundEnabled] = useState(phoneNumber.outboundEnabled ?? true);
+    const [smsEnabled, setSmsEnabled] = useState(phoneNumber.smsEnabled ?? false);
     const [label, setLabel] = useState(phoneNumber.label || '');
     
     // Assistant selection
@@ -130,6 +131,7 @@ const PhoneNumberConfigModal: React.FC<PhoneNumberConfigModalProps> = ({
                 label: label || phoneNumber.label,
                 inboundEnabled,
                 outboundEnabled,
+                smsEnabled,
                 assistantId: selectedAssistantId || undefined
             });
 
@@ -139,6 +141,7 @@ const PhoneNumberConfigModal: React.FC<PhoneNumberConfigModalProps> = ({
                     label,
                     inboundEnabled,
                     outboundEnabled,
+                    smsEnabled,
                     assistantId: selectedAssistantId || undefined
                 });
                 onClose();
@@ -228,6 +231,23 @@ const PhoneNumberConfigModal: React.FC<PhoneNumberConfigModalProps> = ({
                             >
                                 <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${
                                     outboundEnabled ? 'translate-x-7' : 'translate-x-1'
+                                }`} />
+                            </button>
+                        </div>
+
+                        <div className="flex items-center justify-between p-4 bg-surface/50 border border-border rounded-xl">
+                            <div>
+                                <h4 className="text-sm font-medium text-textMain">SMS</h4>
+                                <p className="text-xs text-textMuted">Enable SMS messaging on this number</p>
+                            </div>
+                            <button
+                                onClick={() => setSmsEnabled(!smsEnabled)}
+                                className={`relative w-12 h-6 rounded-full transition-colors ${
+                                    smsEnabled ? 'bg-primary' : 'bg-surfaceHover'
+                                }`}
+                            >
+                                <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${
+                                    smsEnabled ? 'translate-x-7' : 'translate-x-1'
                                 }`} />
                             </button>
                         </div>

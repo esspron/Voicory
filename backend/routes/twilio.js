@@ -910,7 +910,167 @@ router.post('/:userId/status', async (req, res) => {
  * - phoneNumberId: ID of the imported phone number to call FROM
  * - toNumber: Phone number to call TO (with country code, e.g., +1234567890)
  */
-router.post('/test-call', async (req, res) => {
+/**
+ * Delete a phone number by ID
+ * DELETE /api/twilio/phone-numbers/:id
+ * Removes phone number from DB (user must own it)
+ * PROTECTED: Requires valid Supabase JWT token
+ */
+router.delete('/phone-numbers/:id', verifySupabaseAuth, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const userId = req.userId;
+
+        // Verify ownership before deleting
+        const { data: phoneData, error: fetchError } = await supabase
+            .from('phone_numbers')
+            .select('id, user_id, number')
+            .eq('id', id)
+            .eq('user_id', userId)
+            .single();
+
+        if (fetchError || !phoneData) {
+            return res.status(404).json({ error: 'Phone number not found or not owned by you' });
+        }
+
+        const { error: deleteError } = await supabase
+            .from('phone_numbers')
+            .delete()
+            .eq('id', id)
+            .eq('user_id', userId);
+
+        if (deleteError) {
+            console.error('Error deleting phone number:', deleteError);
+            return res.status(500).json({ error: 'Failed to delete phone number' });
+        }
+
+        console.log(`✅ Phone number deleted: ${phoneData.number} (${id}) by user ${userId}`);
+        res.json({ success: true, message: 'Phone number deleted successfully' });
+
+    } catch (error) {
+        console.error('Delete phone number error:', error.message);
+        res.status(500).json({ error: error.message || 'Failed to delete phone number' });
+    }
+});
+
+/**
+ * Assign an assistant to a phone number
+ * PUT /api/twilio/phone-numbers/:id/assign
+ * Body: { assistantId }
+ * PROTECTED: Requires valid Supabase JWT token
+ */
+router.put('/phone-numbers/:id/assign', verifySupabaseAuth, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { assistantId } = req.body;
+        const userId = req.userId;
+
+        // Verify ownership
+        const { data: phoneData, error: fetchError } = await supabase
+            .from('phone_numbers')
+            .select('id, user_id')
+            .eq('id', id)
+            .eq('user_id', userId)
+            .single();
+
+        if (fetchError || !phoneData) {
+            return res.status(404).json({ error: 'Phone number not found or not owned by you' });
+        }
+
+        // If assistantId provided, verify ownership of assistant
+        if (assistantId) {
+            const { data: assistantData, error: assistantError } = await supabase
+                .from('assistants')
+                .select('id')
+                .eq('id', assistantId)
+                .eq('user_id', userId)
+                .single();
+
+            if (assistantError || !assistantData) {
+                return res.status(404).json({ error: 'Assistant not found or not owned by you' });
+            }
+        }
+
+        const { error: updateError } = await supabase
+            .from('phone_numbers')
+            .update({ assistant_id: assistantId || null })
+            .eq('id', id)
+            .eq('user_id', userId);
+
+        if (updateError) {
+            console.error('Error assigning assistant:', updateError);
+            return res.status(500).json({ error: 'Failed to assign assistant' });
+        }
+
+        console.log(`✅ Assistant ${assistantId || 'none'} assigned to phone number ${id}`);
+        res.json({ success: true, assistantId: assistantId || null });
+
+    } catch (error) {
+        console.error('Assign assistant error:', error.message);
+        res.status(500).json({ error: error.message || 'Failed to assign assistant' });
+    }
+});
+
+/**
+ * Update phone number configuration
+ * PUT /api/twilio/phone-numbers/:id
+ * Body: { label, inboundEnabled, outboundEnabled, smsEnabled, assistantId }
+ * PROTECTED: Requires valid Supabase JWT token
+ */
+router.put('/phone-numbers/:id', verifySupabaseAuth, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { label, inboundEnabled, outboundEnabled, smsEnabled, assistantId } = req.body;
+        const userId = req.userId;
+
+        // Verify ownership
+        const { data: phoneData, error: fetchError } = await supabase
+            .from('phone_numbers')
+            .select('id, user_id')
+            .eq('id', id)
+            .eq('user_id', userId)
+            .single();
+
+        if (fetchError || !phoneData) {
+            return res.status(404).json({ error: 'Phone number not found or not owned by you' });
+        }
+
+        const updatePayload = {};
+        if (label !== undefined) updatePayload.label = label;
+        if (inboundEnabled !== undefined) updatePayload.inbound_enabled = inboundEnabled;
+        if (outboundEnabled !== undefined) updatePayload.outbound_enabled = outboundEnabled;
+        if (smsEnabled !== undefined) updatePayload.sms_enabled = smsEnabled;
+        if (assistantId !== undefined) updatePayload.assistant_id = assistantId || null;
+
+        const { error: updateError } = await supabase
+            .from('phone_numbers')
+            .update(updatePayload)
+            .eq('id', id)
+            .eq('user_id', userId);
+
+        if (updateError) {
+            console.error('Error updating phone number:', updateError);
+            return res.status(500).json({ error: 'Failed to update phone number' });
+        }
+
+        res.json({ success: true });
+
+    } catch (error) {
+        console.error('Update phone number error:', error.message);
+        res.status(500).json({ error: error.message || 'Failed to update phone number' });
+    }
+});
+
+/**
+ * Test Outbound Call - Make a test call to verify agent connectivity
+ * POST /api/twilio/test-call
+ * 
+ * Body: { phoneNumberId, toNumber }
+ * - phoneNumberId: ID of the imported phone number to call FROM
+ * - toNumber: Phone number to call TO (with country code, e.g., +1234567890)
+ * PROTECTED: Requires valid Supabase JWT token
+ */
+router.post('/test-call', verifySupabaseAuth, async (req, res) => {
     try {
         const { phoneNumberId, toNumber } = req.body;
 
