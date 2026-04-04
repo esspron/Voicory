@@ -42,3 +42,11 @@ coverage/
 .env.production
 test-results/
 docs/
+
+# Personal files
+51.txt
+majorproject.txt
+pricingstrategy.text
+research.md
+ProjectInst2.pdf
+localhost_5173_.png
