@@ -40,3 +40,4 @@ coverage/
 .env.livekit
 .agent/
 .env.production
+test-results/
