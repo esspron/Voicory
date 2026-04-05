@@ -1066,13 +1066,25 @@ export interface UserDialerSettings {
     id?: string;
     userId?: string;
     concurrentCallSlots: number;
+    /** Alias for concurrentCallSlots — used by DialerSettings UI */
+    maxConcurrentCalls: number;
     defaultTimezone: string;
     defaultCallStartHour: number;
     defaultCallEndHour: number;
+    /** HH:MM string derived from defaultCallStartHour */
+    defaultCallStartTime: string;
+    /** HH:MM string derived from defaultCallEndHour */
+    defaultCallEndTime: string;
     defaultMaxAttempts: number;
     defaultRetryDelayHours: number;
     respectDnc: boolean;
+    /** Alias for respectDnc — used by DialerSettings UI */
+    dncCheckEnabled: boolean;
     requireConsent: boolean;
+    tcpaEnabled: boolean;
+    recordingDisclosureEnabled: boolean;
+    defaultMaxCallsPerHour: number;
+    defaultMaxCallsPerDay: number;
     defaultCallerId?: string;
 }
 

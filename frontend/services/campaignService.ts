@@ -100,21 +100,47 @@ function mapLead(data: Record<string, unknown>): CampaignLead {
     };
 }
 
+function hourToTime(hour: unknown): string {
+    const h = typeof hour === 'number' ? hour : parseInt(String(hour ?? '9'), 10) || 9;
+    return `${String(h).padStart(2, '0')}:00`;
+}
+
+function timeToHour(time: unknown): number {
+    if (typeof time === 'string' && time.includes(':')) {
+        return parseInt(time.split(':')[0] ?? '9', 10);
+    }
+    return typeof time === 'number' ? time : 9;
+}
+
 function mapSettings(data: Record<string, unknown>): UserDialerSettings {
+    const startHour = (data['default_call_start_hour'] as number) ?? 9;
+    const endHour = (data['default_call_end_hour'] as number) ?? 20;
+    const slots = (data['concurrent_call_slots'] as number) ?? 1;
+    const dncEnabled = (data['respect_dnc'] as boolean) ?? true;
     return {
         id: data['id'] as string | undefined,
         userId: data['user_id'] as string | undefined,
-        concurrentCallSlots: data['concurrent_call_slots'] as number,
-        defaultTimezone: data['default_timezone'] as string,
-        defaultCallStartHour: data['default_call_start_hour'] as number,
-        defaultCallEndHour: data['default_call_end_hour'] as number,
-        defaultMaxAttempts: data['default_max_attempts'] as number,
-        defaultRetryDelayHours: data['default_retry_delay_hours'] as number,
-        respectDnc: data['respect_dnc'] as boolean,
-        requireConsent: data['require_consent'] as boolean,
+        concurrentCallSlots: slots,
+        maxConcurrentCalls: slots,
+        defaultTimezone: (data['default_timezone'] as string) ?? 'America/New_York',
+        defaultCallStartHour: startHour,
+        defaultCallEndHour: endHour,
+        defaultCallStartTime: hourToTime(startHour),
+        defaultCallEndTime: hourToTime(endHour),
+        defaultMaxAttempts: (data['default_max_attempts'] as number) ?? 3,
+        defaultRetryDelayHours: (data['default_retry_delay_hours'] as number) ?? 4,
+        respectDnc: dncEnabled,
+        dncCheckEnabled: dncEnabled,
+        requireConsent: (data['require_consent'] as boolean) ?? true,
+        tcpaEnabled: (data['tcpa_enabled'] as boolean) ?? true,
+        recordingDisclosureEnabled: (data['recording_disclosure_enabled'] as boolean) ?? true,
+        defaultMaxCallsPerHour: (data['default_max_calls_per_hour'] as number) ?? 50,
+        defaultMaxCallsPerDay: (data['default_max_calls_per_day'] as number) ?? 500,
         defaultCallerId: data['default_caller_id'] as string | undefined
     };
 }
+
+export { timeToHour };
 
 // ============================================
 // CAMPAIGN OPERATIONS
@@ -483,9 +509,28 @@ export async function getDialerSettings(): Promise<UserDialerSettings> {
 }
 
 export async function updateDialerSettings(settings: Partial<UserDialerSettings>): Promise<UserDialerSettings> {
+    // Normalize aliases so backend always receives canonical fields
+    const payload: Record<string, unknown> = { ...settings };
+    // maxConcurrentCalls → concurrentCallSlots
+    if (settings.maxConcurrentCalls !== undefined) {
+        payload['concurrentCallSlots'] = settings.maxConcurrentCalls;
+    }
+    // dncCheckEnabled → respectDnc
+    if (settings.dncCheckEnabled !== undefined) {
+        payload['respectDnc'] = settings.dncCheckEnabled;
+    }
+    // defaultCallStartTime (HH:MM) → defaultCallStartHour
+    if (settings.defaultCallStartTime !== undefined) {
+        payload['defaultCallStartHour'] = parseInt((settings.defaultCallStartTime as string).split(':')[0] ?? '9', 10);
+    }
+    // defaultCallEndTime (HH:MM) → defaultCallEndHour
+    if (settings.defaultCallEndTime !== undefined) {
+        payload['defaultCallEndHour'] = parseInt((settings.defaultCallEndTime as string).split(':')[0] ?? '20', 10);
+    }
+
     const response = await authFetch('/api/outbound-dialer/settings', {
         method: 'PUT',
-        body: JSON.stringify(settings)
+        body: JSON.stringify(payload)
     });
     const data = await response.json();
     

@@ -507,7 +507,11 @@ router.get('/settings', verifySupabaseAuth, async (req, res) => {
                 default_max_attempts: 3,
                 default_retry_delay_hours: 4,
                 respect_dnc: true,
-                require_consent: true
+                require_consent: true,
+                tcpa_enabled: true,
+                recording_disclosure_enabled: true,
+                default_max_calls_per_hour: 50,
+                default_max_calls_per_day: 500
             }
         });
     } catch (error) {
@@ -528,14 +532,20 @@ router.put('/settings', verifySupabaseAuth, async (req, res) => {
         };
         
         if (req.body.concurrentCallSlots !== undefined) updates.concurrent_call_slots = req.body.concurrentCallSlots;
+        if (req.body.maxConcurrentCalls !== undefined) updates.concurrent_call_slots = req.body.maxConcurrentCalls;
         if (req.body.defaultTimezone !== undefined) updates.default_timezone = req.body.defaultTimezone;
         if (req.body.defaultCallStartHour !== undefined) updates.default_call_start_hour = req.body.defaultCallStartHour;
         if (req.body.defaultCallEndHour !== undefined) updates.default_call_end_hour = req.body.defaultCallEndHour;
         if (req.body.defaultMaxAttempts !== undefined) updates.default_max_attempts = req.body.defaultMaxAttempts;
         if (req.body.defaultRetryDelayHours !== undefined) updates.default_retry_delay_hours = req.body.defaultRetryDelayHours;
         if (req.body.respectDnc !== undefined) updates.respect_dnc = req.body.respectDnc;
+        if (req.body.dncCheckEnabled !== undefined) updates.respect_dnc = req.body.dncCheckEnabled;
         if (req.body.requireConsent !== undefined) updates.require_consent = req.body.requireConsent;
         if (req.body.defaultCallerId !== undefined) updates.default_caller_id = req.body.defaultCallerId;
+        if (req.body.tcpaEnabled !== undefined) updates.tcpa_enabled = req.body.tcpaEnabled;
+        if (req.body.recordingDisclosureEnabled !== undefined) updates.recording_disclosure_enabled = req.body.recordingDisclosureEnabled;
+        if (req.body.defaultMaxCallsPerHour !== undefined) updates.default_max_calls_per_hour = req.body.defaultMaxCallsPerHour;
+        if (req.body.defaultMaxCallsPerDay !== undefined) updates.default_max_calls_per_day = req.body.defaultMaxCallsPerDay;
         
         const { data, error } = await supabase
             .from('user_dialer_settings')
