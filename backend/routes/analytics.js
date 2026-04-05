@@ -75,6 +75,134 @@ router.get('/model-usage', async (req, res) => {
   }
 });
 
+// GET /api/analytics/dashboard?days=7
+// Returns aggregated dashboard stats: calls, duration, cost, assistants, recent calls
+// Auth: Bearer token required (Supabase JWT)
+const { verifySupabaseAuth: verifyDashAuth } = require('../lib/auth');
+router.get('/dashboard', verifyDashAuth, async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ success: false, error: 'Unauthorized' });
+
+    const days = Math.min(parseInt(req.query.days || '7', 10), 90);
+    const supabase = getSupabase();
+    const now = new Date();
+    const startDate = new Date(now.getTime() - days * 24 * 60 * 60 * 1000).toISOString();
+    const prevStartDate = new Date(now.getTime() - days * 2 * 24 * 60 * 60 * 1000).toISOString();
+
+    // Fetch call logs for current & previous period (for trend comparison)
+    const [{ data: currentCalls, error: err1 }, { data: prevCalls, error: err2 }, { data: assistants, error: err3 }] = await Promise.all([
+      supabase.from('call_logs').select('id, duration, cost, status, assistant_name, assistant_id, phone_number, created_at, recording_url, call_sid')
+        .eq('user_id', userId).gte('created_at', startDate).order('created_at', { ascending: false }),
+      supabase.from('call_logs').select('id, duration, cost, status')
+        .eq('user_id', userId).gte('created_at', prevStartDate).lt('created_at', startDate),
+      supabase.from('assistants').select('id, name, is_active').eq('user_id', userId).eq('is_active', true),
+    ]);
+
+    if (err1) throw new Error(err1.message);
+    if (err2) throw new Error(err2.message);
+
+    const curr = currentCalls || [];
+    const prev = prevCalls || [];
+
+    // Helper: parse "Xm Ys" duration string to seconds
+    const parseDuration = (d) => {
+      if (!d) return 0;
+      const m = d.match(/(\d+)m\s*(\d+)s/);
+      if (m) return parseInt(m[1]) * 60 + parseInt(m[2]);
+      const sOnly = d.match(/(\d+)s/);
+      if (sOnly) return parseInt(sOnly[1]);
+      const mOnly = d.match(/(\d+)m/);
+      if (mOnly) return parseInt(mOnly[1]) * 60;
+      // also handle "MM:SS" format
+      const colonFmt = d.match(/^(\d+):(\d+)$/);
+      if (colonFmt) return parseInt(colonFmt[1]) * 60 + parseInt(colonFmt[2]);
+      return 0;
+    };
+
+    const totalCalls = curr.length;
+    const prevTotalCalls = prev.length;
+
+    const totalCostCents = curr.reduce((s, c) => s + (Number(c.cost) || 0), 0);
+    const prevCostCents = prev.reduce((s, c) => s + (Number(c.cost) || 0), 0);
+
+    const completedCalls = curr.filter(c => c.status === 'completed');
+    const totalDurationSec = completedCalls.reduce((s, c) => s + parseDuration(c.duration), 0);
+    const avgDurationSec = completedCalls.length > 0 ? Math.round(totalDurationSec / completedCalls.length) : 0;
+    const avgDurationFormatted = `${Math.floor(avgDurationSec / 60)}m ${avgDurationSec % 60}s`;
+
+    const prevCompleted = prev.filter(c => c.status === 'completed');
+    const prevDurationSec = prevCompleted.length > 0
+      ? Math.round(prevCompleted.reduce((s, c) => s + parseDuration(c.duration), 0) / prevCompleted.length) : 0;
+
+    const pctChange = (curr, prev) => prev > 0 ? (((curr - prev) / prev) * 100).toFixed(1) : null;
+
+    const successRate = totalCalls > 0 ? Math.round((completedCalls.length / totalCalls) * 100) : 0;
+
+    // Top performing assistant by call count
+    const assistantCallCounts = {};
+    curr.forEach(c => {
+      if (c.assistant_name) {
+        assistantCallCounts[c.assistant_name] = (assistantCallCounts[c.assistant_name] || 0) + 1;
+      }
+    });
+    const topAssistant = Object.entries(assistantCallCounts).sort((a, b) => b[1] - a[1])[0] || null;
+
+    // Chart data: calls and cost per day for last N days
+    const chartData = [];
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      const dateStr = d.toISOString().slice(0, 10);
+      const dayName = d.toLocaleDateString('en-US', { weekday: 'short' });
+      const dayCalls = curr.filter(c => c.created_at.slice(0, 10) === dateStr);
+      chartData.push({
+        name: days <= 7 ? dayName : dateStr.slice(5),
+        calls: dayCalls.length,
+        cost: dayCalls.reduce((s, c) => s + (Number(c.cost) || 0), 0),
+        date: dateStr,
+      });
+    }
+
+    // Recent calls (last 5)
+    const recentCalls = curr.slice(0, 5).map(c => ({
+      id: c.id,
+      assistantName: c.assistant_name || 'Unknown',
+      phoneNumber: c.phone_number || '',
+      duration: c.duration || '0:00',
+      cost: Number(c.cost) || 0,
+      status: c.status || 'completed',
+      date: c.created_at,
+      recordingUrl: c.recording_url || null,
+      callSid: c.call_sid || null,
+    }));
+
+    res.json({
+      success: true,
+      data: {
+        totalCalls,
+        totalCallsChange: pctChange(totalCalls, prevTotalCalls),
+        totalCallsTrend: totalCalls >= prevTotalCalls ? 'up' : 'down',
+        avgDuration: avgDurationFormatted,
+        avgDurationSec,
+        avgDurationChange: pctChange(avgDurationSec, prevDurationSec),
+        avgDurationTrend: avgDurationSec >= prevDurationSec ? 'up' : 'down',
+        totalCost: totalCostCents,
+        totalCostChange: pctChange(totalCostCents, prevCostCents),
+        totalCostTrend: totalCostCents >= prevCostCents ? 'up' : 'down',
+        successRate,
+        activeAssistants: (assistants || []).length,
+        topAssistant: topAssistant ? { name: topAssistant[0], calls: topAssistant[1] } : null,
+        recentCalls,
+        chartData,
+        periodDays: days,
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 module.exports = router;
 
 // GET /api/analytics/monthly-report?month=YYYY-MM
