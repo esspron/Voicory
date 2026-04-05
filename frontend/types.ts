@@ -627,6 +627,7 @@ export interface UserProfile {
     userId: string;
     organizationName: string;
     organizationEmail: string;
+    logoUrl?: string | null;
     walletId: string;
     channel: string;
     callConcurrencyLimit: number;

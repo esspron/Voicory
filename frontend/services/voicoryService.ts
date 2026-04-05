@@ -1503,6 +1503,7 @@ export const getUserProfile = async (): Promise<UserProfile | null> => {
             userId: data.user_id,
             organizationName: data.organization_name || '',
             organizationEmail: data.organization_email || '',
+            logoUrl: data.logo_url || null,
             walletId: data.wallet_id,
             channel: data.channel || 'daily',
             callConcurrencyLimit: data.call_concurrency_limit || 10,
@@ -1555,6 +1556,7 @@ export const createUserProfile = async (profile: Partial<Omit<UserProfile, 'id' 
             userId: data.user_id,
             organizationName: data.organization_name || '',
             organizationEmail: data.organization_email || '',
+            logoUrl: data.logo_url || null,
             walletId: data.wallet_id,
             channel: data.channel || 'daily',
             callConcurrencyLimit: data.call_concurrency_limit || 10,
@@ -1604,6 +1606,40 @@ export const updateUserProfile = async (updates: Partial<Omit<UserProfile, 'id' 
     } catch (error) {
         console.error('Error updating user profile:', error);
         return false;
+    }
+};
+
+/**
+ * Upload org logo to backend → Supabase Storage bucket 'logos'
+ * Returns the public URL of the uploaded logo
+ */
+export const uploadOrgLogo = async (file: File): Promise<string | null> => {
+    try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) throw new Error('Not authenticated');
+
+        const API_URL = import.meta.env.VITE_API_URL || '';
+        const formData = new FormData();
+        formData.append('logo', file);
+
+        const response = await fetch(`${API_URL}/api/settings/org/logo`, {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${session.access_token}`
+            },
+            body: formData
+        });
+
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err.error || 'Upload failed');
+        }
+
+        const data = await response.json();
+        return data.logoUrl || null;
+    } catch (error) {
+        console.error('Error uploading org logo:', error);
+        return null;
     }
 };
 

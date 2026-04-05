@@ -1,15 +1,28 @@
-import { Copy, Info, Check, Globe, CircleNotch, Buildings, Envelope, IdentificationCard, Wallet, Hash, Phone, ShieldCheck, CurrencyDollar, Sparkle } from '@phosphor-icons/react';
-import React, { useEffect, useState } from 'react';
+import { Copy, Info, Check, Globe, CircleNotch, Buildings, Envelope, IdentificationCard, Wallet, Hash, Phone, ShieldCheck, CurrencyDollar, Sparkle, UploadSimple, Image, X, CheckCircle, WarningCircle } from '@phosphor-icons/react';
+import React, { useEffect, useRef, useState } from 'react';
 
 import Select, { type SelectOption } from '../../components/ui/Select';
 import { useAuth } from '../../contexts/AuthContext';
-import { getUserProfile, updateUserProfile } from '../../services/voicoryService';
+import { getUserProfile, updateUserProfile, uploadOrgLogo } from '../../services/voicoryService';
 import { UserProfile } from '../../types';
 
 // Simple formatAmount function (USD only)
 const formatAmount = (amount: number): string => {
     return `$${amount.toFixed(2)}`;
 };
+
+// ─── Toast ─────────────────────────────────────────────────────────────────
+type ToastType = 'success' | 'error';
+interface ToastState { message: string; type: ToastType }
+
+const ToastBanner: React.FC<ToastState & { onClose: () => void }> = ({ message, type, onClose }) => (
+    <div className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-xl border text-sm font-medium transition-all
+        ${type === 'success' ? 'bg-emerald-900/80 border-emerald-500/30 text-emerald-300' : 'bg-red-900/80 border-red-500/30 text-red-300'}`}>
+        {type === 'success' ? <CheckCircle size={18} weight="fill" /> : <WarningCircle size={18} weight="fill" />}
+        {message}
+        <button onClick={onClose} className="ml-2 opacity-60 hover:opacity-100"><X size={14} /></button>
+    </div>
+);
 
 const channelOptions: SelectOption[] = [
     { value: 'daily', label: 'Daily' },
@@ -34,6 +47,13 @@ const OrgSettings: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [copied, setCopied] = useState<string | null>(null);
+    const [toast, setToast] = useState<ToastState | null>(null);
+
+    // Logo upload state
+    const [logoPreview, setLogoPreview] = useState<string | null>(null);
+    const [logoFile, setLogoFile] = useState<File | null>(null);
+    const [uploadingLogo, setUploadingLogo] = useState(false);
+    const logoInputRef = useRef<HTMLInputElement>(null);
 
     // Form state
     const [organizationName, setOrganizationName] = useState('');
@@ -41,6 +61,11 @@ const OrgSettings: React.FC = () => {
     const [channel, setChannel] = useState<SelectOption>(channelOptions[0]);
     const [callConcurrencyLimit, setCallConcurrencyLimit] = useState(10);
     const [selectedCountry, setSelectedCountry] = useState<SelectOption>(countryOptions[0]);
+
+    const showToast = (message: string, type: ToastType) => {
+        setToast({ message, type });
+        setTimeout(() => setToast(null), 4000);
+    };
 
     useEffect(() => {
         const fetchProfile = async () => {
@@ -53,6 +78,7 @@ const OrgSettings: React.FC = () => {
                     setChannel(channelOptions.find(o => o.value === userProfile.channel) || channelOptions[0]);
                     setCallConcurrencyLimit(userProfile.callConcurrencyLimit);
                     setSelectedCountry(countryOptions.find(o => o.value === (userProfile.country || 'IN')) || countryOptions[0]);
+                    if (userProfile.logoUrl) setLogoPreview(userProfile.logoUrl);
                 }
             } catch (error) {
                 console.error('Error fetching profile:', error);
@@ -76,6 +102,44 @@ const OrgSettings: React.FC = () => {
         }
     };
 
+    // ── Logo file selection ──────────────────────────────────────────────────
+    const handleLogoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setLogoFile(file);
+        const reader = new FileReader();
+        reader.onload = (ev) => setLogoPreview(ev.target?.result as string);
+        reader.readAsDataURL(file);
+    };
+
+    const handleLogoUpload = async () => {
+        if (!logoFile) return;
+        setUploadingLogo(true);
+        try {
+            const url = await uploadOrgLogo(logoFile);
+            if (url) {
+                setLogoPreview(url);
+                setLogoFile(null);
+                setProfile(prev => prev ? { ...prev, logoUrl: url } : prev);
+                showToast('Logo uploaded successfully', 'success');
+            } else {
+                showToast('Logo upload failed', 'error');
+            }
+        } catch (err) {
+            showToast('Logo upload failed', 'error');
+        } finally {
+            setUploadingLogo(false);
+            if (logoInputRef.current) logoInputRef.current.value = '';
+        }
+    };
+
+    const handleRemoveLogo = () => {
+        setLogoPreview(null);
+        setLogoFile(null);
+        if (logoInputRef.current) logoInputRef.current.value = '';
+    };
+
+    // ── Save org profile fields ──────────────────────────────────────────────
     const handleSave = async () => {
         setSaving(true);
         try {
@@ -88,14 +152,18 @@ const OrgSettings: React.FC = () => {
             });
 
             if (success) {
-                // Refresh profile
                 const updatedProfile = await getUserProfile();
                 if (updatedProfile) {
                     setProfile(updatedProfile);
+                    if (updatedProfile.logoUrl) setLogoPreview(updatedProfile.logoUrl);
                 }
+                showToast('Organization profile saved', 'success');
+            } else {
+                showToast('Failed to save profile', 'error');
             }
         } catch (error) {
             console.error('Error saving profile:', error);
+            showToast('Failed to save profile', 'error');
         } finally {
             setSaving(false);
         }
@@ -133,6 +201,82 @@ const OrgSettings: React.FC = () => {
             </div>
 
             <div className="space-y-6">
+                {/* ── Logo Upload Section ──────────────────────────────────────── */}
+                <div className="bg-surface/50 backdrop-blur-sm border border-white/[0.06] rounded-2xl p-6">
+                    <div className="flex items-center gap-2 mb-4">
+                        <Image size={14} weight="fill" className="text-primary" />
+                        <h3 className="text-sm font-semibold text-textMain">Company Logo</h3>
+                    </div>
+
+                    <div className="flex items-center gap-6">
+                        {/* Preview */}
+                        <div className="w-20 h-20 rounded-2xl bg-background/50 border border-white/10 flex items-center justify-center overflow-hidden flex-shrink-0">
+                            {logoPreview ? (
+                                <img src={logoPreview} alt="Company logo" className="w-full h-full object-contain" />
+                            ) : (
+                                <Buildings size={32} weight="duotone" className="text-textMuted/40" />
+                            )}
+                        </div>
+
+                        {/* Controls */}
+                        <div className="flex-1 space-y-3">
+                            <p className="text-xs text-textMuted">Upload your company logo. JPG, PNG, GIF, WebP or SVG — max 5MB.</p>
+
+                            <input
+                                ref={logoInputRef}
+                                type="file"
+                                accept="image/*"
+                                onChange={handleLogoSelect}
+                                className="hidden"
+                                id="logo-upload-input"
+                            />
+
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <label
+                                    htmlFor="logo-upload-input"
+                                    className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium bg-white/5 hover:bg-white/10 text-textMain border border-white/10 cursor-pointer transition-all"
+                                >
+                                    <UploadSimple size={16} />
+                                    {logoFile ? 'Change File' : 'Choose File'}
+                                </label>
+
+                                {logoFile && (
+                                    <>
+                                        <span className="text-xs text-textMuted truncate max-w-[140px]">{logoFile.name}</span>
+                                        <button
+                                            onClick={handleLogoUpload}
+                                            disabled={uploadingLogo}
+                                            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium bg-primary/20 hover:bg-primary/30 text-primary border border-primary/30 disabled:opacity-50 transition-all"
+                                        >
+                                            {uploadingLogo ? (
+                                                <><CircleNotch size={16} className="animate-spin" /> Uploading...</>
+                                            ) : (
+                                                <><Check size={16} weight="bold" /> Upload Logo</>
+                                            )}
+                                        </button>
+                                        <button
+                                            onClick={handleRemoveLogo}
+                                            className="p-2 rounded-lg text-textMuted hover:text-red-400 hover:bg-red-500/10 transition-all"
+                                            title="Cancel"
+                                        >
+                                            <X size={16} />
+                                        </button>
+                                    </>
+                                )}
+
+                                {!logoFile && logoPreview && (
+                                    <button
+                                        onClick={handleRemoveLogo}
+                                        className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm text-red-400 hover:bg-red-500/10 border border-red-500/20 transition-all"
+                                    >
+                                        <X size={14} /> Remove
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 {/* Organization Info Section */}
                 <div className="bg-surface/50 backdrop-blur-sm border border-white/[0.06] rounded-2xl p-6 space-y-5">
                     <div className="flex items-center gap-2 mb-2">
@@ -322,10 +466,12 @@ const OrgSettings: React.FC = () => {
                                 </p>
                             </div>
                         </div>
-                        <button className={`px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${profile?.hipaaEnabled
-                            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/30'
-                            : 'bg-primary/20 text-primary border border-primary/30 hover:bg-primary/30'
-                            }`}>
+                        <button
+                            onClick={() => showToast(profile?.hipaaEnabled ? 'Contact support to manage HIPAA settings' : 'Contact support to purchase the HIPAA add-on', 'success')}
+                            className={`px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${profile?.hipaaEnabled
+                                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/30'
+                                : 'bg-primary/20 text-primary border border-primary/30 hover:bg-primary/30'
+                                }`}>
                             {profile?.hipaaEnabled ? 'Manage' : 'Purchase Add-on'}
                         </button>
                     </div>
@@ -354,6 +500,9 @@ const OrgSettings: React.FC = () => {
                     </div>
                 )}
             </div>
+
+            {/* Toast */}
+            {toast && <ToastBanner {...toast} onClose={() => setToast(null)} />}
         </div>
     );
 };
