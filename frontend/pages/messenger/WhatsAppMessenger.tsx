@@ -13,8 +13,6 @@ import {
     PhoneCall,
     ChatCircle,
     Clock,
-    Users,
-    ChartLineUp,
     Shield,
     Lightning,
     CaretRight,
@@ -25,12 +23,19 @@ import {
     Eye,
     EyeSlash,
     GlobeHemisphereWest,
-    CaretDown
+    MagnifyingGlass,
+    PaperPlaneRight,
+    Paperclip,
+    UserCircle,
+    BookmarkSimple,
+    Check,
+    ArrowLeft
 } from '@phosphor-icons/react';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 
 import { API } from '../../lib/constants';
+import { authFetch } from '../../lib/api';
 
 import { FadeIn } from '../../components/ui/FadeIn';
 import Select from '../../components/ui/Select';
@@ -39,11 +44,59 @@ import {
     getWhatsAppConfigs,
     createWhatsAppConfig,
     updateWhatsAppConfig,
-    deleteWhatsAppConfig,
     verifyWhatsAppConnection,
     updateCallingSettings
 } from '../../services/whatsappService';
-import { WhatsAppConfig, WhatsAppCallSettings, Assistant } from '../../types';
+import { WhatsAppConfig, Assistant } from '../../types';
+
+// ============================================
+// TYPES
+// ============================================
+interface Conversation {
+    id: string;
+    config_id: string;
+    wa_id: string;
+    phone_number: string;
+    profile_name?: string;
+    last_message_at?: string;
+    conversation_window_open?: boolean;
+    lastMessage?: {
+        content: { body?: string; caption?: string };
+        direction: 'inbound' | 'outbound';
+        message_type: string;
+        message_timestamp: string;
+        status: string;
+    } | null;
+}
+
+interface WaMessage {
+    id: string;
+    wa_message_id?: string;
+    config_id: string;
+    from_number: string;
+    to_number: string;
+    direction: 'inbound' | 'outbound';
+    message_type: string;
+    content: { body?: string; caption?: string; templateName?: string; mediaUrl?: string };
+    status: string;
+    is_from_bot?: boolean;
+    message_timestamp: string;
+    read_at?: string;
+}
+
+interface WaTemplate {
+    id: string;
+    config_id: string;
+    template_name: string;
+    language: string;
+    category: string;
+    status: string;
+    components: any[];
+}
+
+// ============================================
+// MAIN COMPONENT
+// ============================================
 
 const WhatsAppMessenger: React.FC = () => {
     const [configs, setConfigs] = useState<WhatsAppConfig[]>([]);
@@ -53,6 +106,9 @@ const WhatsAppMessenger: React.FC = () => {
     const [showSettingsModal, setShowSettingsModal] = useState(false);
     const [selectedConfig, setSelectedConfig] = useState<WhatsAppConfig | null>(null);
     const [verifying, setVerifying] = useState<string | null>(null);
+
+    // Messenger view
+    const [messengerConfig, setMessengerConfig] = useState<WhatsAppConfig | null>(null);
 
     useEffect(() => {
         loadData();
@@ -128,6 +184,17 @@ const WhatsAppMessenger: React.FC = () => {
                 return null;
         }
     };
+
+    // If messenger panel is open, render full-screen messenger
+    if (messengerConfig) {
+        return (
+            <MessengerPanel
+                config={messengerConfig}
+                assistants={assistants}
+                onBack={() => setMessengerConfig(null)}
+            />
+        );
+    }
 
     if (loading) {
         return (
@@ -309,8 +376,10 @@ const WhatsAppMessenger: React.FC = () => {
                                         <Gear size={16} weight="duotone" />
                                         Configure
                                     </button>
+                                    {/* VIEW CHATS — wired to open full messenger panel */}
                                     <button
-                                        className="flex items-center gap-2 px-4 py-2 bg-surfaceHover text-textMain rounded-xl hover:bg-surfaceHover/80 transition-all duration-200 text-sm"
+                                        onClick={() => setMessengerConfig(config)}
+                                        className="flex items-center gap-2 px-4 py-2 bg-green-500/10 text-green-400 rounded-xl hover:bg-green-500/20 transition-all duration-200 text-sm font-medium"
                                     >
                                         <ChatCircle size={16} weight="duotone" />
                                         View Chats
@@ -385,6 +454,592 @@ const WhatsAppMessenger: React.FC = () => {
 };
 
 // ============================================
+// MESSENGER PANEL — Full Chat UI
+// ============================================
+
+interface MessengerPanelProps {
+    config: WhatsAppConfig;
+    assistants: Assistant[];
+    onBack: () => void;
+}
+
+const MessengerPanel: React.FC<MessengerPanelProps> = ({ config, assistants, onBack }) => {
+    const [conversations, setConversations] = useState<Conversation[]>([]);
+    const [filteredConvs, setFilteredConvs] = useState<Conversation[]>([]);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [activeConv, setActiveConv] = useState<Conversation | null>(null);
+    const [messages, setMessages] = useState<WaMessage[]>([]);
+    const [templates, setTemplates] = useState<WaTemplate[]>([]);
+    const [loadingConvs, setLoadingConvs] = useState(true);
+    const [loadingMsgs, setLoadingMsgs] = useState(false);
+    const [sendingMsg, setSendingMsg] = useState(false);
+    const [messageText, setMessageText] = useState('');
+    const [showTemplates, setShowTemplates] = useState(false);
+    const [showAssignModal, setShowAssignModal] = useState(false);
+    const [error, setError] = useState('');
+    const messagesEndRef = useRef<HTMLDivElement>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // Load conversations on mount
+    useEffect(() => {
+        loadConversations();
+        loadTemplates();
+    }, []);
+
+    // Filter conversations by search
+    useEffect(() => {
+        if (!searchQuery.trim()) {
+            setFilteredConvs(conversations);
+        } else {
+            const q = searchQuery.toLowerCase();
+            setFilteredConvs(conversations.filter(c =>
+                c.profile_name?.toLowerCase().includes(q) ||
+                c.phone_number?.toLowerCase().includes(q)
+            ));
+        }
+    }, [searchQuery, conversations]);
+
+    // Auto-scroll messages
+    useEffect(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [messages]);
+
+    const loadConversations = async () => {
+        setLoadingConvs(true);
+        try {
+            const resp = await authFetch(`/api/whatsapp/conversations?configId=${config.id}`);
+            if (resp.ok) {
+                const data = await resp.json();
+                setConversations(data.conversations || []);
+            } else {
+                const err = await resp.json().catch(() => ({}));
+                setError(err.error || 'Failed to load conversations');
+            }
+        } catch (e: any) {
+            setError(e.message);
+        }
+        setLoadingConvs(false);
+    };
+
+    const loadTemplates = async () => {
+        try {
+            const resp = await authFetch(`/api/whatsapp/templates/${config.id}`);
+            if (resp.ok) {
+                const data = await resp.json();
+                setTemplates(data.templates || []);
+            }
+        } catch (_) {}
+    };
+
+    const openConversation = async (conv: Conversation) => {
+        setActiveConv(conv);
+        setLoadingMsgs(true);
+        setMessages([]);
+        try {
+            const resp = await authFetch(`/api/whatsapp/messages/${config.id}/${conv.wa_id}`);
+            if (resp.ok) {
+                const data = await resp.json();
+                setMessages(data.messages || []);
+            }
+        } catch (e: any) {
+            setError(e.message);
+        }
+        setLoadingMsgs(false);
+    };
+
+    const sendTextMessage = async () => {
+        if (!activeConv || !messageText.trim() || sendingMsg) return;
+        setSendingMsg(true);
+        setError('');
+        const text = messageText.trim();
+        setMessageText('');
+        try {
+            const resp = await authFetch('/api/whatsapp/send', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    configId: config.id,
+                    to: activeConv.wa_id,
+                    type: 'text',
+                    content: text
+                })
+            });
+            const data = await resp.json();
+            if (!resp.ok) {
+                setError(data.error || 'Failed to send message');
+                setMessageText(text); // restore
+            } else {
+                // Optimistically append
+                setMessages(prev => [...prev, {
+                    id: data.message?.id || Date.now().toString(),
+                    wa_message_id: data.waMessageId,
+                    config_id: config.id,
+                    from_number: config.displayPhoneNumber || '',
+                    to_number: activeConv.phone_number,
+                    direction: 'outbound',
+                    message_type: 'text',
+                    content: { body: text },
+                    status: 'sent',
+                    is_from_bot: false,
+                    message_timestamp: new Date().toISOString()
+                }]);
+            }
+        } catch (e: any) {
+            setError(e.message);
+            setMessageText(text);
+        }
+        setSendingMsg(false);
+    };
+
+    const sendTemplate = async (template: WaTemplate) => {
+        if (!activeConv || sendingMsg) return;
+        setSendingMsg(true);
+        setError('');
+        setShowTemplates(false);
+        try {
+            const resp = await authFetch('/api/whatsapp/send', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    configId: config.id,
+                    to: activeConv.wa_id,
+                    type: 'template',
+                    templateName: template.template_name,
+                    templateLanguage: template.language,
+                    templateComponents: []
+                })
+            });
+            const data = await resp.json();
+            if (!resp.ok) {
+                setError(data.error || 'Failed to send template');
+            } else {
+                setMessages(prev => [...prev, {
+                    id: data.message?.id || Date.now().toString(),
+                    wa_message_id: data.waMessageId,
+                    config_id: config.id,
+                    from_number: config.displayPhoneNumber || '',
+                    to_number: activeConv.phone_number,
+                    direction: 'outbound',
+                    message_type: 'template',
+                    content: { templateName: template.template_name },
+                    status: 'sent',
+                    is_from_bot: false,
+                    message_timestamp: new Date().toISOString()
+                }]);
+            }
+        } catch (e: any) {
+            setError(e.message);
+        }
+        setSendingMsg(false);
+    };
+
+    const sendMedia = async (_file: File) => {
+        if (!activeConv || sendingMsg) return;
+        setSendingMsg(true);
+        setError('');
+        try {
+            // Determine media type (not yet used — media needs public URL)
+            // let type = 'document';
+            // if (file.type.startsWith('image/')) type = 'image';
+            // else if (file.type.startsWith('video/')) type = 'video';
+            // else if (file.type.startsWith('audio/')) type = 'audio';
+
+            // Upload to get a public URL (use backend upload endpoint if available, otherwise show error)
+            // For now, send as document with a note — media requires a publicly accessible URL or WhatsApp Media ID
+            setError('Media send requires a public URL or WhatsApp Media ID. Please use the template or text for now, or upload media to WhatsApp separately first.');
+        } catch (e: any) {
+            setError(e.message);
+        }
+        setSendingMsg(false);
+    };
+
+    const markAsRead = async (msg: WaMessage) => {
+        if (!msg.wa_message_id || msg.direction !== 'inbound') return;
+        try {
+            await authFetch(`/api/whatsapp/mark-read/${config.id}/${msg.wa_message_id}`, {
+                method: 'POST'
+            });
+            setMessages(prev => prev.map(m =>
+                m.wa_message_id === msg.wa_message_id ? { ...m, status: 'read' } : m
+            ));
+        } catch (_) {}
+    };
+
+    const assignAssistant = async (assistantId: string) => {
+        if (!activeConv) return;
+        setShowAssignModal(false);
+        try {
+            await authFetch(`/api/whatsapp/conversations/${config.id}/${activeConv.wa_id}/assign`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ assistantId })
+            });
+        } catch (_) {}
+    };
+
+    const formatTime = (ts: string) => {
+        try {
+            const d = new Date(ts);
+            return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        } catch { return ''; }
+    };
+
+    const getMessagePreview = (conv: Conversation) => {
+        if (!conv.lastMessage) return 'No messages yet';
+        const { content, direction, message_type } = conv.lastMessage;
+        const prefix = direction === 'outbound' ? 'You: ' : '';
+        if (message_type === 'text') return `${prefix}${content.body || ''}`;
+        if (message_type === 'template') return `${prefix}📋 Template`;
+        if (message_type === 'image') return `${prefix}📷 Image`;
+        if (message_type === 'video') return `${prefix}🎥 Video`;
+        if (message_type === 'audio') return `${prefix}🎤 Audio`;
+        if (message_type === 'document') return `${prefix}📎 Document`;
+        return `${prefix}${message_type}`;
+    };
+
+    return (
+        <div className="flex h-screen bg-background overflow-hidden">
+            {/* Sidebar — Conversations list */}
+            <div className="w-80 flex-shrink-0 border-r border-border flex flex-col bg-surface/50">
+                {/* Header */}
+                <div className="p-4 border-b border-border">
+                    <div className="flex items-center gap-3 mb-3">
+                        <button
+                            onClick={onBack}
+                            className="p-1.5 hover:bg-white/5 rounded-lg text-textMuted hover:text-textMain transition-colors"
+                            title="Back"
+                        >
+                            <ArrowLeft size={18} weight="bold" />
+                        </button>
+                        <div className="flex items-center gap-2 flex-1">
+                            <WhatsappLogo size={20} weight="fill" className="text-green-500" />
+                            <span className="font-semibold text-textMain text-sm truncate">{config.displayName}</span>
+                        </div>
+                        <button
+                            onClick={loadConversations}
+                            className="p-1.5 hover:bg-white/5 rounded-lg text-textMuted hover:text-primary transition-colors"
+                            title="Refresh"
+                        >
+                            <ArrowsClockwise size={16} weight="bold" className={loadingConvs ? 'animate-spin' : ''} />
+                        </button>
+                    </div>
+                    {/* Search conversations */}
+                    <div className="relative">
+                        <MagnifyingGlass size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-textMuted" />
+                        <input
+                            type="text"
+                            value={searchQuery}
+                            onChange={e => setSearchQuery(e.target.value)}
+                            placeholder="Search conversations..."
+                            className="w-full pl-9 pr-3 py-2 bg-background border border-border/50 rounded-lg text-sm text-textMain placeholder-textMuted outline-none focus:border-primary/50 transition-colors"
+                        />
+                    </div>
+                </div>
+
+                {/* Conversations list */}
+                <div className="flex-1 overflow-y-auto">
+                    {loadingConvs ? (
+                        <div className="flex items-center justify-center h-32">
+                            <CircleNotch className="animate-spin text-primary" size={24} weight="bold" />
+                        </div>
+                    ) : filteredConvs.length === 0 ? (
+                        <div className="p-6 text-center text-textMuted text-sm">
+                            {searchQuery ? 'No matching conversations' : 'No conversations yet'}
+                        </div>
+                    ) : (
+                        filteredConvs.map(conv => (
+                            <button
+                                key={conv.id}
+                                onClick={() => openConversation(conv)}
+                                className={`w-full px-4 py-3 flex items-start gap-3 hover:bg-white/5 transition-colors text-left border-b border-border/30 ${
+                                    activeConv?.id === conv.id ? 'bg-primary/10 border-l-2 border-l-primary' : ''
+                                }`}
+                            >
+                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-500/30 to-green-500/10 flex items-center justify-center flex-shrink-0">
+                                    <UserCircle size={22} className="text-green-400" weight="fill" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex items-center justify-between">
+                                        <span className="font-medium text-textMain text-sm truncate">
+                                            {conv.profile_name || conv.phone_number}
+                                        </span>
+                                        {conv.lastMessage && (
+                                            <span className="text-xs text-textMuted flex-shrink-0 ml-2">
+                                                {formatTime(conv.lastMessage.message_timestamp)}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <p className="text-xs text-textMuted truncate mt-0.5">
+                                        {getMessagePreview(conv)}
+                                    </p>
+                                </div>
+                            </button>
+                        ))
+                    )}
+                </div>
+            </div>
+
+            {/* Chat area */}
+            <div className="flex-1 flex flex-col overflow-hidden">
+                {activeConv ? (
+                    <>
+                        {/* Chat header */}
+                        <div className="px-5 py-3 border-b border-border flex items-center gap-3 bg-surface/50">
+                            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-green-500/30 to-green-500/10 flex items-center justify-center">
+                                <UserCircle size={20} className="text-green-400" weight="fill" />
+                            </div>
+                            <div className="flex-1">
+                                <h3 className="font-semibold text-textMain text-sm">
+                                    {activeConv.profile_name || activeConv.phone_number}
+                                </h3>
+                                <p className="text-xs text-textMuted">{activeConv.phone_number}</p>
+                            </div>
+                            {/* Assign to assistant */}
+                            <button
+                                onClick={() => setShowAssignModal(true)}
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-primary rounded-lg hover:bg-primary/20 transition-colors text-xs font-medium"
+                                title="Assign to AI Assistant"
+                            >
+                                <Robot size={14} weight="duotone" />
+                                Assign AI
+                            </button>
+                            {/* Mark all as read */}
+                            <button
+                                onClick={() => {
+                                    const unread = messages.filter(m => m.direction === 'inbound' && m.status !== 'read');
+                                    unread.forEach(m => markAsRead(m));
+                                }}
+                                className="p-2 text-textMuted hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
+                                title="Mark all as read"
+                            >
+                                <Check size={16} weight="bold" />
+                            </button>
+                        </div>
+
+                        {/* Messages */}
+                        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-2">
+                            {loadingMsgs ? (
+                                <div className="flex items-center justify-center h-full">
+                                    <CircleNotch className="animate-spin text-primary" size={24} weight="bold" />
+                                </div>
+                            ) : messages.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center h-full text-textMuted">
+                                    <ChatCircle size={40} weight="duotone" className="mb-3 opacity-50" />
+                                    <p className="text-sm">No messages yet. Start the conversation!</p>
+                                </div>
+                            ) : (
+                                messages.map(msg => (
+                                    <div
+                                        key={msg.id}
+                                        className={`flex ${msg.direction === 'outbound' ? 'justify-end' : 'justify-start'}`}
+                                    >
+                                        <div
+                                            className={`max-w-[70%] px-4 py-2.5 rounded-2xl text-sm ${
+                                                msg.direction === 'outbound'
+                                                    ? 'bg-primary text-black rounded-br-sm'
+                                                    : 'bg-surface border border-border/50 text-textMain rounded-bl-sm'
+                                            }`}
+                                        >
+                                            {msg.message_type === 'text' && (
+                                                <p className="break-words">{msg.content.body}</p>
+                                            )}
+                                            {msg.message_type === 'template' && (
+                                                <p className="break-words italic">
+                                                    📋 Template: {msg.content.templateName || 'sent'}
+                                                </p>
+                                            )}
+                                            {['image', 'video', 'audio', 'document'].includes(msg.message_type) && (
+                                                <p className="break-words italic">
+                                                    {msg.message_type === 'image' ? '📷' : msg.message_type === 'video' ? '🎥' : msg.message_type === 'audio' ? '🎤' : '📎'}
+                                                    {' '}{msg.content.caption || msg.message_type}
+                                                </p>
+                                            )}
+                                            <div className={`flex items-center gap-1 mt-1 ${msg.direction === 'outbound' ? 'justify-end' : 'justify-start'}`}>
+                                                <span className={`text-xs ${msg.direction === 'outbound' ? 'text-black/60' : 'text-textMuted'}`}>
+                                                    {formatTime(msg.message_timestamp)}
+                                                </span>
+                                                {msg.direction === 'outbound' && (
+                                                    <span className="text-xs text-black/60">
+                                                        {msg.status === 'read' ? '✓✓' : msg.status === 'delivered' ? '✓✓' : '✓'}
+                                                    </span>
+                                                )}
+                                                {msg.is_from_bot && (
+                                                    <Robot size={10} weight="fill" className={msg.direction === 'outbound' ? 'text-black/60' : 'text-textMuted'} />
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                            <div ref={messagesEndRef} />
+                        </div>
+
+                        {/* Error banner */}
+                        {error && (
+                            <div className="mx-5 mb-2 px-4 py-2 bg-red-500/10 border border-red-500/20 rounded-lg flex items-center justify-between">
+                                <span className="text-red-400 text-xs">{error}</span>
+                                <button onClick={() => setError('')} className="text-red-400 hover:text-red-300 ml-3">
+                                    <X size={14} />
+                                </button>
+                            </div>
+                        )}
+
+                        {/* Template picker */}
+                        {showTemplates && (
+                            <div className="mx-5 mb-2 bg-surface border border-border rounded-xl overflow-hidden max-h-48 overflow-y-auto">
+                                <div className="px-4 py-2 border-b border-border flex items-center justify-between">
+                                    <span className="text-xs font-medium text-textMuted">Approved Templates</span>
+                                    <button onClick={() => setShowTemplates(false)} className="text-textMuted hover:text-textMain">
+                                        <X size={14} />
+                                    </button>
+                                </div>
+                                {templates.length === 0 ? (
+                                    <div className="px-4 py-3 text-xs text-textMuted">
+                                        No approved templates found.{' '}
+                                        <button
+                                            onClick={async () => {
+                                                await authFetch(`/api/whatsapp/templates/${config.id}?sync=true`);
+                                                loadTemplates();
+                                            }}
+                                            className="text-primary hover:underline"
+                                        >
+                                            Sync from WhatsApp
+                                        </button>
+                                    </div>
+                                ) : (
+                                    templates.map(tmpl => (
+                                        <button
+                                            key={tmpl.id}
+                                            onClick={() => sendTemplate(tmpl)}
+                                            className="w-full px-4 py-2.5 text-left hover:bg-white/5 transition-colors border-b border-border/30 last:border-0"
+                                        >
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-sm text-textMain font-medium">{tmpl.template_name}</span>
+                                                <span className="text-xs text-textMuted">{tmpl.language}</span>
+                                            </div>
+                                            <span className="text-xs text-textMuted">{tmpl.category}</span>
+                                        </button>
+                                    ))
+                                )}
+                            </div>
+                        )}
+
+                        {/* Input bar */}
+                        <div className="px-5 py-3 border-t border-border bg-surface/50">
+                            <div className="flex items-end gap-2">
+                                {/* Template button */}
+                                <button
+                                    onClick={() => { setShowTemplates(!showTemplates); }}
+                                    className={`p-2.5 rounded-xl transition-colors flex-shrink-0 ${
+                                        showTemplates ? 'bg-primary/20 text-primary' : 'text-textMuted hover:text-primary hover:bg-primary/10'
+                                    }`}
+                                    title="Use template"
+                                >
+                                    <BookmarkSimple size={20} weight="duotone" />
+                                </button>
+
+                                {/* Media/Attachment button */}
+                                <button
+                                    onClick={() => fileInputRef.current?.click()}
+                                    className="p-2.5 rounded-xl text-textMuted hover:text-primary hover:bg-primary/10 transition-colors flex-shrink-0"
+                                    title="Send media (image, document, etc.)"
+                                >
+                                    <Paperclip size={20} weight="duotone" />
+                                </button>
+                                <input
+                                    ref={fileInputRef}
+                                    type="file"
+                                    accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xlsx,.csv"
+                                    className="hidden"
+                                    onChange={e => {
+                                        const file = e.target.files?.[0];
+                                        if (file) sendMedia(file);
+                                        e.target.value = '';
+                                    }}
+                                />
+
+                                {/* Text input */}
+                                <textarea
+                                    value={messageText}
+                                    onChange={e => setMessageText(e.target.value)}
+                                    onKeyDown={e => {
+                                        if (e.key === 'Enter' && !e.shiftKey) {
+                                            e.preventDefault();
+                                            sendTextMessage();
+                                        }
+                                    }}
+                                    placeholder="Type a message… (Enter to send, Shift+Enter for newline)"
+                                    rows={1}
+                                    className="flex-1 px-4 py-2.5 bg-background border border-border/50 rounded-xl text-textMain placeholder-textMuted outline-none focus:border-primary/50 transition-colors text-sm resize-none"
+                                    style={{ maxHeight: '120px', overflowY: 'auto' }}
+                                />
+
+                                {/* Send button */}
+                                <button
+                                    onClick={sendTextMessage}
+                                    disabled={!messageText.trim() || sendingMsg}
+                                    className="p-2.5 bg-green-500 hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl transition-colors flex-shrink-0"
+                                    title="Send message"
+                                >
+                                    {sendingMsg ? (
+                                        <CircleNotch size={20} weight="bold" className="animate-spin" />
+                                    ) : (
+                                        <PaperPlaneRight size={20} weight="fill" />
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+                    </>
+                ) : (
+                    /* No conversation selected */
+                    <div className="flex-1 flex flex-col items-center justify-center text-textMuted">
+                        <WhatsappLogo size={56} weight="fill" className="text-green-500/30 mb-4" />
+                        <h3 className="text-lg font-semibold text-textMain mb-1">WhatsApp Messenger</h3>
+                        <p className="text-sm text-textMuted">{config.displayPhoneNumber}</p>
+                        <p className="text-sm mt-3">Select a conversation from the left panel to start messaging</p>
+                    </div>
+                )}
+            </div>
+
+            {/* Assign Assistant Modal */}
+            {showAssignModal && activeConv && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[200] p-4">
+                    <div className="bg-surface border border-border rounded-xl w-80">
+                        <div className="flex items-center justify-between p-4 border-b border-border">
+                            <h3 className="font-semibold text-textMain">Assign AI Assistant</h3>
+                            <button onClick={() => setShowAssignModal(false)} className="text-textMuted hover:text-textMain">
+                                <X size={18} />
+                            </button>
+                        </div>
+                        <div className="p-4 space-y-2">
+                            {assistants.length === 0 ? (
+                                <p className="text-sm text-textMuted">No assistants available. Create one first.</p>
+                            ) : assistants.map(a => (
+                                <button
+                                    key={a.id}
+                                    onClick={() => assignAssistant(a.id)}
+                                    className="w-full flex items-center gap-3 px-4 py-3 bg-background hover:bg-white/5 rounded-xl transition-colors text-left"
+                                >
+                                    <Robot size={18} weight="duotone" className="text-primary" />
+                                    <span className="text-sm text-textMain">{a.name}</span>
+                                </button>
+                            ))}
+                            <button
+                                onClick={() => assignAssistant('')}
+                                className="w-full flex items-center gap-3 px-4 py-3 bg-background hover:bg-white/5 rounded-xl transition-colors text-left mt-2"
+                            >
+                                <X size={18} className="text-textMuted" />
+                                <span className="text-sm text-textMuted">Unassign (use config default)</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+// ============================================
 // CONNECT WHATSAPP MODAL
 // ============================================
 
@@ -421,10 +1076,7 @@ const ConnectWhatsAppModal: React.FC<ConnectModalProps> = ({ onClose, onSuccess 
     }, [connectionMethod]);
 
     const loadFacebookSDK = () => {
-        // Check if SDK is already loaded
         if ((window as any).FB) return;
-
-        // Load Facebook SDK
         const script = document.createElement('script');
         script.src = 'https://connect.facebook.net/en_US/sdk.js';
         script.async = true;
@@ -444,19 +1096,15 @@ const ConnectWhatsAppModal: React.FC<ConnectModalProps> = ({ onClose, onSuccess 
     const handleFacebookLogin = () => {
         setOauthStatus('connecting');
         setError('');
-
         const FB = (window as any).FB;
         if (!FB) {
             setError('Facebook SDK not loaded. Please try again.');
             setOauthStatus('error');
             return;
         }
-
-        // Launch Embedded Signup
         FB.login(
             (response: any) => {
                 if (response.authResponse) {
-                    // Successfully authenticated
                     handleOAuthSuccess(response.authResponse);
                 } else {
                     setError('Facebook login was cancelled or failed.');
@@ -467,37 +1115,26 @@ const ConnectWhatsAppModal: React.FC<ConnectModalProps> = ({ onClose, onSuccess 
                 config_id: FB_CONFIG_ID,
                 response_type: 'code',
                 override_default_response_type: true,
-                extras: {
-                    setup: {},
-                    featureType: '',
-                    sessionInfoVersion: '3'
-                }
+                extras: { setup: {}, featureType: '', sessionInfoVersion: '3' }
             }
         );
     };
 
     const handleOAuthSuccess = async (authResponse: any) => {
         try {
-            // Exchange the code for access token and get WABA details
-            // Use authFetch to call authenticated backend endpoint
-            const { authFetch } = await import('../../lib/api');
-            
             const response = await authFetch('/api/whatsapp/oauth/callback', {
                 method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     code: authResponse.code,
                     accessToken: authResponse.accessToken
                 })
             });
-
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
                 throw new Error(errorData.error || errorData.details || 'Failed to complete OAuth');
             }
-
             const data = await response.json();
-
-            // Create WhatsApp config with the received data
             const result = await createWhatsAppConfig({
                 wabaId: data.wabaId,
                 phoneNumberId: data.phoneNumberId,
@@ -506,13 +1143,9 @@ const ConnectWhatsAppModal: React.FC<ConnectModalProps> = ({ onClose, onSuccess 
                 accessToken: data.accessToken,
                 appId: FB_APP_ID
             });
-
             if (result) {
                 setOauthStatus('success');
-                setTimeout(() => {
-                    onSuccess();
-                    onClose();
-                }, 1500);
+                setTimeout(() => { onSuccess(); onClose(); }, 1500);
             } else {
                 throw new Error('Failed to save WhatsApp configuration');
             }
@@ -526,7 +1159,6 @@ const ConnectWhatsAppModal: React.FC<ConnectModalProps> = ({ onClose, onSuccess 
     const handleManualSubmit = async () => {
         setLoading(true);
         setError('');
-
         try {
             const result = await createWhatsAppConfig(formData);
             if (result) {
@@ -538,7 +1170,6 @@ const ConnectWhatsAppModal: React.FC<ConnectModalProps> = ({ onClose, onSuccess 
         } catch (err: any) {
             setError(err.message || 'An error occurred');
         }
-
         setLoading(false);
     };
 
@@ -547,14 +1178,7 @@ const ConnectWhatsAppModal: React.FC<ConnectModalProps> = ({ onClose, onSuccess 
         setStep(1);
         setError('');
         setOauthStatus('idle');
-        setFormData({
-            wabaId: '',
-            phoneNumberId: '',
-            displayPhoneNumber: '',
-            displayName: '',
-            accessToken: '',
-            appId: ''
-        });
+        setFormData({ wabaId: '', phoneNumberId: '', displayPhoneNumber: '', displayName: '', accessToken: '', appId: '', appSecret: '' });
     };
 
     return createPortal(
@@ -575,105 +1199,54 @@ const ConnectWhatsAppModal: React.FC<ConnectModalProps> = ({ onClose, onSuccess 
                             </p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="text-textMuted hover:text-textMain">
-                        <X size={20} />
-                    </button>
+                    <button onClick={onClose} className="text-textMuted hover:text-textMain"><X size={20} /></button>
                 </div>
 
                 {/* Content */}
                 <div className="p-6">
-                    {/* Choose Connection Method */}
                     {connectionMethod === 'choose' && (
                         <div className="space-y-4">
-                            <p className="text-sm text-textMuted mb-6">
-                                Choose how you want to connect your WhatsApp Business account
-                            </p>
-
-                            {/* Option 1: Facebook OAuth (Recommended) */}
-                            <button
-                                onClick={() => setConnectionMethod('oauth')}
-                                className="w-full p-4 bg-background border-2 border-border rounded-xl hover:border-primary/50 transition-all group text-left"
-                            >
+                            <p className="text-sm text-textMuted mb-6">Choose how you want to connect your WhatsApp Business account</p>
+                            <button onClick={() => setConnectionMethod('oauth')} className="w-full p-4 bg-background border-2 border-border rounded-xl hover:border-primary/50 transition-all group text-left">
                                 <div className="flex items-start gap-4">
                                     <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center shrink-0">
-                                        <svg className="w-6 h-6 text-white" viewBox="0 0 24 24" fill="currentColor">
-                                            <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
-                                        </svg>
+                                        <svg className="w-6 h-6 text-white" viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" /></svg>
                                     </div>
                                     <div className="flex-1">
                                         <div className="flex items-center gap-2">
                                             <h3 className="font-semibold text-textMain">Continue with Facebook</h3>
-                                            <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded-full font-medium">
-                                                Recommended
-                                            </span>
+                                            <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded-full font-medium">Recommended</span>
                                         </div>
-                                        <p className="text-sm text-textMuted mt-1">
-                                            One-click setup via Facebook Business. Automatically configures everything for you.
-                                        </p>
+                                        <p className="text-sm text-textMuted mt-1">One-click setup via Facebook Business.</p>
                                         <div className="flex items-center gap-4 mt-3 text-xs text-textMuted">
-                                            <span className="flex items-center gap-1">
-                                                <Sparkle size={12} className="text-primary" weight="fill" />
-                                                Quick setup
-                                            </span>
-                                            <span className="flex items-center gap-1">
-                                                <Shield size={12} className="text-green-400" />
-                                                Secure OAuth
-                                            </span>
-                                            <span className="flex items-center gap-1">
-                                                <Lightning size={12} className="text-yellow-400" weight="fill" />
-                                                Auto-config
-                                            </span>
+                                            <span className="flex items-center gap-1"><Sparkle size={12} className="text-primary" weight="fill" />Quick setup</span>
+                                            <span className="flex items-center gap-1"><Shield size={12} className="text-green-400" />Secure OAuth</span>
+                                            <span className="flex items-center gap-1"><Lightning size={12} className="text-yellow-400" weight="fill" />Auto-config</span>
                                         </div>
                                     </div>
                                     <CaretRight size={20} className="text-textMuted group-hover:text-primary transition-colors" weight="bold" />
                                 </div>
                             </button>
-
-                            {/* Option 2: Manual Setup */}
-                            <button
-                                onClick={() => setConnectionMethod('manual')}
-                                className="w-full p-4 bg-background border-2 border-border rounded-xl hover:border-primary/50 transition-all group text-left"
-                            >
+                            <button onClick={() => setConnectionMethod('manual')} className="w-full p-4 bg-background border-2 border-border rounded-xl hover:border-primary/50 transition-all group text-left">
                                 <div className="flex items-start gap-4">
                                     <div className="w-12 h-12 bg-surfaceHover rounded-xl flex items-center justify-center shrink-0">
                                         <Key className="text-textMuted" size={24} />
                                     </div>
                                     <div className="flex-1">
                                         <h3 className="font-semibold text-textMain">Manual Setup</h3>
-                                        <p className="text-sm text-textMuted mt-1">
-                                            Enter your WhatsApp Business API credentials manually. Best for advanced users.
-                                        </p>
-                                        <div className="flex items-center gap-4 mt-3 text-xs text-textMuted">
-                                            <span className="flex items-center gap-1">
-                                                <Gear size={12} />
-                                                Full control
-                                            </span>
-                                            <span className="flex items-center gap-1">
-                                                <Key size={12} />
-                                                Use existing tokens
-                                            </span>
-                                        </div>
+                                        <p className="text-sm text-textMuted mt-1">Enter credentials manually. Best for advanced users.</p>
                                     </div>
                                     <CaretRight size={20} className="text-textMuted group-hover:text-primary transition-colors" weight="bold" />
                                 </div>
                             </button>
-
                             <div className="pt-4 border-t border-border">
-                                <a
-                                    href="https://developers.facebook.com/docs/whatsapp/cloud-api/get-started"
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="flex items-center gap-2 text-sm text-primary hover:underline"
-                                >
-                                    <Info size={14} />
-                                    Learn more about WhatsApp Business API setup
-                                    <ArrowSquareOut size={12} />
+                                <a href="https://developers.facebook.com/docs/whatsapp/cloud-api/get-started" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-primary hover:underline">
+                                    <Info size={14} />Learn more about WhatsApp Business API setup<ArrowSquareOut size={12} />
                                 </a>
                             </div>
                         </div>
                     )}
 
-                    {/* OAuth Flow */}
                     {connectionMethod === 'oauth' && (
                         <div className="space-y-6">
                             {oauthStatus === 'idle' && (
@@ -688,217 +1261,82 @@ const ConnectWhatsAppModal: React.FC<ConnectModalProps> = ({ onClose, onSuccess 
                                                     <li>• Log in to your Facebook Business account</li>
                                                     <li>• Select or create a WhatsApp Business Account</li>
                                                     <li>• Choose a phone number to connect</li>
-                                                    <li>• Verify your phone number via SMS/call</li>
                                                 </ul>
                                             </div>
                                         </div>
                                     </div>
-
                                     {!FB_APP_ID && (
                                         <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4">
                                             <div className="flex items-start gap-3">
                                                 <Warning className="text-yellow-400 shrink-0 mt-0.5" size={18} weight="fill" />
                                                 <div className="text-sm">
                                                     <p className="text-yellow-400 font-medium">Configuration Required</p>
-                                                    <p className="text-textMuted mt-1">
-                                                        Facebook OAuth is not configured. Please set <code className="text-xs bg-background px-1 py-0.5 rounded">VITE_FACEBOOK_APP_ID</code> and <code className="text-xs bg-background px-1 py-0.5 rounded">VITE_FACEBOOK_CONFIG_ID</code> environment variables, or use Manual Setup.
-                                                    </p>
+                                                    <p className="text-textMuted mt-1">Facebook OAuth requires <code className="text-xs bg-background px-1 py-0.5 rounded">VITE_FACEBOOK_APP_ID</code>. Use Manual Setup instead.</p>
                                                 </div>
                                             </div>
                                         </div>
                                     )}
-
-                                    <button
-                                        onClick={handleFacebookLogin}
-                                        disabled={!FB_APP_ID}
-                                        className="w-full flex items-center justify-center gap-3 px-6 py-3 bg-[#1877F2] text-white font-semibold rounded-xl hover:bg-[#166FE5] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                    >
-                                        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                                            <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
-                                        </svg>
+                                    <button onClick={handleFacebookLogin} disabled={!FB_APP_ID} className="w-full flex items-center justify-center gap-3 px-6 py-3 bg-[#1877F2] text-white font-semibold rounded-xl hover:bg-[#166FE5] disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                                        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" /></svg>
                                         Continue with Facebook
                                     </button>
                                 </>
                             )}
-
                             {oauthStatus === 'connecting' && (
                                 <div className="text-center py-8">
                                     <CircleNotch className="w-12 h-12 text-primary animate-spin mx-auto mb-4" />
                                     <h3 className="font-semibold text-textMain">Connecting to Facebook...</h3>
-                                    <p className="text-sm text-textMuted mt-1">
-                                        Complete the setup in the popup window
-                                    </p>
+                                    <p className="text-sm text-textMuted mt-1">Complete the setup in the popup window</p>
                                 </div>
                             )}
-
                             {oauthStatus === 'success' && (
                                 <div className="text-center py-8">
                                     <div className="w-16 h-16 bg-green-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
                                         <CheckCircle className="w-8 h-8 text-green-500" />
                                     </div>
                                     <h3 className="font-semibold text-textMain">Connected Successfully!</h3>
-                                    <p className="text-sm text-textMuted mt-1">
-                                        Your WhatsApp Business account is now connected
-                                    </p>
                                 </div>
                             )}
-
                             {oauthStatus === 'error' && error && (
                                 <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4">
-                                    <div className="flex items-start gap-3">
-                                        <Warning className="text-red-400 shrink-0 mt-0.5" size={18} weight="fill" />
-                                        <div className="text-sm">
-                                            <p className="text-red-400 font-medium">Connection Failed</p>
-                                            <p className="text-textMuted mt-1">{error}</p>
-                                        </div>
-                                    </div>
+                                    <p className="text-red-400 text-sm">{error}</p>
                                 </div>
                             )}
                         </div>
                     )}
 
-                    {/* Manual Setup Flow */}
                     {connectionMethod === 'manual' && (
                         <>
                             {step === 1 && (
                                 <div className="space-y-4">
-                                    <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4">
-                                        <div className="flex items-start gap-3">
-                                            <Info className="text-blue-400 shrink-0 mt-0.5" size={18} />
-                                            <div className="text-sm">
-                                                <p className="text-blue-400 font-medium">Before you begin</p>
-                                                <p className="text-textMuted mt-1">
-                                                    You need a Meta Business account and a WhatsApp Business API app.
-                                                    <a
-                                                        href="https://developers.facebook.com/docs/whatsapp/cloud-api/get-started"
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="text-primary hover:underline ml-1"
-                                                    >
-                                                        Get started →
-                                                    </a>
-                                                </p>
-                                            </div>
+                                    {[
+                                        { label: 'WhatsApp Business Account ID', key: 'wabaId', placeholder: 'e.g., 123456789012345' },
+                                        { label: 'Phone Number ID', key: 'phoneNumberId', placeholder: 'e.g., 123456789012345' },
+                                        { label: 'Display Phone Number', key: 'displayPhoneNumber', placeholder: 'e.g., +1 555-123-4567' },
+                                        { label: 'Business Display Name', key: 'displayName', placeholder: 'e.g., My Business' },
+                                    ].map(field => (
+                                        <div key={field.key}>
+                                            <label className="block text-sm font-medium text-textMain mb-2">{field.label}</label>
+                                            <input type="text" value={(formData as any)[field.key]} onChange={e => setFormData({ ...formData, [field.key]: e.target.value })} placeholder={field.placeholder} className="w-full px-4 py-2.5 bg-background border border-white/10 rounded-xl text-textMain placeholder-textMuted outline-none focus:border-primary/50 transition-all duration-200" />
                                         </div>
-                                    </div>
-
+                                    ))}
                                     <div>
-                                        <label className="block text-sm font-medium text-textMain mb-2">
-                                            WhatsApp Business Account ID
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={formData.wabaId}
-                                            onChange={(e) => setFormData({ ...formData, wabaId: e.target.value })}
-                                            placeholder="e.g., 123456789012345"
-                                            className="w-full px-4 py-2.5 bg-background border border-white/10 rounded-xl text-textMain placeholder-textMuted outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all duration-200"
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-sm font-medium text-textMain mb-2">
-                                            Phone Number ID
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={formData.phoneNumberId}
-                                            onChange={(e) => setFormData({ ...formData, phoneNumberId: e.target.value })}
-                                            placeholder="e.g., 123456789012345"
-                                            className="w-full px-4 py-2.5 bg-background border border-white/10 rounded-xl text-textMain placeholder-textMuted outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all duration-200"
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-sm font-medium text-textMain mb-2">
-                                            Display Phone Number
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={formData.displayPhoneNumber}
-                                            onChange={(e) => setFormData({ ...formData, displayPhoneNumber: e.target.value })}
-                                            placeholder="e.g., +1 555-123-4567"
-                                            className="w-full px-4 py-2.5 bg-background border border-white/10 rounded-xl text-textMain placeholder-textMuted outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all duration-200"
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-sm font-medium text-textMain mb-2">
-                                            Business Display Name
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={formData.displayName}
-                                            onChange={(e) => setFormData({ ...formData, displayName: e.target.value })}
-                                            placeholder="e.g., My Business"
-                                            className="w-full px-4 py-2.5 bg-background border border-white/10 rounded-xl text-textMain placeholder-textMuted outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all duration-200"
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-sm font-medium text-textMain mb-2">
-                                            Permanent Access Token
-                                        </label>
-                                        <textarea
-                                            value={formData.accessToken}
-                                            onChange={(e) => setFormData({ ...formData, accessToken: e.target.value })}
-                                            placeholder="Paste your permanent (System User) access token here"
-                                            rows={3}
-                                            className="w-full px-4 py-2.5 bg-background border border-white/10 rounded-xl text-textMain placeholder-textMuted outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all duration-200 font-mono text-sm"
-                                        />
-                                        <p className="text-xs text-textMuted mt-1">
-                                            Create a System User in Business Settings → System Users → Generate Token with <code className="bg-surface px-1 rounded">whatsapp_business_messaging</code> permission.
-                                            <a
-                                                href="https://developers.facebook.com/docs/whatsapp/business-management-api/get-started#system-user-access-tokens"
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="text-primary hover:underline ml-1"
-                                            >
-                                                Learn how →
-                                            </a>
-                                        </p>
+                                        <label className="block text-sm font-medium text-textMain mb-2">Permanent Access Token</label>
+                                        <textarea value={formData.accessToken} onChange={e => setFormData({ ...formData, accessToken: e.target.value })} placeholder="Paste your permanent (System User) access token here" rows={3} className="w-full px-4 py-2.5 bg-background border border-white/10 rounded-xl text-textMain placeholder-textMuted outline-none focus:border-primary/50 transition-all duration-200 font-mono text-sm" />
                                     </div>
                                 </div>
                             )}
-
                             {step === 2 && (
                                 <div className="space-y-4">
                                     <div>
-                                        <label className="block text-sm font-medium text-textMain mb-2">
-                                            App ID (Optional)
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={formData.appId}
-                                            onChange={(e) => setFormData({ ...formData, appId: e.target.value })}
-                                            placeholder="e.g., 123456789012345"
-                                            className="w-full px-4 py-2.5 bg-background border border-white/10 rounded-xl text-textMain placeholder-textMuted outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all duration-200"
-                                        />
-                                        <p className="text-xs text-textMuted mt-1">
-                                            Found in Meta for Developers → Your App → App Dashboard
-                                        </p>
+                                        <label className="block text-sm font-medium text-textMain mb-2">App ID (Optional)</label>
+                                        <input type="text" value={formData.appId} onChange={e => setFormData({ ...formData, appId: e.target.value })} placeholder="e.g., 123456789012345" className="w-full px-4 py-2.5 bg-background border border-white/10 rounded-xl text-textMain placeholder-textMuted outline-none focus:border-primary/50 transition-all duration-200" />
                                     </div>
-
                                     <div>
-                                        <label className="block text-sm font-medium text-textMain mb-2">
-                                            App Secret (Optional)
-                                        </label>
-                                        <input
-                                            type="password"
-                                            value={formData.appSecret || ''}
-                                            onChange={(e) => setFormData({ ...formData, appSecret: e.target.value })}
-                                            placeholder="Your app secret for webhook verification"
-                                            className="w-full px-4 py-2.5 bg-background border border-white/10 rounded-xl text-textMain placeholder-textMuted outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all duration-200"
-                                        />
-                                        <p className="text-xs text-textMuted mt-1">
-                                            Required for webhook signature verification. Found in App Settings → Basic.
-                                        </p>
+                                        <label className="block text-sm font-medium text-textMain mb-2">App Secret (Optional)</label>
+                                        <input type="password" value={formData.appSecret || ''} onChange={e => setFormData({ ...formData, appSecret: e.target.value })} placeholder="Your app secret for webhook verification" className="w-full px-4 py-2.5 bg-background border border-white/10 rounded-xl text-textMain placeholder-textMuted outline-none focus:border-primary/50 transition-all duration-200" />
                                     </div>
-
-                                    {error && (
-                                        <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4">
-                                            <p className="text-red-400 text-sm">{error}</p>
-                                        </div>
-                                    )}
+                                    {error && <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4"><p className="text-red-400 text-sm">{error}</p></div>}
                                 </div>
                             )}
                         </>
@@ -908,73 +1346,28 @@ const ConnectWhatsAppModal: React.FC<ConnectModalProps> = ({ onClose, onSuccess 
                 {/* Footer */}
                 <div className="flex items-center justify-between p-6 border-t border-border">
                     {connectionMethod === 'choose' ? (
-                        <button
-                            onClick={onClose}
-                            className="px-4 py-2 text-textMuted hover:text-textMain transition-colors"
-                        >
-                            Cancel
-                        </button>
+                        <button onClick={onClose} className="px-4 py-2 text-textMuted hover:text-textMain transition-colors">Cancel</button>
                     ) : connectionMethod === 'oauth' ? (
                         <>
-                            <button
-                                onClick={resetModal}
-                                className="px-4 py-2 text-textMuted hover:text-textMain transition-colors"
-                            >
-                                ← Back
-                            </button>
+                            <button onClick={resetModal} className="px-4 py-2 text-textMuted hover:text-textMain transition-colors">← Back</button>
                             {oauthStatus === 'error' && (
-                                <button
-                                    onClick={() => setOauthStatus('idle')}
-                                    className="px-4 py-2 bg-gradient-to-r from-primary to-primary/80 text-black font-semibold rounded-xl hover:shadow-lg hover:shadow-primary/25 transition-colors"
-                                >
-                                    Try Again
-                                </button>
+                                <button onClick={() => setOauthStatus('idle')} className="px-4 py-2 bg-gradient-to-r from-primary to-primary/80 text-black font-semibold rounded-xl hover:shadow-lg transition-colors">Try Again</button>
                             )}
                         </>
                     ) : (
                         <>
                             {step > 1 ? (
-                                <button
-                                    onClick={() => setStep(step - 1)}
-                                    className="px-4 py-2 text-textMuted hover:text-textMain transition-colors"
-                                >
-                                    Back
-                                </button>
+                                <button onClick={() => setStep(step - 1)} className="px-4 py-2 text-textMuted hover:text-textMain transition-colors">Back</button>
                             ) : (
-                                <button
-                                    onClick={resetModal}
-                                    className="px-4 py-2 text-textMuted hover:text-textMain transition-colors"
-                                >
-                                    ← Back
-                                </button>
+                                <button onClick={resetModal} className="px-4 py-2 text-textMuted hover:text-textMain transition-colors">← Back</button>
                             )}
-
                             {step < 2 ? (
-                                <button
-                                    onClick={() => setStep(step + 1)}
-                                    disabled={!formData.wabaId || !formData.phoneNumberId || !formData.displayPhoneNumber || !formData.displayName}
-                                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-primary to-primary/80 text-black font-semibold rounded-xl hover:shadow-lg hover:shadow-primary/25 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                >
-                                    Continue
-                                    <CaretRight size={16} weight="bold" />
+                                <button onClick={() => setStep(step + 1)} disabled={!formData.wabaId || !formData.phoneNumberId || !formData.displayPhoneNumber || !formData.displayName} className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-primary to-primary/80 text-black font-semibold rounded-xl hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                                    Continue<CaretRight size={16} weight="bold" />
                                 </button>
                             ) : (
-                                <button
-                                    onClick={handleManualSubmit}
-                                    disabled={loading || !formData.accessToken}
-                                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-primary to-primary/80 text-black font-semibold rounded-xl hover:shadow-lg hover:shadow-primary/25 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                >
-                                    {loading ? (
-                                        <>
-                                            <CircleNotch size={16} className="animate-spin" />
-                                            Connecting...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <CheckCircle size={16} />
-                                            Connect
-                                        </>
-                                    )}
+                                <button onClick={handleManualSubmit} disabled={loading || !formData.accessToken} className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-primary to-primary/80 text-black font-semibold rounded-xl hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                                    {loading ? <><CircleNotch size={16} className="animate-spin" />Connecting...</> : <><CheckCircle size={16} />Connect</>}
                                 </button>
                             )}
                         </>
@@ -997,7 +1390,6 @@ interface SettingsModalProps {
     onUpdate: () => void;
 }
 
-// Server region options for webhook URL
 const SERVER_REGIONS = [
     { id: 'INDIA', label: 'India (Asia South)', flag: '🇮🇳', url: API.BACKEND_URLS.INDIA },
     { id: 'USA', label: 'USA (US Central)', flag: '🇺🇸', url: API.BACKEND_URLS.USA },
@@ -1013,11 +1405,7 @@ const WhatsAppSettingsModal: React.FC<SettingsModalProps> = ({ config, assistant
         chatbotEnabled: config.chatbotEnabled,
         assistantId: config.assistantId || '',
         callingEnabled: config.callingEnabled,
-        callSettings: config.callSettings || {
-            inboundCallsEnabled: false,
-            outboundCallsEnabled: false,
-            callbackRequestEnabled: false
-        }
+        callSettings: config.callSettings || { inboundCallsEnabled: false, outboundCallsEnabled: false, callbackRequestEnabled: false }
     });
 
     const handleSave = async () => {
@@ -1028,11 +1416,9 @@ const WhatsAppSettingsModal: React.FC<SettingsModalProps> = ({ config, assistant
                 assistantId: settings.assistantId || null,
                 callingEnabled: settings.callingEnabled
             });
-
             if (settings.callingEnabled) {
                 await updateCallingSettings(config.id, settings.callSettings);
             }
-
             onUpdate();
             onClose();
         } catch (error) {
@@ -1041,9 +1427,7 @@ const WhatsAppSettingsModal: React.FC<SettingsModalProps> = ({ config, assistant
         setLoading(false);
     };
 
-    const copyToClipboard = (text: string) => {
-        navigator.clipboard.writeText(text);
-    };
+    const copyToClipboard = (text: string) => { navigator.clipboard.writeText(text); };
 
     return createPortal(
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4">
@@ -1059,9 +1443,7 @@ const WhatsAppSettingsModal: React.FC<SettingsModalProps> = ({ config, assistant
                             <p className="text-xs text-textMuted">{config.displayPhoneNumber}</p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="text-textMuted hover:text-textMain">
-                        <X size={20} />
-                    </button>
+                    <button onClick={onClose} className="text-textMuted hover:text-textMain"><X size={20} /></button>
                 </div>
 
                 {/* Tabs */}
@@ -1074,14 +1456,7 @@ const WhatsAppSettingsModal: React.FC<SettingsModalProps> = ({ config, assistant
                     ].map((tab) => {
                         const isActive = activeTab === tab.id;
                         return (
-                            <button
-                                key={tab.id}
-                                onClick={() => setActiveTab(tab.id as any)}
-                                className={`group relative flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-xl transition-all duration-200 ${isActive
-                                    ? 'bg-gradient-to-r from-primary/15 to-primary/5 text-textMain border border-primary/20 shadow-lg shadow-primary/5'
-                                    : 'text-textMuted hover:text-textMain hover:bg-white/[0.03] border border-transparent'
-                                    }`}
-                            >
+                            <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`group relative flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-xl transition-all duration-200 ${isActive ? 'bg-gradient-to-r from-primary/15 to-primary/5 text-textMain border border-primary/20 shadow-lg shadow-primary/5' : 'text-textMuted hover:text-textMain hover:bg-white/[0.03] border border-transparent'}`}>
                                 <tab.icon size={16} weight={isActive ? "fill" : "regular"} className={isActive ? 'text-primary' : 'group-hover:text-primary'} />
                                 {tab.label}
                             </button>
@@ -1096,22 +1471,10 @@ const WhatsAppSettingsModal: React.FC<SettingsModalProps> = ({ config, assistant
                             <div>
                                 <h3 className="font-medium text-textMain mb-4">Account Information</h3>
                                 <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-xs text-textMuted mb-1">WABA ID</label>
-                                        <p className="text-sm text-textMain font-mono">{config.wabaId}</p>
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs text-textMuted mb-1">Phone Number ID</label>
-                                        <p className="text-sm text-textMain font-mono">{config.phoneNumberId}</p>
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs text-textMuted mb-1">Status</label>
-                                        <p className="text-sm capitalize text-textMain">{config.status}</p>
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs text-textMuted mb-1">Quality Rating</label>
-                                        <p className="text-sm text-textMain">{config.qualityRating || 'Unknown'}</p>
-                                    </div>
+                                    <div><label className="block text-xs text-textMuted mb-1">WABA ID</label><p className="text-sm text-textMain font-mono">{config.wabaId}</p></div>
+                                    <div><label className="block text-xs text-textMuted mb-1">Phone Number ID</label><p className="text-sm text-textMain font-mono">{config.phoneNumberId}</p></div>
+                                    <div><label className="block text-xs text-textMuted mb-1">Status</label><p className="text-sm capitalize text-textMain">{config.status}</p></div>
+                                    <div><label className="block text-xs text-textMuted mb-1">Quality Rating</label><p className="text-sm text-textMain">{config.qualityRating || 'Unknown'}</p></div>
                                 </div>
                             </div>
                         </div>
@@ -1122,34 +1485,19 @@ const WhatsAppSettingsModal: React.FC<SettingsModalProps> = ({ config, assistant
                             <div className="flex items-center justify-between">
                                 <div>
                                     <h3 className="font-medium text-textMain">Enable AI Chatbot</h3>
-                                    <p className="text-sm text-textMuted mt-1">
-                                        Automatically respond to incoming messages using an AI assistant
-                                    </p>
+                                    <p className="text-sm text-textMuted mt-1">Automatically respond to incoming messages using an AI assistant</p>
                                 </div>
-                                <button
-                                    onClick={() => setSettings({ ...settings, chatbotEnabled: !settings.chatbotEnabled })}
-                                    className={`w-12 h-6 rounded-full transition-colors ${settings.chatbotEnabled ? 'bg-primary' : 'bg-gray-600'
-                                        }`}
-                                >
-                                    <div
-                                        className={`w-5 h-5 rounded-full bg-white shadow-md transform transition-transform ${settings.chatbotEnabled ? 'translate-x-6' : 'translate-x-0.5'
-                                            }`}
-                                    />
+                                <button onClick={() => setSettings({ ...settings, chatbotEnabled: !settings.chatbotEnabled })} className={`w-12 h-6 rounded-full transition-colors ${settings.chatbotEnabled ? 'bg-primary' : 'bg-gray-600'}`}>
+                                    <div className={`w-5 h-5 rounded-full bg-white shadow-md transform transition-transform ${settings.chatbotEnabled ? 'translate-x-6' : 'translate-x-0.5'}`} />
                                 </button>
                             </div>
-
                             {settings.chatbotEnabled && (
                                 <div>
-                                    <label className="block text-sm font-medium text-textMain mb-2">
-                                        Select Assistant
-                                    </label>
+                                    <label className="block text-sm font-medium text-textMain mb-2">Select Assistant</label>
                                     <Select
                                         value={assistants.map(a => ({ value: a.id, label: a.name })).find(o => o.value === settings.assistantId) || { value: '', label: 'Select an assistant...' }}
                                         onChange={(option) => setSettings({ ...settings, assistantId: option.value })}
-                                        options={[
-                                            { value: '', label: 'Select an assistant...' },
-                                            ...assistants.map(a => ({ value: a.id, label: a.name }))
-                                        ]}
+                                        options={[{ value: '', label: 'Select an assistant...' }, ...assistants.map(a => ({ value: a.id, label: a.name }))]}
                                     />
                                 </div>
                             )}
@@ -1161,92 +1509,29 @@ const WhatsAppSettingsModal: React.FC<SettingsModalProps> = ({ config, assistant
                             <div className="flex items-center justify-between">
                                 <div>
                                     <h3 className="font-medium text-textMain">Enable Calling</h3>
-                                    <p className="text-sm text-textMuted mt-1">
-                                        Allow voice calls through WhatsApp
-                                    </p>
+                                    <p className="text-sm text-textMuted mt-1">Allow voice calls through WhatsApp</p>
                                 </div>
-                                <button
-                                    onClick={() => setSettings({ ...settings, callingEnabled: !settings.callingEnabled })}
-                                    className={`w-12 h-6 rounded-full transition-colors ${settings.callingEnabled ? 'bg-primary' : 'bg-gray-600'
-                                        }`}
-                                >
-                                    <div
-                                        className={`w-5 h-5 rounded-full bg-white shadow-md transform transition-transform ${settings.callingEnabled ? 'translate-x-6' : 'translate-x-0.5'
-                                            }`}
-                                    />
+                                <button onClick={() => setSettings({ ...settings, callingEnabled: !settings.callingEnabled })} className={`w-12 h-6 rounded-full transition-colors ${settings.callingEnabled ? 'bg-primary' : 'bg-gray-600'}`}>
+                                    <div className={`w-5 h-5 rounded-full bg-white shadow-md transform transition-transform ${settings.callingEnabled ? 'translate-x-6' : 'translate-x-0.5'}`} />
                                 </button>
                             </div>
-
                             {settings.callingEnabled && (
                                 <div className="space-y-4 pt-4 border-t border-border">
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <h4 className="text-sm font-medium text-textMain">Inbound Calls</h4>
-                                            <p className="text-xs text-textMuted">Receive calls from customers</p>
+                                    {[
+                                        { key: 'inboundCallsEnabled', label: 'Inbound Calls', desc: 'Receive calls from customers' },
+                                        { key: 'outboundCallsEnabled', label: 'Outbound Calls', desc: 'Initiate calls to customers' },
+                                        { key: 'callbackRequestEnabled', label: 'Callback Requests', desc: 'Allow users to request a callback' }
+                                    ].map(toggle => (
+                                        <div key={toggle.key} className="flex items-center justify-between">
+                                            <div>
+                                                <h4 className="text-sm font-medium text-textMain">{toggle.label}</h4>
+                                                <p className="text-xs text-textMuted">{toggle.desc}</p>
+                                            </div>
+                                            <button onClick={() => setSettings({ ...settings, callSettings: { ...settings.callSettings, [toggle.key]: !(settings.callSettings as any)[toggle.key] } })} className={`w-10 h-5 rounded-full transition-colors ${(settings.callSettings as any)[toggle.key] ? 'bg-primary' : 'bg-gray-600'}`}>
+                                                <div className={`w-4 h-4 rounded-full bg-white shadow-md transform transition-transform ${(settings.callSettings as any)[toggle.key] ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                                            </button>
                                         </div>
-                                        <button
-                                            onClick={() => setSettings({
-                                                ...settings,
-                                                callSettings: {
-                                                    ...settings.callSettings,
-                                                    inboundCallsEnabled: !settings.callSettings.inboundCallsEnabled
-                                                }
-                                            })}
-                                            className={`w-10 h-5 rounded-full transition-colors ${settings.callSettings.inboundCallsEnabled ? 'bg-primary' : 'bg-gray-600'
-                                                }`}
-                                        >
-                                            <div
-                                                className={`w-4 h-4 rounded-full bg-white shadow-md transform transition-transform ${settings.callSettings.inboundCallsEnabled ? 'translate-x-5' : 'translate-x-0.5'
-                                                    }`}
-                                            />
-                                        </button>
-                                    </div>
-
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <h4 className="text-sm font-medium text-textMain">Outbound Calls</h4>
-                                            <p className="text-xs text-textMuted">Initiate calls to customers</p>
-                                        </div>
-                                        <button
-                                            onClick={() => setSettings({
-                                                ...settings,
-                                                callSettings: {
-                                                    ...settings.callSettings,
-                                                    outboundCallsEnabled: !settings.callSettings.outboundCallsEnabled
-                                                }
-                                            })}
-                                            className={`w-10 h-5 rounded-full transition-colors ${settings.callSettings.outboundCallsEnabled ? 'bg-primary' : 'bg-gray-600'
-                                                }`}
-                                        >
-                                            <div
-                                                className={`w-4 h-4 rounded-full bg-white shadow-md transform transition-transform ${settings.callSettings.outboundCallsEnabled ? 'translate-x-5' : 'translate-x-0.5'
-                                                    }`}
-                                            />
-                                        </button>
-                                    </div>
-
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <h4 className="text-sm font-medium text-textMain">Callback Requests</h4>
-                                            <p className="text-xs text-textMuted">Allow users to request a callback</p>
-                                        </div>
-                                        <button
-                                            onClick={() => setSettings({
-                                                ...settings,
-                                                callSettings: {
-                                                    ...settings.callSettings,
-                                                    callbackRequestEnabled: !settings.callSettings.callbackRequestEnabled
-                                                }
-                                            })}
-                                            className={`w-10 h-5 rounded-full transition-colors ${settings.callSettings.callbackRequestEnabled ? 'bg-primary' : 'bg-gray-600'
-                                                }`}
-                                        >
-                                            <div
-                                                className={`w-4 h-4 rounded-full bg-white shadow-md transform transition-transform ${settings.callSettings.callbackRequestEnabled ? 'translate-x-5' : 'translate-x-0.5'
-                                                    }`}
-                                            />
-                                        </button>
-                                    </div>
+                                    ))}
                                 </div>
                             )}
                         </div>
@@ -1256,91 +1541,36 @@ const WhatsAppSettingsModal: React.FC<SettingsModalProps> = ({ config, assistant
                         <div className="space-y-6">
                             <div>
                                 <h3 className="font-medium text-textMain mb-4">Webhook Configuration</h3>
-                                <p className="text-sm text-textMuted mb-4">
-                                    Configure these settings in your Meta App Dashboard to receive messages and call events.
-                                </p>
+                                <p className="text-sm text-textMuted mb-4">Configure these settings in your Meta App Dashboard.</p>
                             </div>
-
-                            {/* Server Region Selector */}
                             <div>
                                 <label className="block text-sm font-medium text-textMain mb-2">
-                                    <div className="flex items-center gap-2">
-                                        <GlobeHemisphereWest size={16} className="text-primary" />
-                                        Server Region
-                                    </div>
+                                    <div className="flex items-center gap-2"><GlobeHemisphereWest size={16} className="text-primary" />Server Region</div>
                                 </label>
-                                <p className="text-xs text-textMuted mb-3">
-                                    Select the server closest to your WhatsApp number's country for optimal latency.
-                                </p>
                                 <div className="grid grid-cols-3 gap-2">
                                     {SERVER_REGIONS.map((region) => (
-                                        <button
-                                            key={region.id}
-                                            onClick={() => setServerRegion(region.id as typeof serverRegion)}
-                                            className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border transition-all ${
-                                                serverRegion === region.id
-                                                    ? 'bg-primary/10 border-primary/30 text-textMain'
-                                                    : 'bg-background border-border text-textMuted hover:border-primary/20 hover:bg-white/[0.02]'
-                                            }`}
-                                        >
+                                        <button key={region.id} onClick={() => setServerRegion(region.id as typeof serverRegion)} className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border transition-all ${serverRegion === region.id ? 'bg-primary/10 border-primary/30 text-textMain' : 'bg-background border-border text-textMuted hover:border-primary/20'}`}>
                                             <span className="text-lg">{region.flag}</span>
                                             <span className="text-sm font-medium">{region.id}</span>
                                         </button>
                                     ))}
                                 </div>
                             </div>
-
                             <div>
-                                <label className="block text-sm font-medium text-textMain mb-2">
-                                    Webhook URL
-                                </label>
+                                <label className="block text-sm font-medium text-textMain mb-2">Webhook URL</label>
                                 <div className="flex items-center gap-2">
-                                    <input
-                                        type="text"
-                                        readOnly
-                                        value={`${SERVER_REGIONS.find(r => r.id === serverRegion)?.url}/api/webhooks/whatsapp`}
-                                        className="flex-1 px-4 py-2.5 bg-background border border-border rounded-lg text-textMain font-mono text-sm"
-                                    />
-                                    <button
-                                        onClick={() => copyToClipboard(`${SERVER_REGIONS.find(r => r.id === serverRegion)?.url}/api/webhooks/whatsapp`)}
-                                        className="p-2.5 bg-surfaceHover rounded-lg hover:bg-surfaceHover/80 transition-colors"
-                                    >
-                                        <Copy size={18} className="text-textMuted" />
-                                    </button>
+                                    <input type="text" readOnly value={`${SERVER_REGIONS.find(r => r.id === serverRegion)?.url}/api/webhooks/whatsapp`} className="flex-1 px-4 py-2.5 bg-background border border-border rounded-lg text-textMain font-mono text-sm" />
+                                    <button onClick={() => copyToClipboard(`${SERVER_REGIONS.find(r => r.id === serverRegion)?.url}/api/webhooks/whatsapp`)} className="p-2.5 bg-surfaceHover rounded-lg hover:bg-surfaceHover/80 transition-colors"><Copy size={18} className="text-textMuted" /></button>
                                 </div>
-                                <p className="text-xs text-textMuted mt-2">
-                                    📍 Using <span className="font-medium text-primary">{SERVER_REGIONS.find(r => r.id === serverRegion)?.label}</span> server
-                                </p>
                             </div>
-
                             <div>
-                                <label className="block text-sm font-medium text-textMain mb-2">
-                                    Verify Token
-                                </label>
+                                <label className="block text-sm font-medium text-textMain mb-2">Verify Token</label>
                                 <div className="flex items-center gap-2">
-                                    <input
-                                        type={showVerifyToken ? "text" : "password"}
-                                        readOnly
-                                        value={config.webhookVerifyToken}
-                                        className="flex-1 px-4 py-2.5 bg-background border border-border rounded-lg text-textMain font-mono text-sm"
-                                    />
-                                    <button
-                                        onClick={() => setShowVerifyToken(!showVerifyToken)}
-                                        className="p-2.5 bg-surfaceHover rounded-lg hover:bg-surfaceHover/80 transition-colors"
-                                        title={showVerifyToken ? "Hide token" : "Show token"}
-                                    >
-                                        {showVerifyToken ? (
-                                            <EyeSlash size={18} className="text-textMuted" />
-                                        ) : (
-                                            <Eye size={18} className="text-textMuted" />
-                                        )}
+                                    <input type={showVerifyToken ? "text" : "password"} readOnly value={config.webhookVerifyToken} className="flex-1 px-4 py-2.5 bg-background border border-border rounded-lg text-textMain font-mono text-sm" />
+                                    <button onClick={() => setShowVerifyToken(!showVerifyToken)} className="p-2.5 bg-surfaceHover rounded-lg hover:bg-surfaceHover/80 transition-colors">
+                                        {showVerifyToken ? <EyeSlash size={18} className="text-textMuted" /> : <Eye size={18} className="text-textMuted" />}
                                     </button>
-                                    <button
-                                        onClick={() => copyToClipboard(config.webhookVerifyToken)}
-                                        className="p-2.5 bg-surfaceHover rounded-lg hover:bg-surfaceHover/80 transition-colors"
-                                    >
-                                        <Copy size={18} className="text-textMuted" />
-                                    </button>
+                                    <button onClick={() => copyToClipboard(config.webhookVerifyToken)} className="p-2.5 bg-surfaceHover rounded-lg hover:bg-surfaceHover/80 transition-colors"><Copy size={18} className="text-textMuted" /></button>
                                 </div>
                             </div>
                         </div>
@@ -1349,28 +1579,9 @@ const WhatsAppSettingsModal: React.FC<SettingsModalProps> = ({ config, assistant
 
                 {/* Footer */}
                 <div className="flex items-center justify-end gap-3 p-6 border-t border-border">
-                    <button
-                        onClick={onClose}
-                        className="px-4 py-2 text-textMuted hover:text-textMain transition-colors"
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        onClick={handleSave}
-                        disabled={loading}
-                        className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-primary to-primary/80 text-black font-semibold rounded-xl hover:shadow-lg hover:shadow-primary/25 disabled:opacity-50 transition-colors"
-                    >
-                        {loading ? (
-                            <>
-                                <CircleNotch size={16} className="animate-spin" />
-                                Saving...
-                            </>
-                        ) : (
-                            <>
-                                <CheckCircle size={16} />
-                                Save Changes
-                            </>
-                        )}
+                    <button onClick={onClose} className="px-4 py-2 text-textMuted hover:text-textMain transition-colors">Cancel</button>
+                    <button onClick={handleSave} disabled={loading} className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-primary to-primary/80 text-black font-semibold rounded-xl hover:shadow-lg disabled:opacity-50 transition-colors">
+                        {loading ? <><CircleNotch size={16} className="animate-spin" />Saving...</> : <><CheckCircle size={16} />Save Changes</>}
                     </button>
                 </div>
             </div>

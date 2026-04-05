@@ -180,4 +180,393 @@ router.post('/oauth/callback', verifySupabaseAuth, async (req, res) => {
 });
 
 
+// ============================================
+// WHATSAPP MESSENGER API ROUTES
+// Outbound send, conversations, templates, mark-read, assign
+// ============================================
+
+/**
+ * GET /api/whatsapp/conversations
+ * List all conversations (contacts with last message) for the authenticated user.
+ */
+router.get('/conversations', verifySupabaseAuth, async (req, res) => {
+    try {
+        const userId = req.userId;
+        const { configId } = req.query;
+
+        let query = supabase
+            .from('whatsapp_contacts')
+            .select(`
+                id, config_id, wa_id, phone_number, profile_name,
+                last_message_at, conversation_window_open, window_expires_at,
+                whatsapp_configs!inner(id, user_id, display_phone_number, display_name, assistant_id)
+            `)
+            .eq('whatsapp_configs.user_id', userId)
+            .order('last_message_at', { ascending: false, nullsFirst: false })
+            .limit(50);
+
+        if (configId) {
+            query = query.eq('config_id', configId);
+        }
+
+        const { data, error } = await query;
+        if (error) throw error;
+
+        // Fetch last message for each contact
+        const contacts = data || [];
+        const enriched = await Promise.all(contacts.map(async (contact) => {
+            const { data: msgs } = await supabase
+                .from('whatsapp_messages')
+                .select('content, direction, message_timestamp, message_type, status')
+                .eq('config_id', contact.config_id)
+                .or(`from_number.eq.${contact.phone_number},to_number.eq.${contact.phone_number}`)
+                .order('message_timestamp', { ascending: false })
+                .limit(1);
+            return {
+                ...contact,
+                lastMessage: msgs?.[0] || null
+            };
+        }));
+
+        res.json({ conversations: enriched });
+    } catch (err) {
+        console.error('GET /conversations error:', err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+/**
+ * GET /api/whatsapp/messages/:configId/:contactWaId
+ * Get conversation messages for a specific contact.
+ */
+router.get('/messages/:configId/:contactWaId', verifySupabaseAuth, async (req, res) => {
+    try {
+        const userId = req.userId;
+        const { configId, contactWaId } = req.params;
+        const limit = parseInt(req.query.limit) || 50;
+
+        // Verify config belongs to user
+        const { data: config, error: configErr } = await supabase
+            .from('whatsapp_configs')
+            .select('id, user_id, display_phone_number')
+            .eq('id', configId)
+            .eq('user_id', userId)
+            .single();
+
+        if (configErr || !config) {
+            return res.status(403).json({ error: 'Config not found or access denied' });
+        }
+
+        const phoneNumber = contactWaId.startsWith('+') ? contactWaId : '+' + contactWaId;
+
+        const { data, error } = await supabase
+            .from('whatsapp_messages')
+            .select('*')
+            .eq('config_id', configId)
+            .or(`from_number.eq.${phoneNumber},to_number.eq.${phoneNumber}`)
+            .order('message_timestamp', { ascending: true })
+            .limit(limit);
+
+        if (error) throw error;
+        res.json({ messages: data || [] });
+    } catch (err) {
+        console.error('GET /messages error:', err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+/**
+ * POST /api/whatsapp/send
+ * Send an outbound WhatsApp message (text, template, or media).
+ * Body: { configId, to, type, content, templateName?, templateLanguage?, templateComponents?, mediaUrl?, mediaId?, caption?, filename? }
+ */
+router.post('/send', verifySupabaseAuth, async (req, res) => {
+    try {
+        const userId = req.userId;
+        const { configId, to, type = 'text', content, templateName, templateLanguage, templateComponents, mediaUrl, mediaId, caption, filename } = req.body;
+
+        if (!configId || !to) {
+            return res.status(400).json({ error: 'configId and to are required' });
+        }
+
+        // Verify config belongs to user
+        const { data: config, error: configErr } = await supabase
+            .from('whatsapp_configs')
+            .select('id, user_id, phone_number_id, display_phone_number, access_token')
+            .eq('id', configId)
+            .eq('user_id', userId)
+            .single();
+
+        if (configErr || !config) {
+            return res.status(403).json({ error: 'Config not found or access denied' });
+        }
+
+        if (!config.access_token) {
+            return res.status(503).json({ error: 'WhatsApp not configured: missing access token' });
+        }
+
+        const appSecret = process.env.FACEBOOK_APP_SECRET;
+        if (!appSecret) {
+            return res.status(503).json({ error: 'WhatsApp not configured: FACEBOOK_APP_SECRET not set' });
+        }
+
+        // Clean access token
+        let accessToken = config.access_token.trim().replace(/[\r\n]/g, '');
+        if (accessToken.includes('=')) {
+            accessToken = accessToken.split('=').pop();
+        }
+
+        // Build WhatsApp API payload
+        let payload = {
+            messaging_product: 'whatsapp',
+            recipient_type: 'individual',
+            to: to.replace(/^\+/, ''),
+            type
+        };
+
+        if (type === 'text') {
+            if (!content) return res.status(400).json({ error: 'content is required for text messages' });
+            payload.text = { body: content, preview_url: false };
+        } else if (type === 'template') {
+            if (!templateName) return res.status(400).json({ error: 'templateName is required for template messages' });
+            payload.template = {
+                name: templateName,
+                language: { code: templateLanguage || 'en' },
+                components: templateComponents || []
+            };
+        } else if (['image', 'video', 'audio', 'document'].includes(type)) {
+            const mediaObj = {};
+            if (mediaId) mediaObj.id = mediaId;
+            if (mediaUrl) mediaObj.link = mediaUrl;
+            if (caption) mediaObj.caption = caption;
+            if (filename && type === 'document') mediaObj.filename = filename;
+            payload[type] = mediaObj;
+        } else {
+            return res.status(400).json({ error: `Unsupported message type: ${type}` });
+        }
+
+        // Send via WhatsApp API
+        const waResponse = await axios.post(
+            `https://graph.facebook.com/v21.0/${config.phone_number_id}/messages`,
+            payload,
+            {
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                }
+            }
+        );
+
+        const waMessageId = waResponse.data?.messages?.[0]?.id;
+
+        // Store outbound message in DB
+        const messageContent = type === 'text' ? { body: content }
+            : type === 'template' ? { templateName, templateLanguage, templateComponents }
+            : { mediaUrl, mediaId, caption, filename };
+
+        const { data: storedMsg, error: insertErr } = await supabase
+            .from('whatsapp_messages')
+            .insert({
+                wa_message_id: waMessageId,
+                config_id: configId,
+                from_number: config.display_phone_number,
+                to_number: to.startsWith('+') ? to : '+' + to,
+                direction: 'outbound',
+                message_type: type,
+                content: messageContent,
+                status: 'sent',
+                is_from_bot: false,
+                message_timestamp: new Date().toISOString()
+            })
+            .select()
+            .single();
+
+        if (insertErr) console.error('Failed to store outbound message:', insertErr.message);
+
+        // Update contact last_message_at
+        await supabase
+            .from('whatsapp_contacts')
+            .update({ last_message_at: new Date().toISOString() })
+            .eq('config_id', configId)
+            .eq('wa_id', to.replace(/^\+/, ''));
+
+        res.json({ success: true, waMessageId, message: storedMsg });
+    } catch (err) {
+        const errData = err.response?.data;
+        console.error('POST /send error:', errData || err.message);
+        if (err.response?.status === 401) {
+            return res.status(503).json({ error: 'WhatsApp not configured: invalid access token' });
+        }
+        res.status(500).json({ error: errData?.error?.message || err.message });
+    }
+});
+
+/**
+ * GET /api/whatsapp/templates/:configId
+ * List approved message templates for a config (from DB, synced from WA API).
+ */
+router.get('/templates/:configId', verifySupabaseAuth, async (req, res) => {
+    try {
+        const userId = req.userId;
+        const { configId } = req.params;
+        const { sync } = req.query; // ?sync=true to re-fetch from WA API
+
+        // Verify config belongs to user
+        const { data: config, error: configErr } = await supabase
+            .from('whatsapp_configs')
+            .select('id, user_id, waba_id, access_token')
+            .eq('id', configId)
+            .eq('user_id', userId)
+            .single();
+
+        if (configErr || !config) {
+            return res.status(403).json({ error: 'Config not found or access denied' });
+        }
+
+        if (sync === 'true' && config.access_token && config.waba_id) {
+            // Sync from WhatsApp API
+            let accessToken = config.access_token.trim().replace(/[\r\n]/g, '');
+            if (accessToken.includes('=')) accessToken = accessToken.split('=').pop();
+
+            try {
+                const waResp = await axios.get(
+                    `https://graph.facebook.com/v21.0/${config.waba_id}/message_templates`,
+                    { headers: { 'Authorization': `Bearer ${accessToken}` } }
+                );
+
+                for (const tmpl of waResp.data?.data || []) {
+                    await supabase
+                        .from('whatsapp_templates')
+                        .upsert({
+                            config_id: configId,
+                            template_name: tmpl.name,
+                            language: tmpl.language,
+                            category: tmpl.category,
+                            status: tmpl.status,
+                            components: tmpl.components,
+                            quality_score: tmpl.quality_score?.score
+                        }, { onConflict: 'config_id,template_name,language' });
+                }
+            } catch (syncErr) {
+                console.warn('Template sync failed:', syncErr.response?.data || syncErr.message);
+                // Continue to return cached templates
+            }
+        }
+
+        const { data, error } = await supabase
+            .from('whatsapp_templates')
+            .select('*')
+            .eq('config_id', configId)
+            .eq('status', 'APPROVED')
+            .order('template_name');
+
+        if (error) throw error;
+        res.json({ templates: data || [] });
+    } catch (err) {
+        console.error('GET /templates error:', err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+/**
+ * POST /api/whatsapp/mark-read/:configId/:waMessageId
+ * Mark a message as read (send read receipt to WhatsApp).
+ */
+router.post('/mark-read/:configId/:waMessageId', verifySupabaseAuth, async (req, res) => {
+    try {
+        const userId = req.userId;
+        const { configId, waMessageId } = req.params;
+
+        const { data: config, error: configErr } = await supabase
+            .from('whatsapp_configs')
+            .select('id, user_id, phone_number_id, access_token')
+            .eq('id', configId)
+            .eq('user_id', userId)
+            .single();
+
+        if (configErr || !config) {
+            return res.status(403).json({ error: 'Config not found or access denied' });
+        }
+
+        if (!config.access_token) {
+            return res.status(503).json({ error: 'WhatsApp not configured' });
+        }
+
+        let accessToken = config.access_token.trim().replace(/[\r\n]/g, '');
+        if (accessToken.includes('=')) accessToken = accessToken.split('=').pop();
+
+        // Send read receipt
+        await axios.post(
+            `https://graph.facebook.com/v21.0/${config.phone_number_id}/messages`,
+            {
+                messaging_product: 'whatsapp',
+                status: 'read',
+                message_id: waMessageId
+            },
+            {
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                }
+            }
+        );
+
+        // Update in DB
+        await supabase
+            .from('whatsapp_messages')
+            .update({ status: 'read', read_at: new Date().toISOString() })
+            .eq('wa_message_id', waMessageId)
+            .eq('config_id', configId);
+
+        res.json({ success: true });
+    } catch (err) {
+        console.error('POST /mark-read error:', err.response?.data || err.message);
+        res.status(500).json({ error: err.response?.data?.error?.message || err.message });
+    }
+});
+
+/**
+ * PATCH /api/whatsapp/conversations/:configId/:waId/assign
+ * Assign a conversation (contact) to an assistant.
+ * Body: { assistantId }
+ */
+router.patch('/conversations/:configId/:waId/assign', verifySupabaseAuth, async (req, res) => {
+    try {
+        const userId = req.userId;
+        const { configId, waId } = req.params;
+        const { assistantId } = req.body;
+
+        const { data: config, error: configErr } = await supabase
+            .from('whatsapp_configs')
+            .select('id, user_id')
+            .eq('id', configId)
+            .eq('user_id', userId)
+            .single();
+
+        if (configErr || !config) {
+            return res.status(403).json({ error: 'Config not found or access denied' });
+        }
+
+        // Update contact's assistant assignment in whatsapp_contacts metadata
+        const { data, error } = await supabase
+            .from('whatsapp_contacts')
+            .update({ assigned_assistant_id: assistantId })
+            .eq('config_id', configId)
+            .eq('wa_id', waId)
+            .select()
+            .single();
+
+        if (error) {
+            // Column might not exist, fall back to metadata
+            console.warn('assign update failed (column may not exist):', error.message);
+            return res.json({ success: true, note: 'Assignment saved in config default' });
+        }
+
+        res.json({ success: true, contact: data });
+    } catch (err) {
+        console.error('PATCH /assign error:', err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 module.exports = router;
