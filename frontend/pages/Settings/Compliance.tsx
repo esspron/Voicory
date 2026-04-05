@@ -38,6 +38,7 @@ import {
   getDNCList,
   removeFromDNC,
   addToDNC,
+  addToDNCBulk,
   exportDNCList,
   getConsents,
   revokeConsent,
@@ -151,8 +152,10 @@ function DNCTab() {
   const [newPhone, setNewPhone] = useState('');
   const [newReason, setNewReason] = useState('');
   const [isAdding, setIsAdding] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [importSuccess, setImportSuccess] = useState<string | null>(null);
 
   const debouncedSearch = useDebounce(search, 300);
   const limit = 20;
@@ -221,6 +224,40 @@ function DNCTab() {
     }
   };
 
+  const handleImportCSV = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsImporting(true);
+    setError(null);
+    setImportSuccess(null);
+
+    try {
+      const text = await file.text();
+      const lines = text.split('\n').filter(l => l.trim());
+      // Skip header row if it looks like a header (non-numeric first column)
+      const dataLines = (lines[0]?.toLowerCase() ?? '').includes('phone') ? lines.slice(1) : lines;
+      const phoneNumbers = dataLines
+        .map(l => (l.split(',')[0] ?? '').replace(/["\s]/g, '').trim())
+        .filter(p => p.length > 7);
+
+      if (phoneNumbers.length === 0) {
+        setError('No valid phone numbers found in CSV');
+        return;
+      }
+
+      const result = await addToDNCBulk({ phoneNumbers, reason: 'import', source: 'csv_import' });
+      setImportSuccess(`Imported ${result.added} numbers to DNC list`);
+      loadEntries();
+    } catch (err) {
+      setError('Failed to import CSV. Make sure first column contains phone numbers.');
+    } finally {
+      setIsImporting(false);
+      // Reset file input
+      e.target.value = '';
+    }
+  };
+
   const totalPages = Math.ceil(total / limit);
 
   return (
@@ -245,6 +282,16 @@ function DNCTab() {
             <Download size={18} className="mr-2" />
             Export
           </Button>
+          <label className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-xl border border-white/10 bg-surface/80 text-textMain hover:bg-white/5 cursor-pointer transition-all ${isImporting ? 'opacity-50 cursor-not-allowed' : ''}`}>
+            <input
+              type="file"
+              accept=".csv,text/csv"
+              onChange={handleImportCSV}
+              disabled={isImporting}
+              className="hidden"
+            />
+            {isImporting ? 'Importing...' : 'Import CSV'}
+          </label>
           <Button onClick={() => setShowAddModal(true)}>
             <Plus size={18} className="mr-2" />
             Add Number
@@ -257,6 +304,14 @@ function DNCTab() {
           <Warning size={16} weight="fill" />
           {error}
           <button onClick={() => setError(null)} className="ml-auto text-red-400 hover:text-red-300">×</button>
+        </div>
+      )}
+
+      {importSuccess && (
+        <div className="flex items-center gap-2 text-green-400 text-sm p-4 bg-green-500/10 border border-green-500/20 rounded-xl">
+          <CheckCircle size={16} weight="fill" />
+          {importSuccess}
+          <button onClick={() => setImportSuccess(null)} className="ml-auto text-green-400 hover:text-green-300">×</button>
         </div>
       )}
 
