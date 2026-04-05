@@ -287,7 +287,7 @@ router.post('/token', async (req, res) => {
             canPublish: true,          // Can publish audio
             canPublishData: true,      // Can send data messages
             canSubscribe: true,        // Can receive agent audio
-            canPublishSources: ['microphone'], // Only microphone, no video/screen
+            // canPublishSources omitted — SDK v2 requires TrackSource enum, string 'microphone' throws
             hidden: false,
         });
         
