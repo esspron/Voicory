@@ -108,7 +108,7 @@ export const getReferralStats = async (): Promise<ReferralStats | null> => {
  */
 export const getReferralHistory = async (): Promise<ReferralHistoryItem[]> => {
     try {
-        const { data, error } = await supabase.rpc('get_my_referral_history');
+        const { data, error } = await supabase.rpc('get_my_referral_history') as { data: any[] | null; error: any };
 
         if (error) throw error;
 
@@ -230,9 +230,9 @@ export const getReferralActivity = async (limit: number = 50): Promise<ReferralA
  * Generate the full referral URL
  */
 export const generateReferralUrl = (code: string, customCode?: string | null): string => {
-    const baseUrl = window.location.origin;
     const referralCode = customCode || code;
-    return `${baseUrl}/#/signup?ref=${referralCode}`;
+    // Always use the canonical production signup URL so shared links land correctly
+    return `https://app.voicory.com/signup?ref=${referralCode}`;
 };
 
 /**

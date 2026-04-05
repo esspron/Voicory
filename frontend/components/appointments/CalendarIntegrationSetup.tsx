@@ -17,6 +17,8 @@ import {
   CheckCircle,
   CircleNotch,
   Warning,
+  Info,
+  Envelope,
 } from '@phosphor-icons/react';
 import type { CalendarProvider, CalendarIntegrationFormData } from '@/types/appointments';
 import { CALENDAR_PROVIDERS_LIST } from '@/types/appointments';
@@ -63,9 +65,9 @@ const PROVIDER_DETAILS: Record<CalendarProvider, {
     icon: GoogleLogo,
     authType: 'oauth',
     instructions: [
-      'Click Connect below',
-      'Sign in with your Google account',
-      'Select calendars to sync',
+      'Google Calendar integration requires OAuth credentials setup on the server.',
+      'Please contact support@voicory.com to enable Google Calendar for your account.',
+      'Alternative: Use Cal.com (which supports Google Calendar sync) to connect now.',
     ],
   },
   follow_up_boss: {
@@ -110,10 +112,19 @@ export function CalendarIntegrationSetup({
 
     try {
       if (details.authType === 'oauth') {
-        // For OAuth, redirect to auth URL
-        const authUrl = `/api/appointments/integrations/connect/${selectedProvider}`;
-        window.location.href = authUrl;
-        return;
+        if (selectedProvider === 'google_calendar') {
+          // Google Calendar OAuth is not yet configured — show a clear message
+          throw new Error(
+            'Google Calendar integration requires setup. Please contact support@voicory.com or use Cal.com instead.'
+          );
+        }
+
+        if (selectedProvider === 'calendly') {
+          // Calendly OAuth — redirect to auth URL
+          const authUrl = `/api/appointments/integrations/connect/${selectedProvider}`;
+          window.location.href = authUrl;
+          return;
+        }
       }
 
       // For API key auth
@@ -333,7 +344,35 @@ export function CalendarIntegrationSetup({
                         </div>
                       )}
 
-                      {/* Actions */}
+                      {/* Google Calendar: show support info banner instead of Connect button */}
+                      {selectedProvider === 'google_calendar' ? (
+                        <div className="space-y-3">
+                          <div className="p-4 bg-blue-500/10 border border-blue-500/30 rounded-xl flex items-start gap-3">
+                            <Info size={20} className="text-blue-400 flex-shrink-0 mt-0.5" />
+                            <div>
+                              <p className="text-sm font-medium text-blue-300">Google Calendar requires setup</p>
+                              <p className="text-xs text-blue-400/80 mt-1">
+                                Google Calendar OAuth credentials have not yet been configured. Contact support to enable this integration.
+                              </p>
+                            </div>
+                          </div>
+                          <a
+                            href="mailto:support@voicory.com?subject=Google%20Calendar%20Integration%20Request"
+                            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-500/20 border border-blue-500/40 text-blue-300 font-medium rounded-xl hover:bg-blue-500/30 transition-all"
+                          >
+                            <Envelope size={18} weight="bold" />
+                            Contact Support
+                          </a>
+                          <button
+                            type="button"
+                            onClick={() => setStep('select')}
+                            className="w-full px-4 py-2.5 bg-background border border-white/10 text-textMain rounded-xl hover:bg-surfaceHover transition-colors"
+                          >
+                            Back
+                          </button>
+                        </div>
+                      ) : (
+                      /* Actions */
                       <div className="flex gap-3 pt-2">
                         <button
                           type="button"
@@ -354,6 +393,7 @@ export function CalendarIntegrationSetup({
                           )}
                         </button>
                       </div>
+                      )}
                     </div>
                   )}
 

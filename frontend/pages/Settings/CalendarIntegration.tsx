@@ -10,7 +10,6 @@ import {
   Plus,
   Clock,
   Gear,
-  CircleNotch,
   CalendarBlank,
   Warning,
 } from '@phosphor-icons/react';
@@ -24,7 +23,7 @@ import { Skeleton } from '@/components/ui';
 import type { CalendarIntegration, AppointmentType } from '@/types/appointments';
 import {
   getCalendarIntegrations,
-  disconnectCalendar,
+  deleteCalendarIntegration,
   getAppointmentTypes,
   deleteAppointmentType,
 } from '@/services/appointmentService';
@@ -72,7 +71,7 @@ export default function CalendarIntegration() {
     if (!confirm('Are you sure you want to disconnect this calendar?')) return;
 
     try {
-      await disconnectCalendar(integrationId);
+      await deleteCalendarIntegration(integrationId);
       setIntegrations((prev) => prev.filter((i) => i.id !== integrationId));
     } catch (err) {
       console.error('Failed to disconnect calendar:', err);
