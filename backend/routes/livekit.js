@@ -53,7 +53,7 @@ async function checkUserCreditsAndLimits(userId) {
         const { data: profile, error: profileError } = await supabase
             .from('user_profiles')
             .select('credits_balance')
-            .eq('id', userId)
+            .eq('user_id', userId)
             .single();
         
         if (profileError) {
@@ -141,7 +141,7 @@ async function deductVoiceCredits(userId, durationMinutes, sessionId) {
             const { data: profile } = await supabase
                 .from('user_profiles')
                 .select('credits_balance')
-                .eq('id', userId)
+                .eq('user_id', userId)
                 .single();
             
             const newBalance = Math.max(0, (profile?.credits_balance || 0) - amount);
@@ -149,7 +149,7 @@ async function deductVoiceCredits(userId, durationMinutes, sessionId) {
             await supabase
                 .from('user_profiles')
                 .update({ credits_balance: newBalance })
-                .eq('id', userId);
+                .eq('user_id', userId);
             
             return { success: true, amountDeducted: amount, newBalance };
         }
@@ -540,7 +540,7 @@ router.get('/usage', async (req, res) => {
         const { data: profile, error: profileError } = await supabase
             .from('user_profiles')
             .select('credits_balance')
-            .eq('id', user.id)
+            .eq('user_id', user.id)
             .single();
         
         if (profileError) {
