@@ -506,6 +506,7 @@ app.use('/api/crawler', crawlerRoutes);
 app.use('/api/coupons', couponsRoutes);
 app.use('/api/integrations', integrationsRoutes);
 app.use('/api/customers', customersRoutes);
+app.use('/api/script-templates', require('./routes/scriptTemplates'));
 app.use('/api/calls', require('./routes/calls'));
 app.use('/api/assistants', require('./routes/assistants'));
 app.use('/api/voices', require('./routes/voices'));
