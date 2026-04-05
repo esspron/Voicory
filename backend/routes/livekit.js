@@ -33,8 +33,8 @@ const LIVEKIT_URL = process.env.LIVEKIT_URL || 'wss://livekit.voicory.com';
 
 // Pricing configuration (USD)
 const PRICING = {
-    VOICE_CALL_PER_MINUTE: 0.0100,        // $0.01/min for voice calls
-    MIN_CREDITS_REQUIRED: 0.10,            // Minimum $0.10 credits to start a call
+    VOICE_CALL_PER_MINUTE: 0.03,        // $0.03/min for voice calls (Twilio+STT+TTS+margin)
+    MIN_CREDITS_REQUIRED: 0.03,            // Minimum $0.10 credits to start a call
     DEFAULT_CONCURRENT_LINES: 1,           // Default concurrent calls (free)
     RESERVED_LINE_COST_MONTHLY: 10.00,     // $10/mo per reserved line
     TOKEN_TTL_MINUTES: 30,                 // Token expires in 30 min

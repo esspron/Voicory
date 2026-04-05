@@ -93,7 +93,7 @@ export function PricingSection() {
           <div className="mb-6 pb-6 border-b border-border">
             <div className="flex items-baseline gap-2 mb-2">
               <span className="text-textMuted text-lg">₹</span>
-              <span className="text-5xl font-bold">0.80</span>
+              <span className="text-5xl font-bold">0.03</span>
               <span className="text-textMuted">/minute</span>
             </div>
             <div className="flex items-center gap-2 text-sm text-primary">

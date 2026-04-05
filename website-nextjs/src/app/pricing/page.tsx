@@ -12,8 +12,8 @@ export default function PricingPage() {
   const [messagesPerMonth, setMessagesPerMonth] = useState(5000)
 
   // Calculate costs
-  const voicoryCostPerMin = 0.05
-  const messageCost = 0.005
+  const voicoryCostPerMin = 0.03
+  const messageCost = 0.001
   const totalCallMinutes = callsPerMonth * avgCallLength
   const totalCallCost = totalCallMinutes * voicoryCostPerMin
   const totalMessageCost = messagesPerMonth * messageCost
@@ -79,13 +79,13 @@ export default function PricingPage() {
             
             <div className="grid grid-cols-3 gap-4 p-4 border-b border-white/5 hover:bg-white/[0.02]">
               <div className="text-sm text-textMain">Voice Calls</div>
-              <div className="text-sm text-center"><span className="text-primary font-semibold">$0.05</span> <span className="text-textMuted">/ min</span></div>
+              <div className="text-sm text-center"><span className="text-primary font-semibold">$0.03</span> <span className="text-textMuted">/ min</span></div>
               <div className="text-sm text-textMuted text-center">Volume based</div>
             </div>
             
             <div className="grid grid-cols-3 gap-4 p-4 border-b border-white/5 hover:bg-white/[0.02]">
               <div className="text-sm text-textMain">WhatsApp / Chat</div>
-              <div className="text-sm text-center"><span className="text-primary font-semibold">$0.005</span> <span className="text-textMuted">/ msg</span></div>
+              <div className="text-sm text-center"><span className="text-primary font-semibold">$0.001</span> <span className="text-textMuted">/ msg</span></div>
               <div className="text-sm text-textMuted text-center">Volume based</div>
             </div>
 
@@ -287,7 +287,7 @@ export default function PricingPage() {
                 <div className="flex justify-between items-center pb-4 border-b border-white/5">
                   <div>
                     <p className="text-sm font-medium text-textMain">Voicory Platform (Calls)</p>
-                    <p className="text-xs text-textMuted">{totalCallMinutes.toLocaleString()} mins × $0.05/min</p>
+                    <p className="text-xs text-textMuted">{totalCallMinutes.toLocaleString()} mins × $0.03/min</p>
                   </div>
                   <span className="text-textMain font-semibold">${totalCallCost.toFixed(2)}</span>
                 </div>
@@ -295,7 +295,7 @@ export default function PricingPage() {
                 <div className="flex justify-between items-center pb-4 border-b border-white/5">
                   <div>
                     <p className="text-sm font-medium text-textMain">Voicory Platform (Chat)</p>
-                    <p className="text-xs text-textMuted">{messagesPerMonth.toLocaleString()} msgs × $0.005/msg</p>
+                    <p className="text-xs text-textMuted">{messagesPerMonth.toLocaleString()} msgs × $0.001/msg</p>
                   </div>
                   <span className="text-textMain font-semibold">${totalMessageCost.toFixed(2)}</span>
                 </div>
@@ -378,7 +378,7 @@ export default function PricingPage() {
                 <span className="text-primary group-open:rotate-45 transition-transform">+</span>
               </summary>
               <div className="px-5 pb-5 text-textMuted text-sm">
-                $1 = 1 credit. The Voicory platform charges $0.05 per minute for calls and $0.005 per message for chat.
+                $1 = 1 credit. The Voicory platform charges $0.03 per minute for calls and $0.001 per message for chat.
                 Model provider costs (LLM, TTS, STT) are charged separately at cost.
               </div>
             </details>
@@ -410,7 +410,7 @@ export default function PricingPage() {
                 <span className="text-primary group-open:rotate-45 transition-transform">+</span>
               </summary>
               <div className="px-5 pb-5 text-textMuted text-sm">
-                No, the $0.05/min platform cost is for Voicory&apos;s infrastructure only. 
+                No, the $0.03/min platform cost is for Voicory&apos;s infrastructure only. 
                 Model provider costs (OpenAI, ElevenLabs, Deepgram, etc.) are charged at cost and vary by provider.
               </div>
             </details>

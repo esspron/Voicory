@@ -21,7 +21,7 @@ export const metadata: Metadata = {
     default: 'Voicory - AI Voice & Chat Agents for India | Hindi, English & 10+ Languages',
     template: '%s | Voicory',
   },
-  description: 'Build intelligent AI voice agents and WhatsApp chatbots that speak Hindi, English, and 10+ Indian languages. Pay-as-you-go pricing starting at ₹0.80/min. Perfect for customer support, appointment booking, and lead qualification.',
+  description: 'Build intelligent AI voice agents and WhatsApp chatbots that speak Hindi, English, and 10+ Indian languages. Pay-as-you-go pricing starting at $0.03/min for voice calls. Perfect for customer support, appointment booking, and lead qualification.',
   keywords: [
     'voice AI India',
     'AI voice agent',
@@ -100,9 +100,9 @@ const jsonLd = {
   operatingSystem: 'Web',
   offers: {
     '@type': 'Offer',
-    price: '0.80',
-    priceCurrency: 'INR',
-    priceValidUntil: '2025-12-31',
+    price: '0.03',
+    priceCurrency: 'USD',
+    priceValidUntil: '2026-12-31',
     availability: 'https://schema.org/InStock',
   },
   aggregateRating: {

@@ -13,7 +13,7 @@ export interface Voice {
   language: string
   accent: string
   gender: 'Male' | 'Female'
-  costPerMin: number // in INR
+  costPerMin: number // in USD
   previewUrl: string
   tags: string[]
 }
