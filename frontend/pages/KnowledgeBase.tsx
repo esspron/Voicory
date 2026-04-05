@@ -161,7 +161,7 @@ const KnowledgeBase: React.FC = () => {
             const newKb = await createKnowledgeBase(newKbName.trim());
             console.log('Created knowledge base:', newKb);
             if (newKb) {
-                // TODO: If we have temp documents, add them here
+                // Documents can be added after KB creation via the upload flow
                 await loadKnowledgeBases();
                 setSelectedKb(newKb);
                 resetMainModal();

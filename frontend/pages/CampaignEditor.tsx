@@ -3,7 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
     ArrowLeft,
     FloppyDisk,
-    Trash
+    Trash,
+    Warning,
 } from '@phosphor-icons/react';
 import { Button } from '../components/ui/Button';
 import { DateRangePicker, DaySelector, TimeRangePicker } from '../components/campaigns';
@@ -40,6 +41,7 @@ export default function CampaignEditor() {
     const [formData, setFormData] = useState<CampaignInput>(DEFAULT_FORM);
     const [isLoading, setIsLoading] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
+    const [formError, setFormError] = useState<string | null>(null);
     const [assistants] = useState<{ id: string; name: string }[]>([]);
     const [phoneNumbers] = useState<{ id: string; number: string; label?: string }[]>([]);
 
@@ -111,9 +113,10 @@ export default function CampaignEditor() {
         e.preventDefault();
         
         if (!formData.name.trim()) {
-            alert('Campaign name is required');
+            setFormError('Campaign name is required');
             return;
         }
+        setFormError(null);
 
         try {
             setIsSaving(true);
@@ -127,7 +130,7 @@ export default function CampaignEditor() {
             navigate('/campaigns');
         } catch (err) {
             console.error('Failed to save campaign:', err);
-            alert('Failed to save campaign');
+            setFormError('Failed to save campaign. Please try again.');
         } finally {
             setIsSaving(false);
         }
@@ -146,7 +149,7 @@ export default function CampaignEditor() {
             navigate('/campaigns');
         } catch (err) {
             console.error('Failed to delete campaign:', err);
-            alert('Failed to delete campaign');
+            setFormError('Failed to delete campaign. Please try again.');
         } finally {
             setIsSaving(false);
         }
@@ -192,6 +195,14 @@ export default function CampaignEditor() {
                         </Button>
                     </div>
                 </div>
+
+                {/* Error Banner */}
+                {formError && (
+                    <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-xl flex items-center gap-2">
+                        <Warning size={18} className="text-red-400 shrink-0" />
+                        <p className="text-red-400 text-sm">{formError}</p>
+                    </div>
+                )}
 
                 {/* Basic Info */}
                 <section className="bg-white/5 rounded-xl p-6 border border-white/5 space-y-4">

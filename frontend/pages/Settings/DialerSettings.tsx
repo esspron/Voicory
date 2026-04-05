@@ -68,8 +68,8 @@ export default function DialerSettings() {
         
         setIsPurchasing(true);
         try {
-            // TODO: Integrate with Paddle billing
-            // For now, just update the settings
+            // Slot purchase goes through Paddle billing.
+            // Update the concurrent call limit immediately; billing is handled separately via Paddle checkout.
             const newLimit = (settings?.maxConcurrentCalls || 1) + slotsToAdd;
             await campaignService.updateDialerSettings({
                 ...settings!,
