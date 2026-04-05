@@ -257,7 +257,7 @@ export function CustomizationSection() {
           <Lightning size={18} weight="fill" />
         </Link>
         <p className="text-textMuted text-sm mt-3">
-          Free to start • No credit card required
+          Pay as you go • No commitments
         </p>
       </motion.div>
     </section>

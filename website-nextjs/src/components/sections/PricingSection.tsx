@@ -59,7 +59,7 @@ export function PricingSection() {
           Pay Only for What You Use
         </h2>
         <p className="text-textMuted text-base max-w-2xl mx-auto">
-          No monthly fees, no commitments. Start with ₹2000 free credits and scale as you grow.
+          No monthly fees, no commitments. Pay only for what you use. Scale as you grow.
         </p>
       </motion.div>
 
@@ -98,7 +98,7 @@ export function PricingSection() {
             </div>
             <div className="flex items-center gap-2 text-sm text-primary">
               <Gift size={16} weight="fill" />
-              <span>₹2000 free credits on signup</span>
+              <span>Pay only for what you use</span>
             </div>
           </div>
 
@@ -120,9 +120,9 @@ export function PricingSection() {
             href="https://app.voicory.com/signup"
             className="block text-center py-3.5 px-6 rounded-xl font-semibold bg-primary text-background hover:bg-primaryHover transition-all hover:-translate-y-0.5 hover:shadow-lg hover:shadow-primary/25"
           >
-            Start Free — ₹2000 Credits
+            Get Started
           </Link>
-          <p className="text-center text-xs text-textMuted mt-3">No credit card required</p>
+          <p className="text-center text-xs text-textMuted mt-3">Minimum top-up $20 · Pay only for what you use</p>
         </motion.div>
 
         {/* Enterprise Card */}
@@ -187,7 +187,7 @@ export function PricingSection() {
           </div>
           <div className="flex items-center gap-2">
             <Check size={18} weight="bold" className="text-primary" />
-            <span>No credit card to start</span>
+            <span>Pay only for what you use</span>
           </div>
           <div className="flex items-center gap-2">
             <Check size={18} weight="bold" className="text-primary" />

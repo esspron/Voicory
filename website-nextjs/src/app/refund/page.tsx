@@ -29,10 +29,10 @@ export default function RefundPolicyPage() {
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold mb-4">2. Free Credits</h2>
+            <h2 className="text-2xl font-semibold mb-4">2. Prepaid Credits</h2>
             <p className="text-textMuted leading-relaxed">
-              New accounts receive <strong>50 free credits</strong> to test our services. 
-              Free credits are promotional and are not eligible for refund or cash value.
+              Voicory operates on a prepaid credit model. Credits are purchased and used as you go. 
+              Unused credits are non-refundable once purchased. Please use the minimum purchase ($20) to evaluate the service before committing to larger amounts.
             </p>
           </section>
 
@@ -59,7 +59,7 @@ export default function RefundPolicyPage() {
               <ul className="list-disc list-inside text-textMuted space-y-2 ml-4">
                 <li>Credit packages where <strong>any credits have been used</strong> (even 1 credit)</li>
                 <li>Purchases older than 7 days</li>
-                <li>Free or promotional credits</li>
+                <li>Credits that have already been consumed</li>
                 <li>Bonus credits received from referrals or coupons</li>
                 <li>Accounts terminated for Terms of Service violations</li>
                 <li>Multiple refund requests (one refund per customer)</li>
@@ -70,7 +70,7 @@ export default function RefundPolicyPage() {
               <h3 className="text-xl font-medium mb-3 text-amber-400">⚠️ Important Note</h3>
               <p className="text-textMuted leading-relaxed">
                 Because credits are consumed immediately upon use, we cannot offer partial 
-                refunds for partially used packages. Please use your free credits to 
+                refunds for partially used credit balances. Please purchase the minimum amount to 
                 evaluate our service before making a purchase.
               </p>
             </div>

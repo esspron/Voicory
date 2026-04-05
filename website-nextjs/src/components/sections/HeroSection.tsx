@@ -93,7 +93,7 @@ export function HeroSection() {
           href="https://app.voicory.com/signup"
           className="bg-primary hover:bg-primaryHover text-background px-8 py-3.5 rounded-full text-sm md:text-base font-semibold transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-primary/25"
         >
-          Start Free — ₹2000 Credits
+          Get Started Free
         </Link>
         <Link
           href="#demo"
@@ -137,7 +137,7 @@ export function HeroSection() {
           <svg className="w-5 h-5 text-primary" fill="currentColor" viewBox="0 0 20 20">
             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
           </svg>
-          <span>No credit card required</span>
+          <span>No commitments</span>
         </div>
         <div className="flex items-center gap-2 text-textMuted text-sm">
           <svg className="w-5 h-5 text-primary" fill="currentColor" viewBox="0 0 20 20">

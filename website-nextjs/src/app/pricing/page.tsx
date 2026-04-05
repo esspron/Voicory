@@ -32,7 +32,7 @@ export default function PricingPage() {
           </h1>
           <p className="text-lg text-textMuted max-w-2xl mx-auto">
             Pay only for what you use. No subscriptions, no commitments.
-            Start with free credits and scale as you grow.
+            Start today. Pay only for what you use.
           </p>
         </div>
       </section>
@@ -321,7 +321,7 @@ export default function PricingPage() {
                 href="https://app.voicory.com/signup"
                 className="block w-full mt-6 py-3 bg-primary text-black font-semibold rounded-xl text-center hover:bg-primary/90 transition-all"
               >
-                Start Free Trial
+                Get Started
               </Link>
             </div>
           </div>
@@ -342,7 +342,7 @@ export default function PricingPage() {
                 href="https://app.voicory.com/signup"
                 className="inline-flex items-center gap-2 px-8 py-3 bg-primary text-black font-semibold rounded-xl hover:bg-primary/90 transition-all"
               >
-                Get 50 Free Credits
+                Get Started
               </Link>
               <Link
                 href="https://app.voicory.com/settings/billing"
@@ -367,8 +367,8 @@ export default function PricingPage() {
                 <span className="text-primary group-open:rotate-45 transition-transform">+</span>
               </summary>
               <div className="px-5 pb-5 text-textMuted text-sm">
-                Yes! Every new account gets 50 free credits to test our AI voice and chat agents. 
-                No credit card required to sign up.
+                Start immediately with a minimum top-up of $20. Pay only for what you use. 
+                Sign up with just your email.
               </div>
             </details>
 

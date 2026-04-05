@@ -154,7 +154,7 @@ export function Navbar() {
             </div>
 
             <Link
-              href="#community"
+              href="mailto:support@voicory.com"
               className="text-textMuted hover:text-textMain transition-colors text-xs font-medium font-mono uppercase tracking-wider px-4 py-2"
             >
               Community
@@ -247,7 +247,7 @@ export function Navbar() {
               </div>
 
               <Link
-                href="#community"
+                href="mailto:support@voicory.com"
                 className="text-textMuted hover:text-textMain transition-colors text-sm font-medium"
                 onClick={() => setIsOpen(false)}
               >

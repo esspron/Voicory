@@ -125,18 +125,17 @@ export default function TermsOfServicePage() {
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold mb-4">7. Free Credits</h2>
+            <h2 className="text-2xl font-semibold mb-4">7. Prepaid Credits</h2>
             <p className="text-textMuted leading-relaxed">
               New users receive complimentary credits to test our services:
             </p>
             <ul className="list-disc list-inside text-textMuted space-y-2 ml-4 mt-3">
-              <li>50 free credits upon account creation</li>
+              <li>Minimum top-up of $20 to get started</li>
               <li>Access to all features</li>
-              <li>No credit card required to start</li>
+              <li>Minimum purchase of $20 to get started</li>
             </ul>
             <p className="text-textMuted leading-relaxed mt-4">
-              Free credits are for evaluation purposes only. Abuse (creating multiple 
-              accounts to obtain free credits) will result in account termination.
+              Credits are prepaid and non-refundable. Creating multiple accounts to circumvent pricing is prohibited and will result in account termination.
             </p>
           </section>
 

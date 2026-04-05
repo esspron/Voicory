@@ -167,14 +167,14 @@ export default async function SolutionPage({ params }: SolutionPageProps) {
                 Ready to Transform Your {data.title}?
               </h2>
               <p className="text-textMuted text-lg max-w-2xl mx-auto mb-8">
-                Start your 14-day free trial today. No credit card required.
+                Start today. Pay only for what you use.
               </p>
               <div className="flex flex-wrap gap-4 justify-center">
                 <Link 
                   href="https://app.voicory.com/signup"
                   className="bg-primary hover:bg-primaryHover text-background font-bold py-4 px-8 rounded-xl transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-primary/25"
                 >
-                  Start Free Trial
+                  Get Started
                 </Link>
                 <Link 
                   href="/contact"

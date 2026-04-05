@@ -52,7 +52,7 @@ export const metadata: Metadata = {
   },
   openGraph: {
     title: 'Voicory - AI Voice & Chat Agents for India',
-    description: 'Build intelligent AI voice agents that speak Hindi, English & 10+ Indian languages. Start free with ₹100 credits.',
+    description: 'Build intelligent AI voice agents that speak Hindi, English & 10+ Indian languages. AI voice and chat agents for India. Pay as you go.',
     url: 'https://www.voicory.com',
     siteName: 'Voicory',
     locale: 'en_IN',

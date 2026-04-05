@@ -74,7 +74,7 @@ export function Footer() {
               className="inline-flex items-center gap-2 mt-5 bg-primary/10 hover:bg-primary/20 text-primary px-4 py-2 rounded-lg text-sm font-medium transition-colors"
             >
               <Lightning size={16} weight="fill" />
-              Start Free — ₹2000 Credits
+              Get Started
             </Link>
           </div>
 
