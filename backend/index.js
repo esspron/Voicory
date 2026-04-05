@@ -510,6 +510,7 @@ app.use('/api/script-templates', require('./routes/scriptTemplates'));
 app.use('/api/calls', require('./routes/calls'));
 app.use('/api/assistants', require('./routes/assistants'));
 app.use('/api/voices', require('./routes/voices'));
+app.use('/api/team', require('./routes/team'));
 
 // ============================================
 // WHATSAPP WEBHOOK ENDPOINTS
