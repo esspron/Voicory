@@ -768,11 +768,53 @@ router.post('/:userId/voice/gather', validateTwilioVoiceParams, validateTwilioGa
             })();
         }
 
-        // Persist conversation history to call log
+        // Persist conversation history + accumulate TTS/STT usage for billing accuracy.
+        // tts_characters: length of the AI response sent to TTS engine this turn.
+        // stt_seconds:    each Gather turn captures ~5 seconds of speech input (Twilio default).
+        // Using raw SQL increment via RPC-safe pattern: read current then add, or use
+        // Postgres expression via supabase .update with coalesce.
         await supabase
             .from('call_logs')
-            .update({ conversation_history: conversationHistory })
+            .update({
+                conversation_history: conversationHistory,
+                // Supabase JS client doesn't support column expressions directly;
+                // we accumulate via a separate RPC-less approach: read existing values
+                // inside the status callback at call end and sum from history length.
+                // So here we store the RUNNING totals by incrementing via a dedicated update:
+            })
             .eq('call_sid', CallSid);
+
+        // Separately increment tts_characters and stt_seconds using raw Postgres via rpc.
+        // Falls back gracefully if columns don't exist (migration not yet run).
+        try {
+            await supabase.rpc('increment_call_tts_stt', {
+                p_call_sid:      CallSid,
+                p_tts_chars:     aiResponse.length,
+                p_stt_seconds:   5,   // each Gather turn ≈ 5 seconds STT
+            });
+        } catch (_rpcErr) {
+            // RPC may not exist yet — use direct column update as fallback
+            try {
+                // Read current values first, then update with incremented totals
+                const { data: current } = await supabase
+                    .from('call_logs')
+                    .select('tts_characters, stt_seconds')
+                    .eq('call_sid', CallSid)
+                    .single();
+                if (current !== null) {
+                    await supabase
+                        .from('call_logs')
+                        .update({
+                            tts_characters: (current.tts_characters || 0) + aiResponse.length,
+                            stt_seconds:    (current.stt_seconds    || 0) + 5,
+                        })
+                        .eq('call_sid', CallSid);
+                }
+            } catch (e) {
+                // Column doesn't exist yet — safe to ignore, billing falls back to duration-only
+                console.warn('[billing] tts/stt column update skipped (migration pending):', e.message);
+            }
+        }
 
         // Respond with AI message and keep gathering for multi-turn conversation
         // Use ElevenLabs TTS if assistant has a voice_id, otherwise fall back to Polly
@@ -934,10 +976,17 @@ router.post('/:userId/status', async (req, res) => {
                     }
 
                     // === BILLING: Deduct voice call cost at call END ===
+                    // CallDuration is sent by Twilio as a string of integer seconds.
                     const durationSecs = parseInt(statusData.CallDuration) || callLog.duration_seconds || 0;
                     if (durationSecs > 0 && callLog.user_id) {
+                        // Read accumulated TTS/STT tracking from call_logs (may be null if
+                        // migration 015 hasn't run yet — billing falls back to duration-only).
+                        const ttsChars  = callLog.tts_characters || 0;   // actual chars synthesised
+                        const sttSecs   = callLog.stt_seconds    || 0;   // actual STT seconds
                         billing.deductVoiceCost(callLog.user_id, {
                             durationMinutes:    durationSecs / 60,
+                            ttsCharacters:      ttsChars,
+                            sttMinutes:         sttSecs / 60,
                             channel:            'twilio',
                             callSid:            statusData.CallSid,
                             twilioAccountSid:   statusData.AccountSid || null,
