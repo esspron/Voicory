@@ -45,7 +45,6 @@ import {
 // Tab definitions - Agent tab with unified instruction for both calls and messages
 const TABS = [
     { id: 'agent', label: 'Agent' },
-    { id: 'voice', label: 'Voice' },
     { id: 'memory', label: 'Memory' },
     { id: 'knowledge-base', label: 'Knowledge Base' },
     { id: 'integrations', label: 'Integrations' },
