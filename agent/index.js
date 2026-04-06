@@ -169,4 +169,16 @@ export default defineAgent({
   },
 });
 
+// Cloud Run requires an HTTP server listening on PORT.
+// We run a tiny health check server alongside the LiveKit agent worker.
+import { createServer } from 'http';
+const PORT = process.env.PORT || 8080;
+const healthServer = createServer((req, res) => {
+  res.writeHead(200, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify({ status: 'ok', service: 'voicory-agent' }));
+});
+healthServer.listen(PORT, () => {
+  console.log(`[Health] HTTP server listening on port ${PORT}`);
+});
+
 cli.runApp(new WorkerOptions({ agent: fileURLToPath(import.meta.url) }));
