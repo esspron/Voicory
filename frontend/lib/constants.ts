@@ -9,9 +9,9 @@
  * Backend URLs by region for geo-routing
  */
 const BACKEND_URLS = {
-  INDIA: 'https://backendvoicory-732127099858.asia-south1.run.app',
-  USA: 'https://backendvoicory-us-732127099858.us-central1.run.app',
-  EUROPE: 'https://backendvoicory-eu-732127099858.europe-west1.run.app',
+  INDIA: 'https://voicory-backend-783942490798.asia-south1.run.app',
+  USA: 'https://voicory-backend-783942490798.asia-south1.run.app',
+  EUROPE: 'https://voicory-backend-783942490798.asia-south1.run.app',
 } as const;
 
 /**
