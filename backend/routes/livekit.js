@@ -84,6 +84,15 @@ async function checkUserCreditsAndLimits(userId) {
         // Default 1 concurrent line + any reserved lines
         const concurrentLimit = PRICING.DEFAULT_CONCURRENT_LINES + (addon?.quantity || 0);
         
+        // Auto-expire stale sessions older than 5 minutes stuck in created/connecting
+        const staleThreshold = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+        await supabase
+            .from('voice_sessions')
+            .update({ status: 'ended', ended_at: new Date().toISOString() })
+            .eq('user_id', userId)
+            .in('status', ['created', 'connecting'])
+            .lt('created_at', staleThreshold);
+
         // Check current active sessions
         const { count: activeSessions } = await supabase
             .from('voice_sessions')
