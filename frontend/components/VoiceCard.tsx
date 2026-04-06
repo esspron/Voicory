@@ -37,6 +37,11 @@ const VoiceCard: React.FC<VoiceCardProps> = ({ voice, onSelect }) => {
         setLoadingPreview(true);
         setPreviewError(null);
         try {
+            // Google voices don't have live preview support — use static preview URL only
+            if (voice.ttsProvider === 'google' && !voice.previewUrl) {
+                setPreviewError('Live preview not available for Google voices');
+                return;
+            }
             const voiceId = voice.elevenlabsVoiceId || voice.providerVoiceId || voice.id;
             const provider = voice.ttsProvider === 'openai' ? 'openai' : 'elevenlabs';
             const url = await previewVoice(voiceId, provider);
