@@ -491,6 +491,16 @@ const customersRoutes = require('./routes/customers');
 
 app.use('/api', testChatRoutes);
 app.use('/api/twilio', twilioRoutes);
+// TTS proxy: serves ElevenLabs audio cached in Redis for Twilio <Play> tags
+// Route: GET /api/tts/:callSid/:hash
+{
+    const ttsRouter = require('express').Router();
+    const { serveTTSAudio } = require('./services/elevenLabsTTS');
+    ttsRouter.get('/:callSid/:hash', async (req, res) => {
+        return serveTTSAudio(req.params.hash, res);
+    });
+    app.use('/api/tts', ttsRouter);
+}
 app.use('/api/whatsapp', whatsappOAuthRoutes);
 app.use('/api/paddle', paddleRoutes);
 app.use('/api/crm', crmRoutes);

@@ -16,6 +16,7 @@ const { pushCallToAllCRMs } = require('../services/crm');
 const { calculateCallCost, logCostToSupabase } = require('../services/costTracking');
 const { executeHTTPTrigger } = require('../services/httpIntegrationExecutor');
 const billing = require('../services/billing');
+const { generateTTSUrl, serveTTSAudio } = require('../services/elevenLabsTTS');
 
 // ============================================
 // TWILIO PHONE NUMBER IMPORT
@@ -531,10 +532,24 @@ router.post('/:userId/voice', validateTwilioVoiceParams, async (req, res) => {
         });
 
         // Respond with first message and open speech gather for AI conversation loop
+        // Use ElevenLabs TTS if assistant has a voice_id, otherwise fall back to Polly
+        const voiceId = assistant.voice_id || null;
+        const modelId = assistant.elevenlabs_model_id || null;
+        let firstMsgXml;
+        if (voiceId) {
+            const ttsUrl = await generateTTSUrl(firstMessage, voiceId, modelId, callData.CallSid);
+            if (ttsUrl) {
+                firstMsgXml = `<Play>${ttsUrl}</Play>`;
+            } else {
+                firstMsgXml = `<Say voice="Polly.Joanna">${escapeXml(firstMessage)}</Say>`;
+            }
+        } else {
+            firstMsgXml = `<Say voice="Polly.Joanna">${escapeXml(firstMessage)}</Say>`;
+        }
         res.type('text/xml');
         res.send(`
             <Response>
-                <Say voice="Polly.Joanna">${escapeXml(firstMessage)}</Say>
+                ${firstMsgXml}
                 <Gather input="speech" timeout="5" speechTimeout="auto" action="/api/webhooks/twilio/${userId}/voice/gather" method="POST">
                 </Gather>
                 <Say voice="Polly.Joanna">I didn't hear anything. Goodbye!</Say>
@@ -732,10 +747,24 @@ router.post('/:userId/voice/gather', validateTwilioVoiceParams, validateTwilioGa
             .eq('call_sid', CallSid);
 
         // Respond with AI message and keep gathering for multi-turn conversation
+        // Use ElevenLabs TTS if assistant has a voice_id, otherwise fall back to Polly
+        const gatherVoiceId = assistant.voice_id || null;
+        const gatherModelId = assistant.elevenlabs_model_id || null;
+        let aiResponseXml;
+        if (gatherVoiceId) {
+            const ttsUrl = await generateTTSUrl(aiResponse, gatherVoiceId, gatherModelId, CallSid);
+            if (ttsUrl) {
+                aiResponseXml = `<Play>${ttsUrl}</Play>`;
+            } else {
+                aiResponseXml = `<Say voice="Polly.Joanna">${escapeXml(aiResponse)}</Say>`;
+            }
+        } else {
+            aiResponseXml = `<Say voice="Polly.Joanna">${escapeXml(aiResponse)}</Say>`;
+        }
         res.type('text/xml');
         res.send(`
             <Response>
-                <Say voice="Polly.Joanna">${escapeXml(aiResponse)}</Say>
+                ${aiResponseXml}
                 <Gather input="speech" timeout="5" speechTimeout="auto" action="/api/webhooks/twilio/${userId}/voice/gather" method="POST">
                 </Gather>
                 <Say voice="Polly.Joanna">Goodbye!</Say>
@@ -1170,5 +1199,9 @@ router.post('/test-call', verifySupabaseAuth, async (req, res) => {
     }
 });
 
+
+/**
+ * TTS audio proxy removed from this router — served via /api/tts/:callSid/:hash in index.js
+ */
 
 module.exports = router;
