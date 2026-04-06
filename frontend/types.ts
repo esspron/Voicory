@@ -974,7 +974,8 @@ export interface OutboundCampaign {
     
     // Joined data
     assistant?: { id: string; name: string };
-    phoneNumber?: { id: string; number: string; label?: string };
+    phoneNumber?: { id: string; number: string; label?: string; provider?: 'twilio' | 'exotel' };
+    phoneProvider?: 'twilio' | 'exotel';
 }
 
 export interface CampaignLead {
@@ -1094,6 +1095,7 @@ export interface CampaignInput {
     campaignType?: CampaignType;
     assistantId?: string;
     phoneNumberId?: string;
+    phoneProvider?: 'twilio' | 'exotel';
     startDate?: string;
     endDate?: string;
     callDays?: number[];

@@ -46,7 +46,7 @@ export default function CampaignEditor() {
     const [formError, setFormError] = useState<string | null>(null);
     const [assistants] = useState<{ id: string; name: string }[]>([]);
     const [openDropdown, setOpenDropdown] = useState<string | null>(null);
-    const [phoneNumbers] = useState<{ id: string; number: string; label?: string }[]>([]);
+    const [phoneNumbers, setPhoneNumbers] = useState<{ id: string; number: string; label?: string; provider: 'twilio' | 'exotel' }[]>([]);
 
     useEffect(() => {
         // Load assistants and phone numbers
@@ -59,17 +59,44 @@ export default function CampaignEditor() {
     }, [id]);
 
     const loadOptions = async () => {
-        // These would come from your existing services
+        // Fetch phone numbers from both Twilio and Exotel, combine into one list
         try {
-            // Placeholder - you'd call your actual assistant/phone services here
-            // const [assistantData, phoneData] = await Promise.all([
-            //     assistantService.getAssistants(),
-            //     phoneService.getPhoneNumbers()
-            // ]);
-            // setAssistants(assistantData);
-            // setPhoneNumbers(phoneData);
+            const apiBase = import.meta.env.VITE_API_URL || '';
+            const authToken = localStorage.getItem('sb-access-token') || '';
+            const headers = { Authorization: `Bearer ${authToken}` };
+
+            const [twilioResp, exotelResp] = await Promise.allSettled([
+                fetch(`${apiBase}/api/webhooks/twilio/phone-numbers`, { headers }),
+                fetch(`${apiBase}/api/exotel/phone-numbers`, { headers })
+            ]);
+
+            const combined: { id: string; number: string; label?: string; provider: 'twilio' | 'exotel' }[] = [];
+
+            if (twilioResp.status === 'fulfilled' && twilioResp.value.ok) {
+                const data = await twilioResp.value.json();
+                const nums = data.phoneNumbers || data || [];
+                combined.push(...nums.map((n: { id: string; number: string; phoneNumber?: string; friendlyName?: string; label?: string }) => ({
+                    id: n.id,
+                    number: n.number || n.phoneNumber || '',
+                    label: n.label || n.friendlyName,
+                    provider: 'twilio' as const
+                })));
+            }
+
+            if (exotelResp.status === 'fulfilled' && exotelResp.value.ok) {
+                const data = await exotelResp.value.json();
+                const nums = data.phoneNumbers || data || [];
+                combined.push(...nums.map((n: { id: string; number: string; label?: string }) => ({
+                    id: n.id,
+                    number: n.number,
+                    label: n.label,
+                    provider: 'exotel' as const
+                })));
+            }
+
+            setPhoneNumbers(combined);
         } catch (err) {
-            console.error('Failed to load options:', err);
+            console.error('Failed to load phone numbers:', err);
         }
     };
 
@@ -379,9 +406,19 @@ export default function CampaignEditor() {
                                     className="w-full px-4 py-2.5 bg-surface/50 border border-white/10 rounded-xl text-sm flex items-center justify-between hover:border-primary/50 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
                                 >
                                     <span className={formData.phoneNumberId ? 'text-textMain' : 'text-textMuted'}>
-                                        {formData.phoneNumberId ? (() => { const p = phoneNumbers.find(p => p.id === formData.phoneNumberId); return p ? `${p.number}${p.label ? ` (${p.label})` : ''}` : 'Select a phone number...'; })() : 'Select a phone number...'}
+                                        {formData.phoneNumberId ? (() => {
+                                            const p = phoneNumbers.find(p => p.id === formData.phoneNumberId);
+                                            return p ? `${p.number}${p.label ? ` (${p.label})` : ''}` : 'Select a phone number...';
+                                        })() : 'Select a phone number...'}
                                     </span>
-                                    <CaretDown size={14} className={`text-textMuted transition-transform ${openDropdown === 'phone' ? 'rotate-180' : ''}`} />
+                                    <div className="flex items-center gap-2">
+                                        {formData.phoneNumberId && formData.phoneProvider && (
+                                            <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${formData.phoneProvider === 'exotel' ? 'bg-orange-500/20 text-orange-400' : 'bg-red-500/20 text-red-400'}`}>
+                                                {formData.phoneProvider === 'exotel' ? 'Exotel' : 'Twilio'}
+                                            </span>
+                                        )}
+                                        <CaretDown size={14} className={`text-textMuted transition-transform ${openDropdown === 'phone' ? 'rotate-180' : ''}`} />
+                                    </div>
                                 </button>
                                 {openDropdown === 'phone' && (
                                     <div className="absolute z-50 w-full mt-1 bg-surface border border-white/10 rounded-xl shadow-xl overflow-hidden max-h-56 overflow-y-auto">
@@ -391,16 +428,30 @@ export default function CampaignEditor() {
                                             <button
                                                 key={p.id}
                                                 type="button"
-                                                onClick={() => { updateFormData({ phoneNumberId: p.id }); setOpenDropdown(null); }}
+                                                onClick={() => { updateFormData({ phoneNumberId: p.id, phoneProvider: p.provider }); setOpenDropdown(null); }}
                                                 className={`w-full px-4 py-2.5 text-sm text-left flex items-center justify-between hover:bg-white/5 transition-colors ${formData.phoneNumberId === p.id ? 'text-primary' : 'text-textMain'}`}
                                             >
-                                                {p.number}{p.label && ` (${p.label})`}
-                                                {formData.phoneNumberId === p.id && <CheckCircle size={14} weight="fill" className="text-primary" />}
+                                                <span>{p.number}{p.label && ` (${p.label})`}</span>
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${p.provider === 'exotel' ? 'bg-orange-500/20 text-orange-400' : 'bg-red-500/20 text-red-400'}`}>
+                                                        {p.provider === 'exotel' ? 'Exotel' : 'Twilio'}
+                                                    </span>
+                                                    {formData.phoneNumberId === p.id && <CheckCircle size={14} weight="fill" className="text-primary" />}
+                                                </div>
                                             </button>
                                         ))}
                                     </div>
                                 )}
                             </div>
+                            {/* Provider info in summary */}
+                            {formData.phoneNumberId && formData.phoneProvider && (
+                                <p className="mt-1.5 text-xs text-textMuted">
+                                    Outbound calls via{' '}
+                                    <span className={`font-medium ${formData.phoneProvider === 'exotel' ? 'text-orange-400' : 'text-red-400'}`}>
+                                        {formData.phoneProvider === 'exotel' ? 'Exotel' : 'Twilio'}
+                                    </span>
+                                </p>
+                            )}
                         </div>
                     </div>
                 </section>

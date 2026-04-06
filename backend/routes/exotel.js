@@ -296,6 +296,114 @@ router.put('/phone-numbers/:id/assign', verifySupabaseAuth, async (req, res) => 
 });
 
 // ============================================
+// OUTBOUND CALL — EXOTEL v3 API
+// POST /api/exotel/outbound-call
+// Body: { phoneNumberId, toNumber, statusCallbackUrl? }
+// ============================================
+router.post('/outbound-call', verifySupabaseAuth, async (req, res) => {
+    try {
+        const { phoneNumberId, toNumber, statusCallbackUrl } = req.body;
+        const userId = req.userId;
+
+        if (!phoneNumberId || !toNumber) {
+            return res.status(400).json({ error: 'phoneNumberId and toNumber are required.' });
+        }
+
+        // Look up the Exotel phone number record (decrypting credentials)
+        const { data: phoneRecord, error: phoneErr } = await supabase
+            .from('phone_numbers')
+            .select('id, number, exotel_account_sid, exotel_api_key, exotel_api_token, exotel_subdomain')
+            .eq('id', phoneNumberId)
+            .eq('user_id', userId)
+            .eq('provider', 'exotel')
+            .is('deleted_at', null)
+            .maybeSingle();
+
+        if (phoneErr || !phoneRecord) {
+            return res.status(404).json({ error: 'Exotel phone number not found.' });
+        }
+
+        const { supabase: _sb, encrypt: _enc, decrypt } = require('../config');
+
+        let apiKey, apiToken;
+        try {
+            apiKey = decrypt(phoneRecord.exotel_api_key);
+            apiToken = decrypt(phoneRecord.exotel_api_token);
+        } catch (decryptErr) {
+            console.error('[Exotel] credential decrypt error:', decryptErr.message);
+            return res.status(500).json({ error: 'Failed to retrieve Exotel credentials.' });
+        }
+
+        const accountSid = phoneRecord.exotel_account_sid;
+        const subdomain = phoneRecord.exotel_subdomain || 'ccm-api.in.exotel.com';
+        const virtualNumber = phoneRecord.number;
+
+        // Default status callback URL to our backend
+        const callbackUrl = statusCallbackUrl
+            || `${BACKEND_URL}/api/webhooks/exotel/${userId}/status`;
+
+        // Exotel v3 outbound call API
+        // POST https://{subdomain}/v3/accounts/{account_sid}/calls
+        const exotelApiUrl = `https://${subdomain}/v3/accounts/${accountSid}/calls`;
+
+        const payload = {
+            from: { contact_uri: virtualNumber },
+            to: { contact_uri: toNumber },
+            virtual_number: virtualNumber,
+            status_callback: callbackUrl,
+            record: false
+        };
+
+        let callResponse;
+        try {
+            callResponse = await axios.post(exotelApiUrl, payload, {
+                auth: { username: apiKey, password: apiToken },
+                headers: { 'Content-Type': 'application/json' },
+                timeout: 15000
+            });
+        } catch (apiErr) {
+            const status = apiErr.response?.status;
+            const errMsg = apiErr.response?.data?.message || apiErr.message;
+            console.error(`[Exotel] outbound-call API error (${status}):`, errMsg);
+            if (status === 401 || status === 403) {
+                return res.status(401).json({ error: 'Invalid Exotel credentials.' });
+            }
+            return res.status(502).json({ error: `Exotel API error: ${errMsg}` });
+        }
+
+        const callData = callResponse.data?.call || callResponse.data;
+        const callSid = callData?.sid || callData?.call_sid || null;
+
+        // Log the outbound call
+        if (callSid) {
+            await supabase.from('call_logs').insert({
+                call_sid: callSid,
+                user_id: userId,
+                phone_number_id: phoneNumberId,
+                from_number: virtualNumber,
+                to_number: toNumber,
+                direction: 'outbound',
+                provider: 'exotel',
+                status: 'in-progress',
+                started_at: new Date().toISOString()
+            }).catch(e => console.warn('[Exotel] outbound call_logs insert failed:', e.message));
+        }
+
+        return res.json({
+            success: true,
+            callSid,
+            from: virtualNumber,
+            to: toNumber,
+            status: callData?.status || 'initiated'
+        });
+
+    } catch (err) {
+        console.error('[Exotel] outbound-call error:', err.message);
+        return res.status(500).json({ error: 'Failed to initiate outbound call.' });
+    }
+});
+
+// ============================================
 // INCOMING CALL WEBHOOK — EXOML RESPONSE
 // POST /api/webhooks/exotel/:userId/voice
 // ============================================

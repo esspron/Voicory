@@ -76,11 +76,23 @@ export function CampaignCard({ campaign, onClick, onStart, onPause, onStop, onDu
                     )}
                 </div>
                 
-                {/* Status Badge */}
-                <span className={`ml-3 flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full border ${getStatusColor(campaign.status)}`}>
-                    {getStatusIcon(campaign.status)}
-                    {campaign.status}
-                </span>
+                <div className="ml-3 flex items-center gap-1.5 flex-shrink-0">
+                    {/* Provider badge */}
+                    {(campaign.phoneProvider || campaign.phoneNumber?.provider) && (
+                        <span className={`flex items-center gap-0.5 px-1.5 py-0.5 text-xs font-medium rounded border ${
+                            (campaign.phoneProvider || campaign.phoneNumber?.provider) === 'exotel'
+                                ? 'bg-orange-500/15 text-orange-400 border-orange-500/25'
+                                : 'bg-red-500/15 text-red-400 border-red-500/25'
+                        }`}>
+                            {(campaign.phoneProvider || campaign.phoneNumber?.provider) === 'exotel' ? 'Exotel' : 'Twilio'}
+                        </span>
+                    )}
+                    {/* Status Badge */}
+                    <span className={`flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full border ${getStatusColor(campaign.status)}`}>
+                        {getStatusIcon(campaign.status)}
+                        {campaign.status}
+                    </span>
+                </div>
             </div>
 
             {/* Stats Grid */}
