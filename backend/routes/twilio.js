@@ -483,10 +483,6 @@ router.post('/:userId/voice', validateTwilioVoiceParams, async (req, res) => {
             name: assistant.name
         });
 
-        // Use the assistant's configured first_message, or fall back to a generated greeting
-        const firstMessage = assistant.first_message || 
-            `Hello! Thank you for calling. I'm ${assistant.name || 'your AI assistant'}. How can I help you today?`;
-
         // === PRE-FLIGHT BALANCE CHECK ===
         const { hasCredits: twilioHasCredits } = await billing.checkBalance(phoneConfig.user_id);
         if (!twilioHasCredits) {
@@ -531,26 +527,37 @@ router.post('/:userId/voice', validateTwilioVoiceParams, async (req, res) => {
             call_date: new Date().toISOString(),
         });
 
+        // Map assistant language to Twilio STT language code
+        const voiceLangMap = { 'hi': 'hi-IN', 'en': 'en-US', 'es': 'es-ES', 'fr': 'fr-FR', 'de': 'de-DE', 'pt': 'pt-BR', 'ar': 'ar-SA', 'zh': 'zh-CN' };
+        const voiceAssistantLang = assistant.language || 'en';
+        const voiceTwilioLanguage = voiceLangMap[voiceAssistantLang] || (voiceAssistantLang.includes('-') ? voiceAssistantLang : 'en-US');
+
+        // Resolve template variables in first_message
+        const resolvedFirstMsgForVoice = resolveTemplateVariables(
+            assistant.first_message || `Hello! Thank you for calling. I'm ${assistant.name || 'your AI assistant'}. How can I help you today?`,
+            { callerPhone: callData.From, assistantName: assistant.name }
+        );
+
         // Respond with first message and open speech gather for AI conversation loop
         // Use ElevenLabs TTS if assistant has a voice_id, otherwise fall back to Polly
         const voiceId = assistant.voice_id || null;
         const modelId = assistant.elevenlabs_model_id || null;
         let firstMsgXml;
         if (voiceId) {
-            const ttsUrl = await generateTTSUrl(firstMessage, voiceId, modelId, callData.CallSid);
+            const ttsUrl = await generateTTSUrl(resolvedFirstMsgForVoice, voiceId, modelId, callData.CallSid);
             if (ttsUrl) {
                 firstMsgXml = `<Play>${ttsUrl}</Play>`;
             } else {
-                firstMsgXml = `<Say voice="Polly.Joanna">${escapeXml(firstMessage)}</Say>`;
+                firstMsgXml = `<Say voice="Polly.Joanna">${escapeXml(resolvedFirstMsgForVoice)}</Say>`;
             }
         } else {
-            firstMsgXml = `<Say voice="Polly.Joanna">${escapeXml(firstMessage)}</Say>`;
+            firstMsgXml = `<Say voice="Polly.Joanna">${escapeXml(resolvedFirstMsgForVoice)}</Say>`;
         }
         res.type('text/xml');
         res.send(`
             <Response>
                 ${firstMsgXml}
-                <Gather input="speech" timeout="5" speechTimeout="auto" action="/api/webhooks/twilio/${userId}/voice/gather" method="POST">
+                <Gather input="speech" timeout="5" speechTimeout="auto" language="${voiceTwilioLanguage}" action="/api/webhooks/twilio/${userId}/voice/gather" method="POST">
                 </Gather>
                 <Say voice="Polly.Joanna">I didn't hear anything. Goodbye!</Say>
                 <Hangup/>
@@ -591,7 +598,7 @@ router.post('/:userId/voice/gather', validateTwilioVoiceParams, validateTwilioGa
             return res.send(`
                 <Response>
                     <Say voice="Polly.Joanna">I didn't catch that. Could you please repeat?</Say>
-                    <Gather input="speech" timeout="5" speechTimeout="auto" action="/api/webhooks/twilio/${userId}/voice/gather" method="POST">
+                    <Gather input="speech" timeout="5" speechTimeout="auto" language="en-US" action="/api/webhooks/twilio/${userId}/voice/gather" method="POST">
                         <Say voice="Polly.Joanna">I'm listening...</Say>
                     </Gather>
                     <Say voice="Polly.Joanna">Goodbye!</Say>
@@ -623,6 +630,16 @@ router.post('/:userId/voice/gather', validateTwilioVoiceParams, validateTwilioGa
 
         const assistant = phoneConfig.assistant;
 
+        // Map assistant language to Twilio STT language code
+        const langMap = { 'hi': 'hi-IN', 'en': 'en-US', 'es': 'es-ES', 'fr': 'fr-FR', 'de': 'de-DE', 'pt': 'pt-BR', 'ar': 'ar-SA', 'zh': 'zh-CN' };
+        const assistantLang = assistant.language || 'en';
+        const twilioLanguage = langMap[assistantLang] || (assistantLang.includes('-') ? assistantLang : 'en-US');
+
+        // Resolve template variables in first_message and system_prompt
+        const templateContext = { callerPhone: From, assistantName: assistant.name };
+        const resolvedFirstMessage = resolveTemplateVariables(assistant.first_message, templateContext);
+        const resolvedSystemPrompt = resolveTemplateVariables(assistant.system_prompt, templateContext);
+
         // Build conversation history from call log if available
         let conversationHistory = [];
         const { data: callLog } = await supabase
@@ -639,11 +656,15 @@ router.post('/:userId/voice/gather', validateTwilioVoiceParams, validateTwilioGa
         conversationHistory.push({ role: 'user', content: SpeechResult });
 
         // Build RAG context if knowledge base is available
+        // Pass assistant.knowledge_base_ids (array) as the correct second parameter
         let ragContext = '';
         try {
-            const kbResults = await searchKnowledgeBase(assistant.id, SpeechResult);
-            if (kbResults?.length > 0) {
-                ragContext = formatRAGContext(kbResults);
+            const kbIds = assistant.knowledge_base_ids;
+            if (kbIds && kbIds.length > 0) {
+                const kbResults = await searchKnowledgeBase(SpeechResult, kbIds);
+                if (kbResults?.length > 0) {
+                    ragContext = formatRAGContext(kbResults);
+                }
             }
         } catch (e) {
             console.warn('⚠️ RAG search failed:', e.message);
@@ -657,9 +678,16 @@ router.post('/:userId/voice/gather', validateTwilioVoiceParams, validateTwilioGa
             console.warn('⚠️ Memory fetch failed:', e.message);
         }
 
-        // Build system prompt
+        // Add language instruction for non-English assistants
+        const isNonEnglish = assistantLang !== 'en' && !assistantLang.startsWith('en');
+        const langInstruction = isNonEnglish
+            ? `\nPlease respond in ${twilioLanguage}. The caller may speak in ${twilioLanguage}.`
+            : '';
+
+        // Build system prompt with resolved template vars + language note
         const systemPrompt = [
-            assistant.system_prompt || `You are ${assistant.name || 'an AI assistant'}. Be helpful, concise, and conversational. You are on a phone call so keep responses brief (1-3 sentences max).`,
+            resolvedSystemPrompt || `You are ${assistant.name || 'an AI assistant'}. Be helpful, concise, and conversational. You are on a phone call so keep responses brief (1-3 sentences max).`,
+            langInstruction,
             ragContext ? `\nRelevant context:\n${ragContext}` : '',
             memoryContext ? `\nMemory:\n${memoryContext}` : '',
             '\nIMPORTANT: You are on a voice call. Keep responses very short and conversational. No markdown, no lists, no special characters.'
@@ -765,7 +793,7 @@ router.post('/:userId/voice/gather', validateTwilioVoiceParams, validateTwilioGa
         res.send(`
             <Response>
                 ${aiResponseXml}
-                <Gather input="speech" timeout="5" speechTimeout="auto" action="/api/webhooks/twilio/${userId}/voice/gather" method="POST">
+                <Gather input="speech" timeout="5" speechTimeout="auto" language="${twilioLanguage}" action="/api/webhooks/twilio/${userId}/voice/gather" method="POST">
                 </Gather>
                 <Say voice="Polly.Joanna">Goodbye!</Say>
                 <Hangup/>
