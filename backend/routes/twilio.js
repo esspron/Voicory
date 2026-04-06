@@ -3,6 +3,22 @@
 // SECURITY: Import routes require authentication
 // Webhook routes use Twilio signature verification
 // ============================================
+
+/**
+ * Build OpenAI chat.completions params correctly for all models.
+ * Reasoning models (o1/o3/o4) don't support temperature or max_tokens.
+ */
+function buildChatParams(model, messages, maxTokens = 150) {
+    const isReasoning = /^(o1|o3|o4)/.test(model || '');
+    const params = { model: model || 'gpt-4o-mini', messages };
+    if (isReasoning) {
+        params.max_completion_tokens = maxTokens;
+    } else {
+        params.max_tokens = maxTokens;
+        params.temperature = 0.7;
+    }
+    return params;
+}
 const express = require('express');
 const router = express.Router();
 const { supabase, axios, encrypt, decrypt, validateBody, twilioImportSchema } = require('../config');
@@ -697,15 +713,12 @@ router.post('/:userId/voice/gather', validateTwilioVoiceParams, validateTwilioGa
         const OpenAI = require('openai');
         const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-        const completion = await openai.chat.completions.create({
-            model: assistant.model || 'gpt-4o-mini',
-            messages: [
+        const completion = await openai.chat.completions.create(
+            buildChatParams(assistant.model || 'gpt-4o-mini', [
                 { role: 'system', content: systemPrompt },
                 ...conversationHistory
-            ],
-            max_tokens: 150,
-            temperature: 0.7
-        });
+            ], 150)
+        );
 
         const aiResponse = completion.choices[0]?.message?.content || 
             "I'm sorry, I didn't understand that. Could you please repeat?";

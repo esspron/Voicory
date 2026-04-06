@@ -1,6 +1,22 @@
 // ============================================
 // EXOTEL ROUTES — BYOK Phone Import + ExoML Webhook + WebSocket Audio
 //
+
+/**
+ * Build OpenAI chat.completions params correctly for all models.
+ * Reasoning models (o1/o3/o4) don't support temperature or max_tokens.
+ */
+function buildChatParams(model, messages, maxTokens = 150) {
+    const isReasoning = /^(o1|o3|o4)/.test(model || '');
+    const params = { model: model || 'gpt-4o-mini', messages };
+    if (isReasoning) {
+        params.max_completion_tokens = maxTokens;
+    } else {
+        params.max_tokens = maxTokens;
+        params.temperature = 0.7;
+    }
+    return params;
+}
 // Architecture:
 // - TTS routed through voice library (voices table) via services/tts.js
 // - STT: Deepgram (preferred) or OpenAI Whisper fallback
@@ -984,12 +1000,7 @@ async function processExotelTurn(ws, session, audioChunks) {
         try {
             const openaiResp = await axios.post(
                 'https://api.openai.com/v1/chat/completions',
-                {
-                    model: assistant.llm_model || 'gpt-4o-mini',
-                    messages,
-                    max_tokens: 150,
-                    temperature: 0.7
-                },
+                buildChatParams(assistant.llm_model || 'gpt-4o-mini', messages, 150),
                 {
                     headers: {
                         Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,

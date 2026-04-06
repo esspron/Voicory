@@ -59,7 +59,20 @@ type TabId = typeof TABS[number]['id'];
 
 // LLM Options
 const LLM_PROVIDERS = [
-    { id: 'openai', name: 'OpenAI', models: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-3.5-turbo'] },
+    { 
+        id: 'openai', 
+        name: 'OpenAI', 
+        models: [
+            // GPT-5.4 family (latest frontier)
+            'gpt-5.4', 'gpt-5.4-mini', 'gpt-5.4-nano',
+            // GPT-4.1 family
+            'gpt-4.1', 'gpt-4.1-mini', 'gpt-4.1-nano',
+            // GPT-4o family
+            'gpt-4o', 'gpt-4o-mini',
+            // Reasoning models
+            'o4-mini', 'o3', 'o3-mini',
+        ] 
+    },
 ];
 
 // Language options - now imported from types.ts as SUPPORTED_LANGUAGES
