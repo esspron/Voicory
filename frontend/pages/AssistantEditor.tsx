@@ -710,7 +710,7 @@ const AssistantEditor: React.FC = () => {
                 return (
                     <VoiceTab
                         selectedVoiceId={formData.voiceId}
-                        onVoiceSelect={(v) => setFormData(prev => ({ ...prev, voiceId: v.voice_id || v.id || null }))}
+                        onVoiceSelect={(v) => handleVoiceSelect(v)}
                         assistantId={assistantId}
                     />
                 );
