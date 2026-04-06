@@ -745,6 +745,35 @@ const AssistantEditor: React.FC = () => {
         }
     };
 
+    // Show skeleton while loading assistant data to prevent flash of defaults
+    if (loading) {
+        return (
+            <div className="flex flex-col h-full bg-background">
+                <div className="h-16 border-b border-white/5 flex items-center px-6 bg-surface/80 backdrop-blur-xl sticky top-0 z-20">
+                    <div className="h-5 w-48 bg-surfaceHover rounded-lg animate-pulse" />
+                </div>
+                <div className="flex gap-1 px-6 pt-4 border-b border-white/5 pb-3">
+                    {[1,2,3,4,5].map(i => (
+                        <div key={i} className="h-8 w-24 bg-surfaceHover rounded-lg animate-pulse mx-1" />
+                    ))}
+                </div>
+                <div className="flex flex-1 overflow-hidden">
+                    <div className="flex-1 p-6 flex flex-col gap-4">
+                        <div className="h-4 w-32 bg-surfaceHover rounded animate-pulse" />
+                        <div className="h-40 w-full bg-surfaceHover rounded-xl animate-pulse" />
+                        <div className="h-4 w-24 bg-surfaceHover rounded animate-pulse" />
+                        <div className="h-12 w-full bg-surfaceHover rounded-xl animate-pulse" />
+                    </div>
+                    <div className="w-72 border-l border-white/5 p-4 flex flex-col gap-3">
+                        {[1,2,3,4].map(i => (
+                            <div key={i} className="h-16 w-full bg-surfaceHover rounded-xl animate-pulse" />
+                        ))}
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <FadeIn className="flex flex-col h-full bg-background">
             {/* Header */}
