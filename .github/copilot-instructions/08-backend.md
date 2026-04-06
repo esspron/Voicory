@@ -6,15 +6,29 @@
 const testChatRoutes = require('./routes/testChat');
 const twilioRoutes = require('./routes/twilio');
 const whatsappOAuthRoutes = require('./routes/whatsappOAuth');
+const exotelRoutes = require('./routes/exotel');
 
 app.use('/api', testChatRoutes);
 app.use('/api/twilio', twilioRoutes);
 app.use('/api/whatsapp', whatsappOAuthRoutes);
+app.use('/api/exotel', exotelRoutes);
 
 // WhatsApp webhooks are inline in index.js (not using whatsappWebhook.js route file)
 // GET /api/webhooks/whatsapp - Meta webhook verification
 // POST /api/webhooks/whatsapp - Incoming messages with AI processing
+
+// Exotel routes:
+// POST /api/exotel/import-numbers    - Import phone numbers from Exotel
+// POST /api/exotel/verify-import     - Verify Exotel credentials (requires auth)
+// POST /api/webhooks/exotel/:userId/:callSid - Exotel webhook for call events
+// WebSocket: wss://voicory-backend-783942490798.asia-south1.run.app/ws/exotel/:userId/:callSid
 ```
+
+---
+
+## Exotel Phone Numbers
+The `phone_numbers` table has a `provider` column (default: `twilio`) that now also supports `exotel`.
+Exotel numbers are imported via the Exotel API and stored with `provider = 'exotel'`.
 
 ---
 
