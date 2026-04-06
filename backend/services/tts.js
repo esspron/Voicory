@@ -215,4 +215,46 @@ async function serveTTSAudio(hash, res) {
     }
 }
 
-module.exports = { generateTTSUrl, serveTTSAudio, ttsHash };
+/**
+ * Generate TTS audio buffer directly for WebSocket callers (Exotel, LiveKit).
+ * Unlike generateTTSUrl (which caches and returns a URL for Twilio <Play>),
+ * this returns the raw audio Buffer so it can be streamed over WebSocket.
+ *
+ * @param {string} text       - Text to synthesize
+ * @param {string} voiceId    - UUID from voices table (assistant.voice_id)
+ * @returns {Promise<Buffer|null>} Raw audio buffer (μ-law 8kHz) or null
+ */
+async function generateTTSForCall(text, voiceId) {
+    if (!voiceId || !text) return null;
+
+    const { data: voice, error } = await supabase
+        .from('voices')
+        .select('id, name, tts_provider, elevenlabs_voice_id, elevenlabs_model_id, provider_voice_id')
+        .eq('id', voiceId)
+        .single();
+
+    if (error || !voice) {
+        console.warn('[🔊 TTS] generateTTSForCall: voice not found, voiceId:', voiceId);
+        return null;
+    }
+
+    try {
+        switch (voice.tts_provider) {
+            case 'elevenlabs':
+                return await generateElevenLabsAudio(text, voice.elevenlabs_voice_id, voice.elevenlabs_model_id);
+            case 'openai':
+                return await generateOpenAIAudio(text, voice.provider_voice_id || 'alloy');
+            case 'google':
+                console.warn('[🔊 TTS] Google TTS not yet configured in generateTTSForCall');
+                return null;
+            default:
+                console.warn('[🔊 TTS] Unknown tts_provider for WebSocket:', voice.tts_provider);
+                return null;
+        }
+    } catch (e) {
+        console.error('[🔊 TTS] generateTTSForCall failed:', e.message);
+        return null;
+    }
+}
+
+module.exports = { generateTTSUrl, serveTTSAudio, ttsHash, generateTTSForCall };

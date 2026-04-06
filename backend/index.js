@@ -475,6 +475,7 @@ app.use('/api/test-chat', strictLimiter);
 // ============================================
 const testChatRoutes = require('./routes/testChat');
 const twilioRoutes = require('./routes/twilio');
+const exotelRoutes = require('./routes/exotel');
 const whatsappOAuthRoutes = require('./routes/whatsappOAuth');
 const paddleRoutes = require('./routes/paddle');
 const crmRoutes = require('./routes/crm');
@@ -491,6 +492,9 @@ const customersRoutes = require('./routes/customers');
 
 app.use('/api', testChatRoutes);
 app.use('/api/twilio', twilioRoutes);
+// Exotel: BYOK phone import + ExoML webhook + status callback
+app.use('/api/exotel', exotelRoutes);
+app.use('/api/webhooks/exotel', exotelRoutes);
 // TTS proxy: serves ElevenLabs audio cached in Redis for Twilio <Play> tags
 // Route: GET /api/tts/:callSid/:hash
 {
@@ -1508,6 +1512,29 @@ app.use((err, req, res, next) => {
   res.status(status).json({ error: err.message || 'Internal server error' });
 });
 
-app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
+// ============================================
+// WEBSOCKET SERVER — Exotel bidirectional audio streaming
+// Handles: ws://host/ws/exotel/:userId/:callSid
+// ============================================
+const http = require('http');
+const { WebSocketServer } = require('ws');
+const { handleExotelWebSocket } = require('./routes/exotel');
+
+const server = http.createServer(app);
+const wss = new WebSocketServer({ noServer: true });
+
+server.on('upgrade', (request, socket, head) => {
+  const url = request.url || '';
+  if (url.startsWith('/ws/exotel/')) {
+    wss.handleUpgrade(request, socket, head, (ws) => {
+      handleExotelWebSocket(ws, request);
+    });
+  } else {
+    // Unknown WebSocket path — close cleanly
+    socket.destroy();
+  }
+});
+
+server.listen(port, () => {
+  console.log(`Server running on port ${port} (HTTP + WebSocket)`);
 });
