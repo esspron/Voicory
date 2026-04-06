@@ -18,7 +18,7 @@
 
 const express = require('express');
 const router = express.Router();
-const { AccessToken, WebhookReceiver, RoomServiceClient } = require('livekit-server-sdk');
+const { AccessToken, WebhookReceiver, RoomServiceClient, AgentDispatchClient } = require('livekit-server-sdk');
 const { supabase, redis } = require('../config');
 const { v4: uuidv4 } = require('uuid');
 
@@ -324,7 +324,19 @@ router.post('/token', async (req, res) => {
         }
         
         console.log(`[LiveKit] Token generated for room: ${roomName}`);
-        
+
+        // Dispatch AI agent into the room
+        try {
+            const agentDispatch = new AgentDispatchClient(LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET);
+            await agentDispatch.createDispatch(roomName, 'voicory-agent', {
+                metadata: JSON.stringify({ assistantId, userId: user.id }),
+            });
+            console.log(`[LiveKit] Agent dispatched to room: ${roomName}`);
+        } catch (dispatchErr) {
+            // Non-fatal — user can still join, but agent won't respond
+            console.error('[LiveKit] Agent dispatch failed:', dispatchErr.message);
+        }
+
         return res.json({
             token: accessToken,
             roomName,
