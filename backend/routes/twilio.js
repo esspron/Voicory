@@ -727,6 +727,14 @@ router.post('/:userId/voice/gather', validateTwilioVoiceParams, validateTwilioGa
         // Add AI response to history
         conversationHistory.push({ role: 'assistant', content: aiResponse });
 
+        // Persist memory after each gather turn (fire-and-forget, never blocks response)
+        try {
+            trimAndSaveMemory(From, assistant.id, conversationHistory)
+                .catch(err => console.warn('[Memory] trimAndSaveMemory fire-and-forget error:', err.message));
+        } catch (memErr) {
+            console.warn('[Memory] trimAndSaveMemory setup error:', memErr.message);
+        }
+
         // Fire custom_trigger HTTP integrations if AI response contains trigger phrase (non-blocking)
         executeHTTPTrigger(assistant.id, 'custom_trigger', {
             callSid: CallSid,
@@ -938,13 +946,57 @@ router.post('/:userId/status', async (req, res) => {
             // Push completed calls to CRM integrations
             if (statusData.CallStatus === 'completed' && callLog) {
                 try {
+                    // Generate call summary from conversation history (if >= 2 turns)
+                    let callSummary = callLog.summary || null;
+                    const history = callLog.conversation_history || [];
+                    if (!callSummary && history.length >= 2) {
+                        try {
+                            const OpenAI = require('openai');
+                            const openaiClient = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+                            const transcript = history.map(m =>
+                                `${m.role === 'user' ? 'Customer' : 'Assistant'}: ${m.content}`
+                            ).join('\n');
+                            const summaryCompletion = await openaiClient.chat.completions.create({
+                                model: 'gpt-4o-mini',
+                                messages: [
+                                    {
+                                        role: 'system',
+                                        content: 'You are a call summarizer. Summarize the following phone call in 2-3 concise sentences covering: what the caller wanted, key information exchanged, and the outcome. Be factual and brief.'
+                                    },
+                                    { role: 'user', content: transcript }
+                                ],
+                                max_tokens: 150,
+                                temperature: 0.3
+                            });
+                            callSummary = summaryCompletion.choices[0]?.message?.content?.trim() || null;
+                            if (callSummary) {
+                                // Save summary back to call_logs (try summary column, fall back to notes)
+                                const { error: summaryErr } = await supabase
+                                    .from('call_logs')
+                                    .update({ summary: callSummary })
+                                    .eq('call_sid', statusData.CallSid);
+                                if (summaryErr) {
+                                    // summary column may not exist — try notes column
+                                    await supabase
+                                        .from('call_logs')
+                                        .update({ notes: callSummary })
+                                        .eq('call_sid', statusData.CallSid)
+                                        .catch(e => console.warn('[summary] notes column fallback failed:', e.message));
+                                }
+                                console.log(`✅ Call summary saved for ${statusData.CallSid}`);
+                            }
+                        } catch (summaryErr) {
+                            console.warn('[summary] Call summary generation failed:', summaryErr.message);
+                        }
+                    }
+
                     // Prepare call data for CRM
                     const callDataForCRM = {
                         phoneNumber: statusData.From || callLog.from_number,
                         direction: callLog.direction || 'inbound',
                         duration: parseInt(statusData.CallDuration) || callLog.duration_seconds || 0,
                         outcome: mappedStatus,
-                        summary: callLog.summary || null,
+                        summary: callSummary || callLog.summary || null,
                         transcript: callLog.transcript || null,
                         startedAt: callLog.started_at,
                         endedAt: updateData.ended_at,
@@ -974,7 +1026,7 @@ router.post('/:userId/status', async (req, res) => {
                         phoneNumber: statusData.From || callLog.from_number,
                         duration: parseInt(statusData.CallDuration) || 0,
                         transcript: callLog.transcript || '',
-                        summary: callLog.summary || '',
+                        summary: callSummary || callLog.summary || '',
                         disposition: mappedStatus,
                         call_date: callLog.started_at,
                     });
