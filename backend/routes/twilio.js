@@ -1100,6 +1100,24 @@ router.post('/:userId/status', async (req, res) => {
  * - toNumber: Phone number to call TO (with country code, e.g., +1234567890)
  */
 /**
+ * GET /api/twilio/phone-numbers — list user's Twilio phone numbers
+ */
+router.get('/phone-numbers', verifySupabaseAuth, async (req, res) => {
+    try {
+        const userId = req.userId;
+        const { data, error } = await supabase
+            .from('phone_numbers')
+            .select('id, number, label, assistant_id, webhook_url, provider, created_at')
+            .eq('user_id', userId)
+            .eq('provider', 'twilio');
+        if (error) return res.status(500).json({ error: error.message });
+        res.json({ numbers: data || [] });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+/**
  * Delete a phone number by ID
  * DELETE /api/twilio/phone-numbers/:id
  * Removes phone number from DB (user must own it)

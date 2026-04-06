@@ -16,6 +16,10 @@ import LLMSelectorModal from '../components/assistant-editor/LLMSelectorModal';
 import MemoryTab from '../components/assistant-editor/MemoryTab';
 import PromptGeneratorModal from '../components/assistant-editor/PromptGeneratorModal';
 import VoiceSelectorModal from '../components/assistant-editor/VoiceSelectorModal';
+import VoiceTab from '../components/assistant-editor/VoiceTab';
+import PhoneNumbersTab from '../components/assistant-editor/PhoneNumbersTab';
+import WhatsAppTab from '../components/assistant-editor/WhatsAppTab';
+import CampaignsTab from '../components/assistant-editor/CampaignsTab';
 import LiveKitVoiceCall from '../components/LiveKitVoiceCall';
 import WidgetTab from '../components/assistant-editor/WidgetTab';
 import { FadeIn } from '../components/ui/FadeIn';
@@ -41,9 +45,13 @@ import {
 // Tab definitions - Agent tab with unified instruction for both calls and messages
 const TABS = [
     { id: 'agent', label: 'Agent' },
+    { id: 'voice', label: 'Voice' },
     { id: 'memory', label: 'Memory' },
     { id: 'knowledge-base', label: 'Knowledge Base' },
     { id: 'integrations', label: 'Integrations' },
+    { id: 'phone-numbers', label: 'Phone Numbers' },
+    { id: 'whatsapp', label: 'WhatsApp' },
+    { id: 'campaigns', label: 'Campaigns' },
     { id: 'tests', label: 'Tests' },
     { id: 'widget', label: 'Widget' },
 ] as const;
@@ -698,6 +706,14 @@ const AssistantEditor: React.FC = () => {
                         onOpenPromptGenerator={() => setShowPromptGenerator(true)}
                     />
                 );
+            case 'voice':
+                return (
+                    <VoiceTab
+                        selectedVoiceId={formData.voiceId}
+                        onVoiceSelect={(v) => setFormData(prev => ({ ...prev, voiceId: v.voice_id || v.id || null }))}
+                        assistantId={assistantId}
+                    />
+                );
             case 'memory':
                 return (
                     <MemoryTab
@@ -719,6 +735,12 @@ const AssistantEditor: React.FC = () => {
                 );
             case 'widget':
                 return <WidgetTab assistantId={assistantId || undefined} assistantName={formData.name} />;
+            case 'phone-numbers':
+                return <PhoneNumbersTab assistantId={assistantId} />;
+            case 'whatsapp':
+                return <WhatsAppTab assistantId={assistantId} />;
+            case 'campaigns':
+                return <CampaignsTab assistantId={assistantId} />;
             default:
                 return null;
         }

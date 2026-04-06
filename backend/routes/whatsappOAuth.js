@@ -186,6 +186,23 @@ router.post('/oauth/callback', verifySupabaseAuth, async (req, res) => {
 // ============================================
 
 /**
+ * GET /api/whatsapp/numbers — list user's connected WhatsApp numbers
+ */
+router.get('/numbers', verifySupabaseAuth, async (req, res) => {
+    try {
+        const userId = req.userId;
+        const { data, error } = await supabase
+            .from('whatsapp_configs')
+            .select('id, display_phone_number, display_name, assistant_id, status, created_at')
+            .eq('user_id', userId);
+        if (error) return res.status(500).json({ error: error.message });
+        res.json({ numbers: data || [] });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+/**
  * GET /api/whatsapp/conversations
  * List all conversations (contacts with last message) for the authenticated user.
  */
