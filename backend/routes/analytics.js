@@ -92,7 +92,7 @@ router.get('/dashboard', verifyDashAuth, async (req, res) => {
 
     // Fetch call logs for current & previous period (for trend comparison)
     const [{ data: currentCalls, error: err1 }, { data: prevCalls, error: err2 }, { data: assistants, error: err3 }] = await Promise.all([
-      supabase.from('call_logs').select('id, duration, cost, status, assistant_name, assistant_id, phone_number, created_at, recording_url, call_sid')
+      supabase.from('call_logs').select('id, duration, cost, status, assistant_id, phone_number, created_at, recording_url, call_sid, assistants(name)')
         .eq('user_id', userId).gte('created_at', startDate).order('created_at', { ascending: false }),
       supabase.from('call_logs').select('id, duration, cost, status')
         .eq('user_id', userId).gte('created_at', prevStartDate).lt('created_at', startDate),
@@ -142,8 +142,9 @@ router.get('/dashboard', verifyDashAuth, async (req, res) => {
     // Top performing assistant by call count
     const assistantCallCounts = {};
     curr.forEach(c => {
-      if (c.assistant_name) {
-        assistantCallCounts[c.assistant_name] = (assistantCallCounts[c.assistant_name] || 0) + 1;
+      const aName = c.assistants?.name;
+      if (aName) {
+        assistantCallCounts[aName] = (assistantCallCounts[aName] || 0) + 1;
       }
     });
     const topAssistant = Object.entries(assistantCallCounts).sort((a, b) => b[1] - a[1])[0] || null;
@@ -167,7 +168,7 @@ router.get('/dashboard', verifyDashAuth, async (req, res) => {
     // Recent calls (last 5)
     const recentCalls = curr.slice(0, 5).map(c => ({
       id: c.id,
-      assistantName: c.assistant_name || 'Unknown',
+      assistantName: c.assistants?.name || 'Unknown',
       phoneNumber: c.phone_number || '',
       duration: c.duration || '0:00',
       cost: Number(c.cost) || 0,
