@@ -882,15 +882,17 @@ router.post('/:userId/status', async (req, res) => {
         });
 
         // Map Twilio status to our status
+        // Note: 'busy' and 'no-answer' are preserved as-is (schema allows them);
+        // only 'canceled' maps to 'failed'.
         const statusMap = {
-            'queued': 'queued',
-            'ringing': 'ringing',
+            'queued':      'queued',
+            'ringing':     'ringing',
             'in-progress': 'in_progress',
-            'completed': 'completed',
-            'busy': 'failed',
-            'failed': 'failed',
-            'no-answer': 'failed',
-            'canceled': 'failed'
+            'completed':   'completed',
+            'busy':        'busy',
+            'failed':      'failed',
+            'no-answer':   'no-answer',
+            'canceled':    'failed'
         };
 
         const mappedStatus = statusMap[statusData.CallStatus] || statusData.CallStatus;
@@ -901,10 +903,21 @@ router.post('/:userId/status', async (req, res) => {
             updated_at: new Date().toISOString()
         };
 
-        // Add duration and end time for completed calls
+        // Add duration, recording_url, and end time for completed calls
         if (statusData.CallStatus === 'completed') {
+            const durationSec = parseInt(statusData.CallDuration) || 0;
             updateData.ended_at = new Date().toISOString();
-            updateData.duration_seconds = parseInt(statusData.CallDuration) || 0;
+            updateData.duration_seconds = durationSec;
+            // Store Twilio recording URL if present
+            if (statusData.RecordingUrl) {
+                updateData.recording_url = statusData.RecordingUrl;
+            }
+        }
+
+        // For all terminal statuses (failed, busy, no-answer, canceled → failed)
+        // also record ended_at so the call log has a closed timestamp
+        if (['busy', 'failed', 'no-answer'].includes(statusData.CallStatus)) {
+            updateData.ended_at = new Date().toISOString();
         }
 
         const { data: callLog, error } = await supabase
@@ -991,7 +1004,26 @@ router.post('/:userId/status', async (req, res) => {
                             callSid:            statusData.CallSid,
                             twilioAccountSid:   statusData.AccountSid || null,
                             callLogId:          callLog.id || null,
+                        }).then(billingResult => {
+                            if (billingResult && billingResult.cost_usd > 0) {
+                                // Write the final cost back to call_logs for display in the dashboard
+                                supabase
+                                    .from('call_logs')
+                                    .update({ cost: billingResult.cost_usd })
+                                    .eq('call_sid', statusData.CallSid)
+                                    .catch(e => console.error('[billing] call_logs cost write-back error:', e.message));
+                            }
                         }).catch(e => console.error('[billing] deductVoiceCost error:', e.message));
+                    }
+
+                    // === Update phone_numbers.last_call_at ===
+                    // Record the timestamp of this completed call on the phone number record.
+                    if (callLog.phone_number_id) {
+                        supabase
+                            .from('phone_numbers')
+                            .update({ last_call_at: new Date().toISOString() })
+                            .eq('id', callLog.phone_number_id)
+                            .catch(e => console.error('[twilio] phone_numbers last_call_at update error:', e.message));
                     }
                 } catch (crmError) {
                     // Don't fail the webhook if CRM sync fails
