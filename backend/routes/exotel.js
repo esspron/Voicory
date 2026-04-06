@@ -26,7 +26,7 @@ const express = require('express');
 const router = express.Router();
 const axios = require('axios').default || require('axios');
 const FormData = require('form-data');
-const { supabase } = require('../config');
+const { supabase, encrypt } = require('../config');
 const { verifySupabaseAuth } = require('../lib/auth');
 const { searchKnowledgeBase, formatRAGContext } = require('../services/rag');
 const { formatMemoryForPrompt, trimAndSaveMemory } = require('../services/memory');
@@ -58,92 +58,95 @@ function escapeXml(str) {
 // ============================================
 // BYOK — VERIFY EXOTEL CREDENTIALS
 // POST /api/exotel/verify-import
+// Body: { account_sid, api_key, api_token, subdomain?, virtual_number }
 // ============================================
 router.post('/verify-import', verifySupabaseAuth, async (req, res) => {
     try {
-        const { accountSid, apiKey, apiToken, phoneNumber } = req.body;
+        const {
+            account_sid,
+            api_key,
+            api_token,
+            subdomain = 'ccm-api.in.exotel.com',
+            virtual_number
+        } = req.body;
 
-        if (!accountSid || !apiKey || !apiToken || !phoneNumber) {
+        if (!account_sid || !api_key || !api_token || !virtual_number) {
             return res.status(400).json({
-                error: 'accountSid, apiKey, apiToken, and phoneNumber are required'
+                valid: false,
+                error: 'account_sid, api_key, api_token, and virtual_number are required'
             });
         }
 
-        let normalizedNumber = phoneNumber.replace(/[^\d+]/g, '');
-        if (!normalizedNumber.startsWith('+')) {
-            normalizedNumber = '+' + normalizedNumber;
-        }
-
-        // Verify credentials against Exotel API
-        // Exotel API base: https://<accountSid>:<apiKey>:<apiToken>@api.exotel.com
-        const exotelBase = `https://api.exotel.com/v2/accounts/${accountSid}`;
+        // Validate by calling Exotel API:
+        // GET https://{api_key}:{api_token}@{subdomain}/v1/Accounts/{account_sid}/Numbers/{virtual_number}
+        const verifyUrl = `https://${subdomain}/v1/Accounts/${account_sid}/Numbers/${encodeURIComponent(virtual_number)}`;
         let verifyResp;
         try {
-            verifyResp = await axios.get(`${exotelBase}/numbers`, {
-                auth: { username: `${accountSid}:${apiKey}`, password: apiToken },
+            verifyResp = await axios.get(verifyUrl, {
+                auth: { username: api_key, password: api_token },
                 timeout: 10000
             });
         } catch (err) {
             if (err.response?.status === 401 || err.response?.status === 403) {
-                return res.status(401).json({ error: 'Invalid Exotel credentials.' });
+                return res.status(401).json({ valid: false, error: 'Invalid Exotel credentials.' });
             }
-            return res.status(502).json({ error: 'Could not reach Exotel API. Check credentials.' });
+            if (err.response?.status === 404) {
+                return res.status(404).json({ valid: false, error: `Virtual number ${virtual_number} not found in this Exotel account.` });
+            }
+            return res.status(502).json({ valid: false, error: 'Could not reach Exotel API. Check credentials and subdomain.' });
         }
 
-        // Look for the phone number in the list
-        const numbers = verifyResp.data?.items || verifyResp.data?.Numbers || [];
-        const found = numbers.find(n => {
-            const num = n.phone_number || n.Number || '';
-            return num.replace(/[^\d+]/g, '') === normalizedNumber.replace(/[^\d+]/g, '');
-        });
-
-        if (!found) {
-            return res.status(404).json({
-                error: `Phone number ${normalizedNumber} not found in this Exotel account.`
-            });
-        }
+        const number_details = verifyResp.data?.Numbers || verifyResp.data || null;
 
         return res.json({
-            success: true,
-            phoneNumber: normalizedNumber,
-            accountSid,
-            message: 'Exotel credentials verified successfully.'
+            valid: true,
+            number_details
         });
 
     } catch (err) {
         console.error('[Exotel] verify-import error:', err.message);
-        return res.status(500).json({ error: 'Verification failed. Please try again.' });
+        return res.status(500).json({ valid: false, error: 'Verification failed. Please try again.' });
     }
 });
 
 // ============================================
 // BYOK — IMPORT EXOTEL NUMBER
 // POST /api/exotel/import-number
+// Body: { account_sid, api_key, api_token, subdomain?, virtual_number, label? }
 // ============================================
 router.post('/import-number', verifySupabaseAuth, async (req, res) => {
     try {
-        const { accountSid, apiKey, apiToken, phoneNumber, label } = req.body;
+        const {
+            account_sid,
+            api_key,
+            api_token,
+            subdomain = 'ccm-api.in.exotel.com',
+            virtual_number,
+            label
+        } = req.body;
         const userId = req.userId;
 
-        if (!accountSid || !apiKey || !apiToken || !phoneNumber) {
-            return res.status(400).json({ error: 'accountSid, apiKey, apiToken, and phoneNumber are required' });
+        if (!account_sid || !api_key || !api_token || !virtual_number) {
+            return res.status(400).json({ error: 'account_sid, api_key, api_token, and virtual_number are required' });
         }
-
-        let normalizedNumber = phoneNumber.replace(/[^\d+]/g, '');
-        if (!normalizedNumber.startsWith('+')) normalizedNumber = '+' + normalizedNumber;
 
         // Check for duplicate
         const { data: existing } = await supabase
             .from('phone_numbers')
             .select('id')
             .eq('user_id', userId)
-            .eq('phone_number', normalizedNumber)
+            .eq('number', virtual_number)
             .eq('provider', 'exotel')
+            .is('deleted_at', null)
             .maybeSingle();
 
         if (existing) {
             return res.status(409).json({ error: 'This Exotel number is already imported.' });
         }
+
+        // Encrypt credentials before storing
+        const encryptedApiKey = encrypt(api_key);
+        const encryptedApiToken = encrypt(api_token);
 
         const webhookUrl = `${BACKEND_URL}/api/webhooks/exotel/${userId}/voice`;
         const statusCallbackUrl = `${BACKEND_URL}/api/webhooks/exotel/${userId}/status`;
@@ -151,16 +154,17 @@ router.post('/import-number', verifySupabaseAuth, async (req, res) => {
         const { data: inserted, error: insertErr } = await supabase
             .from('phone_numbers')
             .insert({
-                user_id: userId,
-                phone_number: normalizedNumber,
-                label: label || normalizedNumber,
+                number: virtual_number,
                 provider: 'exotel',
-                provider_account_sid: accountSid,
-                provider_api_key: apiKey,
-                provider_api_token: apiToken,
+                user_id: userId,
+                label: label || virtual_number,
+                exotel_account_sid: account_sid,
+                exotel_api_key: encryptedApiKey,
+                exotel_api_token: encryptedApiToken,
+                exotel_subdomain: subdomain,
+                status: 'active',
                 webhook_url: webhookUrl,
                 status_callback_url: statusCallbackUrl,
-                status: 'active',
                 created_at: new Date().toISOString()
             })
             .select()
@@ -168,16 +172,15 @@ router.post('/import-number', verifySupabaseAuth, async (req, res) => {
 
         if (insertErr) {
             console.error('[Exotel] import-number DB error:', insertErr.message);
-            return res.status(500).json({ error: 'Failed to save phone number.' });
+            return res.status(500).json({ error: 'Failed to save phone number: ' + insertErr.message });
         }
 
         return res.status(201).json({
             success: true,
-            id: inserted.id,
-            phoneNumber: normalizedNumber,
+            phoneNumber: inserted,
             webhookUrl,
             statusCallbackUrl,
-            message: `Number imported. Set your Exotel app webhook to: ${webhookUrl}`
+            message: `Number imported successfully. Set your Exotel ExoPhone passthru URL to: ${webhookUrl}`
         });
 
     } catch (err) {
@@ -196,7 +199,7 @@ router.get('/phone-numbers', verifySupabaseAuth, async (req, res) => {
 
         const { data, error } = await supabase
             .from('phone_numbers')
-            .select('id, phone_number, label, provider, status, assistant_id, created_at, last_call_at')
+            .select('id, number, label, provider, status, assistant_id, webhook_url, exotel_account_sid, exotel_subdomain, created_at, last_call_at')
             .eq('user_id', userId)
             .eq('provider', 'exotel')
             .is('deleted_at', null)
@@ -226,15 +229,17 @@ router.delete('/phone-numbers/:id', verifySupabaseAuth, async (req, res) => {
             .eq('id', id)
             .eq('user_id', userId)
             .eq('provider', 'exotel')
+            .is('deleted_at', null)
             .maybeSingle();
 
         if (!existing) {
             return res.status(404).json({ error: 'Phone number not found.' });
         }
 
+        // Soft delete: set status='deleted' and deleted_at timestamp
         const { error } = await supabase
             .from('phone_numbers')
-            .update({ deleted_at: new Date().toISOString(), status: 'inactive' })
+            .update({ deleted_at: new Date().toISOString(), status: 'deleted' })
             .eq('id', id)
             .eq('user_id', userId);
 
@@ -250,15 +255,16 @@ router.delete('/phone-numbers/:id', verifySupabaseAuth, async (req, res) => {
 // ============================================
 // ASSIGN ASSISTANT TO EXOTEL NUMBER
 // PUT /api/exotel/phone-numbers/:id/assign
+// Body: { assistant_id }
 // ============================================
 router.put('/phone-numbers/:id/assign', verifySupabaseAuth, async (req, res) => {
     try {
         const { id } = req.params;
-        const { assistantId } = req.body;
+        const { assistant_id } = req.body;
         const userId = req.userId;
 
-        if (!assistantId) {
-            return res.status(400).json({ error: 'assistantId is required.' });
+        if (!assistant_id) {
+            return res.status(400).json({ error: 'assistant_id is required.' });
         }
 
         const { data: existing } = await supabase
@@ -267,6 +273,7 @@ router.put('/phone-numbers/:id/assign', verifySupabaseAuth, async (req, res) => 
             .eq('id', id)
             .eq('user_id', userId)
             .eq('provider', 'exotel')
+            .is('deleted_at', null)
             .maybeSingle();
 
         if (!existing) {
@@ -275,7 +282,7 @@ router.put('/phone-numbers/:id/assign', verifySupabaseAuth, async (req, res) => 
 
         const { error } = await supabase
             .from('phone_numbers')
-            .update({ assistant_id: assistantId })
+            .update({ assistant_id })
             .eq('id', id)
             .eq('user_id', userId);
 
