@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Info, Play, Square, Check } from '@phosphor-icons/react';
+import { Info, Play, Square, Check, MagnifyingGlass, CaretDown } from '@phosphor-icons/react';
 import { authFetch } from '../../lib/api';
-import { API } from '../../lib/constants';
 
 interface Voice {
   id?: string;
@@ -20,8 +19,8 @@ interface VoiceTabProps {
 
 type Provider = 'all' | 'elevenlabs' | 'openai' | 'google';
 
-const PROVIDER_TABS: { id: Provider; label: string }[] = [
-  { id: 'all', label: 'All' },
+const PROVIDER_OPTIONS: { id: Provider; label: string }[] = [
+  { id: 'all', label: 'All Providers' },
   { id: 'elevenlabs', label: 'ElevenLabs' },
   { id: 'openai', label: 'OpenAI' },
   { id: 'google', label: 'Google' },
@@ -38,8 +37,10 @@ const VoiceTab: React.FC<VoiceTabProps> = ({ selectedVoiceId, onVoiceSelect }) =
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterProvider, setFilterProvider] = useState<Provider>('all');
+  const [providerDropdownOpen, setProviderDropdownOpen] = useState(false);
   const [playingId, setPlayingId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const dropdownRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     authFetch('/api/voices')
@@ -49,34 +50,36 @@ const VoiceTab: React.FC<VoiceTabProps> = ({ selectedVoiceId, onVoiceSelect }) =
       .finally(() => setLoading(false));
   }, []);
 
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setProviderDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
   const getVoiceKey = (v: Voice) => v.voice_id || v.id || v.name;
 
-  const selectedVoice = voices.find(
-    (v) => getVoiceKey(v) === selectedVoiceId
-  );
+  const selectedVoice = voices.find((v) => getVoiceKey(v) === selectedVoiceId);
 
   const filtered = voices.filter((v) => {
-    const matchesProvider =
-      filterProvider === 'all' || v.provider?.toLowerCase() === filterProvider;
+    const matchesProvider = filterProvider === 'all' || v.provider?.toLowerCase() === filterProvider;
     const matchesSearch = v.name?.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesProvider && matchesSearch;
   });
 
   const playVoice = async (voice: Voice) => {
     const key = getVoiceKey(voice);
-
     if (playingId === key) {
       audioRef.current?.pause();
       setPlayingId(null);
       return;
     }
-
-    if (audioRef.current) {
-      audioRef.current.pause();
-    }
-
+    if (audioRef.current) audioRef.current.pause();
     setPlayingId(key);
-
     let url = voice.preview_url;
     if (!url) {
       try {
@@ -92,12 +95,7 @@ const VoiceTab: React.FC<VoiceTabProps> = ({ selectedVoiceId, onVoiceSelect }) =
         return;
       }
     }
-
-    if (!url) {
-      setPlayingId(null);
-      return;
-    }
-
+    if (!url) { setPlayingId(null); return; }
     const audio = new Audio(url);
     audioRef.current = audio;
     audio.onended = () => setPlayingId(null);
@@ -105,58 +103,81 @@ const VoiceTab: React.FC<VoiceTabProps> = ({ selectedVoiceId, onVoiceSelect }) =
     audio.play().catch(() => setPlayingId(null));
   };
 
+  const selectedProviderLabel = PROVIDER_OPTIONS.find(p => p.id === filterProvider)?.label || 'All Providers';
+
   return (
     <div className="flex flex-col gap-4 p-6">
+
       {/* Currently Selected Card */}
       {selectedVoice && (
-        <div className="bg-zinc-800 border border-zinc-700 rounded-xl p-4 flex items-center gap-3">
-          <div className="w-2 h-2 rounded-full bg-green-400" />
-          <div className="flex-1">
-            <div className="text-xs text-zinc-400 mb-0.5">Currently Selected</div>
-            <div className="text-zinc-100 font-medium">{selectedVoice.name}</div>
+        <div className="bg-surface border border-border rounded-xl p-4 flex items-center gap-3">
+          <div className="w-2 h-2 rounded-full bg-green-400 flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <div className="text-xs text-textMuted mb-0.5">Currently Selected</div>
+            <div className="text-textMain font-medium truncate">{selectedVoice.name}</div>
           </div>
-          <span
-            className={`text-xs px-2 py-0.5 rounded-full border ${
-              PROVIDER_BADGE_COLORS[selectedVoice.provider?.toLowerCase()] ||
-              'bg-zinc-700 text-zinc-300 border-zinc-600'
-            }`}
-          >
+          <span className={`text-xs px-2 py-0.5 rounded-full border flex-shrink-0 ${
+            PROVIDER_BADGE_COLORS[selectedVoice.provider?.toLowerCase()] || 'bg-surfaceHover text-textMuted border-border'
+          }`}>
             {selectedVoice.provider}
           </span>
         </div>
       )}
 
-      {/* Filter tabs */}
-      <div className="flex gap-1 bg-zinc-800 rounded-lg p-1 w-fit">
-        {PROVIDER_TABS.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setFilterProvider(tab.id)}
-            className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-              filterProvider === tab.id
-                ? 'bg-zinc-700 text-zinc-100'
-                : 'text-zinc-400 hover:text-zinc-200'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      {/* Search + Filter row */}
+      <div className="flex gap-2">
+        {/* Search */}
+        <div className="flex-1 relative">
+          <MagnifyingGlass size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-textMuted pointer-events-none" />
+          <input
+            type="text"
+            placeholder="Search voices..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full bg-surface border border-border rounded-xl pl-9 pr-4 py-2.5 text-textMain placeholder:text-textMuted text-sm outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all"
+          />
+        </div>
 
-      {/* Search bar */}
-      <input
-        type="text"
-        placeholder="Search voices..."
-        value={searchQuery}
-        onChange={(e) => setSearchQuery(e.target.value)}
-        className="bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 text-zinc-100 placeholder:text-zinc-500 text-sm outline-none focus:border-zinc-500"
-      />
+        {/* Provider custom dropdown */}
+        <div className="relative" ref={dropdownRef}>
+          <button
+            onClick={() => setProviderDropdownOpen(prev => !prev)}
+            className="flex items-center gap-2 px-3 py-2.5 bg-surface border border-border rounded-xl text-sm text-textMain hover:border-primary/40 transition-all min-w-[140px] justify-between"
+          >
+            <span>{selectedProviderLabel}</span>
+            <CaretDown
+              size={13}
+              weight="bold"
+              className={`text-textMuted transition-transform flex-shrink-0 ${providerDropdownOpen ? 'rotate-180' : ''}`}
+            />
+          </button>
+
+          {providerDropdownOpen && (
+            <div className="absolute right-0 top-full mt-1 w-44 bg-surface border border-border rounded-xl shadow-xl z-50 overflow-hidden">
+              {PROVIDER_OPTIONS.map((opt) => (
+                <button
+                  key={opt.id}
+                  onClick={() => { setFilterProvider(opt.id); setProviderDropdownOpen(false); }}
+                  className={`w-full flex items-center justify-between px-4 py-2.5 text-sm transition-colors ${
+                    filterProvider === opt.id
+                      ? 'bg-primary/10 text-textMain font-medium'
+                      : 'text-textMuted hover:bg-surfaceHover hover:text-textMain'
+                  }`}
+                >
+                  <span>{opt.label}</span>
+                  {filterProvider === opt.id && <Check size={13} weight="bold" className="text-primary" />}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Voice list */}
       {loading ? (
-        <div className="text-zinc-400 text-sm py-8 text-center">Loading voices...</div>
+        <div className="text-textMuted text-sm py-10 text-center">Loading voices...</div>
       ) : filtered.length === 0 ? (
-        <div className="text-zinc-500 text-sm py-8 text-center">No voices found</div>
+        <div className="text-textMuted text-sm py-10 text-center">No voices found</div>
       ) : (
         <div className="flex flex-col gap-1">
           {filtered.map((voice) => {
@@ -169,44 +190,38 @@ const VoiceTab: React.FC<VoiceTabProps> = ({ selectedVoiceId, onVoiceSelect }) =
               <div
                 key={key}
                 onClick={() => onVoiceSelect(voice)}
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-colors border ${
+                className={`flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-all border ${
                   isSelected
-                    ? 'bg-zinc-700 border-zinc-600'
-                    : 'bg-zinc-800/50 border-transparent hover:bg-zinc-800 hover:border-zinc-700'
+                    ? 'bg-primary/10 border-primary/30'
+                    : 'bg-surface/50 border-transparent hover:bg-surface hover:border-border'
                 }`}
               >
                 {/* Play/Info button */}
                 {isGoogle ? (
-                  <span title="Preview not available for Google voices">
-                    <Info size={18} className="text-zinc-500" />
+                  <span title="Preview not available for Google voices" className="flex-shrink-0">
+                    <Info size={18} className="text-textMuted" />
                   </span>
                 ) : (
                   <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      playVoice(voice);
-                    }}
-                    className="w-7 h-7 flex items-center justify-center rounded-full bg-zinc-700 hover:bg-zinc-600 text-zinc-300 transition-colors flex-shrink-0"
+                    onClick={(e) => { e.stopPropagation(); playVoice(voice); }}
+                    className="w-7 h-7 flex items-center justify-center rounded-full bg-surfaceHover hover:bg-primary/20 text-textMuted hover:text-primary transition-colors flex-shrink-0"
                   >
                     {isPlaying ? <Square size={12} weight="fill" /> : <Play size={12} weight="fill" />}
                   </button>
                 )}
 
                 {/* Name */}
-                <span className="flex-1 text-zinc-100 text-sm font-medium">{voice.name}</span>
+                <span className="flex-1 text-textMain text-sm font-medium">{voice.name}</span>
 
                 {/* Provider badge */}
-                <span
-                  className={`text-xs px-2 py-0.5 rounded-full border ${
-                    PROVIDER_BADGE_COLORS[voice.provider?.toLowerCase()] ||
-                    'bg-zinc-700 text-zinc-300 border-zinc-600'
-                  }`}
-                >
+                <span className={`text-xs px-2 py-0.5 rounded-full border flex-shrink-0 ${
+                  PROVIDER_BADGE_COLORS[voice.provider?.toLowerCase()] || 'bg-surfaceHover text-textMuted border-border'
+                }`}>
                   {voice.provider}
                 </span>
 
                 {/* Selected indicator */}
-                {isSelected && <Check size={16} className="text-green-400" weight="bold" />}
+                {isSelected && <Check size={15} className="text-primary flex-shrink-0" weight="bold" />}
               </div>
             );
           })}
