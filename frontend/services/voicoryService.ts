@@ -1,3 +1,4 @@
+import { API } from '../lib/constants';
 
 import { Voice, VoiceSample, VoiceWithSamples, Assistant, AssistantInput, AssistantTool, PhoneNumber, ApiKey, CallLog, Customer, SipTrunkCredential, UserProfile, CustomerConversation, CustomerMemory, CustomerInsight, CustomerContext, MemoryConfig, ActionItem, TranscriptMessage } from '../types';
 
@@ -819,7 +820,7 @@ export const getCustomers = async (search?: string): Promise<Customer[]> => {
  * Export all customers as CSV (triggers download)
  */
 export const exportCustomersCSV = async (): Promise<void> => {
-    const apiBase = (import.meta as any).env.VITE_API_URL || '';
+    const apiBase = API.BACKEND_URL;
     const { data: { session } } = await supabase.auth.getSession();
     const token = session?.access_token;
     const response = await fetch(`${apiBase}/api/customers/export`, {
@@ -1084,7 +1085,7 @@ export const exportCallLogsCSV = async (filters?: { from?: string; to?: string; 
         if (filters?.to) params.set('to', filters.to);
         if (filters?.assistantId) params.set('assistantId', filters.assistantId);
 
-        const apiBase = import.meta.env.VITE_API_URL || '';
+        const apiBase = API.BACKEND_URL;
         const url = `${apiBase}/api/calls/export${params.toString() ? '?' + params.toString() : ''}`;
 
         const response = await fetch(url, {
@@ -1618,7 +1619,7 @@ export const uploadOrgLogo = async (file: File): Promise<string | null> => {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) throw new Error('Not authenticated');
 
-        const API_URL = import.meta.env.VITE_API_URL || '';
+        const API_URL = API.BACKEND_URL;
         const formData = new FormData();
         formData.append('logo', file);
 

@@ -153,7 +153,7 @@ const Overview: React.FC = () => {
             const token = session?.access_token;
             if (!token) throw new Error('Not authenticated');
 
-            const apiBase = import.meta.env.VITE_API_URL || '';
+            const apiBase = (await import('../lib/constants')).API.BACKEND_URL;
             const res = await fetch(`${apiBase}/api/analytics/dashboard?days=${days}`, {
                 headers: { Authorization: `Bearer ${token}` },
             });

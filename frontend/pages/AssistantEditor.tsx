@@ -534,7 +534,7 @@ const AssistantEditor: React.FC = () => {
             const { data: { session } } = await supabase.auth.getSession();
             const token = session?.access_token;
 
-            const apiUrl = import.meta.env.VITE_API_URL || '';
+            const apiUrl = API.BACKEND_URL;
             const res = await fetch(`${apiUrl}/api/assistants/preview-voice`, {
                 method: 'POST',
                 headers: {

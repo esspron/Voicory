@@ -12,7 +12,8 @@ import type { CallLog } from '../types';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-const API_BASE = import.meta.env.VITE_API_URL || '';
+import { API } from '../lib/constants';
+const API_BASE = API.BACKEND_URL;
 
 async function getAuthHeader(): Promise<Record<string, string>> {
     try {
