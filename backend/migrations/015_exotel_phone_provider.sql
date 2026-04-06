@@ -1,0 +1,14 @@
+ALTER TABLE phone_numbers ADD COLUMN IF NOT EXISTS exotel_account_sid TEXT;
+ALTER TABLE phone_numbers ADD COLUMN IF NOT EXISTS exotel_api_key TEXT;
+ALTER TABLE phone_numbers ADD COLUMN IF NOT EXISTS exotel_api_token TEXT;
+ALTER TABLE phone_numbers ADD COLUMN IF NOT EXISTS exotel_subdomain TEXT DEFAULT 'ccm-api.in.exotel.com';
+ALTER TABLE phone_numbers ADD COLUMN IF NOT EXISTS exotel_phone_number TEXT;
+ALTER TABLE call_logs ADD COLUMN IF NOT EXISTS provider TEXT DEFAULT 'twilio';
+ALTER TABLE call_logs ADD COLUMN IF NOT EXISTS from_number TEXT;
+ALTER TABLE call_logs ADD COLUMN IF NOT EXISTS to_number TEXT;
+ALTER TABLE call_logs ADD COLUMN IF NOT EXISTS summary TEXT;
+ALTER TABLE call_logs ADD COLUMN IF NOT EXISTS tts_characters INTEGER DEFAULT 0;
+ALTER TABLE call_logs ADD COLUMN IF NOT EXISTS stt_minutes NUMERIC(10,4) DEFAULT 0;
+CREATE INDEX IF NOT EXISTS idx_phone_numbers_exotel ON phone_numbers(exotel_phone_number, user_id) WHERE provider = 'exotel';
+CREATE INDEX IF NOT EXISTS idx_call_logs_provider ON call_logs(provider, user_id);
+SELECT 'migration 015 complete' AS status;
