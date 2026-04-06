@@ -1033,9 +1033,9 @@ router.post('/:userId/status', async (req, res) => {
                     // Save memory after call ends (async, don't block webhook response)
                     const callerPhone = statusData.From || callLog.from_number;
                     const agentId = callLog.assistant?.id || null;
-                    const history = callLog.conversation_history || [];
-                    if (callerPhone && history.length > 0) {
-                        trimAndSaveMemory(callerPhone, agentId, history)
+                    const memHistory = callLog.conversation_history || [];
+                    if (callerPhone && memHistory.length > 0) {
+                        trimAndSaveMemory(callerPhone, agentId, memHistory)
                             .catch(err => console.error('❌ Memory save error:', err.message));
                     }
 
