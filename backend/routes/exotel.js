@@ -311,7 +311,7 @@ router.post('/:userId/voice', async (req, res) => {
             .select(`
                 id, user_id, phone_number, assistant_id,
                 assistants:assistant_id (
-                    id, name, system_prompt, first_message, voice_id, language, rag_enabled
+                    id, name, system_prompt, first_message, voice_id, language, rag_enabled, llm_model
                 )
             `)
             .eq('phone_number', To)
@@ -498,7 +498,7 @@ async function handleExotelWebSocket(ws, req) {
                 .select(`
                     id, assistant_id,
                     assistants:assistant_id (
-                        id, name, system_prompt, first_message, voice_id, language, rag_enabled
+                        id, name, system_prompt, first_message, voice_id, language, rag_enabled, llm_model
                     )
                 `)
                 .eq('user_id', userId)
@@ -677,6 +677,11 @@ async function processExotelTurn(ws, session, audioChunks) {
         let systemPrompt = assistant.system_prompt || `You are ${assistant.name || 'an AI assistant'} helping callers over the phone. Keep responses concise and conversational.`;
         if (ragContext) systemPrompt += `\n\nKnowledge Base:\n${ragContext}`;
         if (memoryContext) systemPrompt += `\n\nMemory from past interactions:\n${memoryContext}`;
+        // Hindi / Indian language support
+        const isHindi = assistant.language === 'hi' || assistant.language === 'hi-IN';
+        if (isHindi) {
+            systemPrompt += '\n\nPlease respond in Hindi. The caller is speaking in Hindi. Use simple, clear Hindi suitable for a phone call.';
+        }
         systemPrompt += '\n\nKeep responses under 2 sentences for voice calls. Be natural and conversational.';
 
         // ─── GPT ──────────────────────────────────────────────────────
@@ -688,7 +693,7 @@ async function processExotelTurn(ws, session, audioChunks) {
         const openaiResp = await axios.post(
             'https://api.openai.com/v1/chat/completions',
             {
-                model: 'gpt-4o-mini',
+                model: assistant.llm_model || 'gpt-4o-mini',
                 messages,
                 max_tokens: 150,
                 temperature: 0.7
@@ -807,7 +812,10 @@ async function finalizeExotelCall(session) {
 async function transcribeWithDeepgram(audioBuffer, language) {
     const apiKey = process.env.DEEPGRAM_API_KEY;
     const lang = language || 'en';
-    const langCode = lang.includes('-') ? lang : `${lang}-US`;
+    // Deepgram language codes: Hindi = 'hi', English = 'en-US', etc.
+    // Do NOT append -US to non-English languages
+    const langCode = lang === 'hi' || lang === 'hi-IN' ? 'hi'
+        : lang.includes('-') ? lang : `${lang}-US`;
 
     const resp = await axios.post(
         `https://api.deepgram.com/v1/listen?model=nova-2&language=${langCode}&encoding=mulaw&sample_rate=8000`,
