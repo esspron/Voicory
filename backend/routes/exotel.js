@@ -45,6 +45,38 @@ const BACKEND_URL = process.env.BACKEND_URL || 'https://voicory-backend-78394249
 // VAD threshold: ~500ms of silence at 8kHz μ-law (160 bytes/chunk @ 20ms = 25 chunks)
 const VAD_SILENCE_CHUNKS = 25;
 
+// Concurrent call protection — in-memory Map: userId → Set of { callSid, startedAt }
+const activeExotelSessions = new Map();
+const MAX_CONCURRENT_CALLS_PER_USER = 3;
+const SESSION_EXPIRE_MS = 5 * 60 * 1000; // 5 minutes
+
+// Connection timeout: close WebSocket if no audio for 30s
+const NO_AUDIO_TIMEOUT_MS = 30 * 1000;
+
+function _getActiveSessions(userId) {
+    const sessions = activeExotelSessions.get(userId) || new Set();
+    // Auto-expire sessions older than 5 minutes
+    const now = Date.now();
+    for (const s of sessions) {
+        if (now - s.startedAt > SESSION_EXPIRE_MS) sessions.delete(s);
+    }
+    return sessions;
+}
+
+function _registerSession(userId, callSid) {
+    const sessions = _getActiveSessions(userId);
+    sessions.add({ callSid, startedAt: Date.now() });
+    activeExotelSessions.set(userId, sessions);
+}
+
+function _unregisterSession(userId, callSid) {
+    const sessions = activeExotelSessions.get(userId);
+    if (!sessions) return;
+    for (const s of sessions) {
+        if (s.callSid === callSid) { sessions.delete(s); break; }
+    }
+}
+
 function escapeXml(str) {
     if (!str) return '';
     return String(str)
@@ -412,14 +444,22 @@ router.post('/:userId/voice', async (req, res) => {
         const { userId } = req.params;
         const { CallSid, From, To } = req.body;
 
-        // Validate required Exotel fields
+        // ── Input validation: Exotel required fields ────────────────────────
         if (!CallSid || !From || !To) {
-            console.warn('[Exotel] Missing required fields — CallSid, From, To');
+            console.warn('[📞 Exotel] Missing required fields — CallSid, From, To');
             res.type('text/xml');
             return res.send(`<Response><Say>This number is not configured.</Say></Response>`);
         }
 
-        console.log(`[Exotel] Incoming call: ${From} → ${To} | CallSid: ${CallSid}`);
+        console.log(`[📞 Exotel] Incoming call: ${From} → ${To} | CallSid: ${CallSid}`);
+
+        // ── Concurrent call protection ──────────────────────────────────────
+        const activeSessions = _getActiveSessions(userId);
+        if (activeSessions.size >= MAX_CONCURRENT_CALLS_PER_USER) {
+            console.warn(`[📞 Exotel] Too many concurrent calls for user=${userId} (${activeSessions.size} active)`);
+            res.type('text/xml');
+            return res.send(`<Response><Say voice="man">We're sorry, all lines are currently busy. Please try again in a moment.</Say><Hangup/></Response>`);
+        }
 
         // Look up phone_number by To number (Exotel provider)
         const { data: phoneConfig, error: phoneErr } = await supabase
@@ -436,30 +476,30 @@ router.post('/:userId/voice', async (req, res) => {
             .maybeSingle();
 
         if (phoneErr || !phoneConfig) {
-            console.warn('[Exotel] Phone number not found for To:', To);
+            console.warn('[📞 Exotel] Phone number not found for To:', To);
             res.type('text/xml');
             return res.send(`<Response><Say>This number is not currently in service.</Say></Response>`);
         }
 
         const assistant = phoneConfig.assistants;
         if (!assistant) {
-            console.warn('[Exotel] No assistant assigned to phone number:', To);
+            console.warn('[📞 Exotel] No assistant assigned to phone number:', To);
             res.type('text/xml');
             return res.send(`<Response><Say>This service is not yet configured. Please try again later.</Say></Response>`);
         }
 
-        // Billing guard
+        // ── Billing guard ───────────────────────────────────────────────────
         const { hasCredits } = await billing.checkBalance(phoneConfig.user_id);
         if (!hasCredits) {
-            console.warn(`[Exotel] Zero balance for user=${phoneConfig.user_id}, blocking call`);
+            console.warn(`[📞 Exotel] Zero balance for user=${phoneConfig.user_id}, blocking call`);
             res.type('text/xml');
-            return res.send(`<Response><Say>This service is currently unavailable. Please contact the business.</Say></Response>`);
+            return res.send(`<Response><Say>Sorry, your account has insufficient credits. Please top up to continue.</Say><Hangup/></Response>`);
         }
 
         // WebSocket stream URL
         const wsUrl = `wss://voicory-backend-783942490798.asia-south1.run.app/ws/exotel/${userId}/${CallSid}`;
 
-        console.log(`[Exotel] Returning ExoML with WebSocket stream: ${wsUrl}`);
+        console.log(`[📞 Exotel] Returning ExoML with WebSocket stream: ${wsUrl}`);
 
         res.type('text/xml');
         return res.send(`<?xml version="1.0" encoding="UTF-8"?>
@@ -470,7 +510,7 @@ router.post('/:userId/voice', async (req, res) => {
 </Response>`);
 
     } catch (err) {
-        console.error('[Exotel] voice webhook error:', err.message);
+        console.error('[📞 Exotel] voice webhook error:', err.message);
         res.type('text/xml');
         return res.send(`<Response><Say>We are experiencing technical difficulties. Please try again later.</Say></Response>`);
     }
@@ -669,7 +709,7 @@ async function handleExotelWebSocket(ws, req) {
     const userId = urlParts[urlParts.length - 2];
     const callSid = urlParts[urlParts.length - 1];
 
-    console.log(`[Exotel WS] Connected: userId=${userId}, callSid=${callSid}`);
+    console.log(`[📞 Exotel] WS Connected: userId=${userId}, callSid=${callSid}`);
 
     // Per-connection session state
     const session = {
@@ -686,6 +726,22 @@ async function handleExotelWebSocket(ws, req) {
         isProcessing: false
     };
 
+    // Register this session for concurrent call tracking
+    _registerSession(userId, callSid);
+
+    // ── Connection timeout: close WebSocket if no audio for 30s ──────────────
+    let noAudioTimer = null;
+    function resetNoAudioTimer() {
+        if (noAudioTimer) clearTimeout(noAudioTimer);
+        noAudioTimer = setTimeout(() => {
+            console.warn(`[📞 Exotel] No audio for 30s on callSid=${callSid} — closing WebSocket gracefully`);
+            if (ws.readyState === 1 /* OPEN */) {
+                ws.close(1000, 'No audio timeout');
+            }
+        }, NO_AUDIO_TIMEOUT_MS);
+    }
+    resetNoAudioTimer();
+
     ws.on('message', async (raw) => {
         let msg;
         try {
@@ -698,14 +754,13 @@ async function handleExotelWebSocket(ws, req) {
 
         // ─── connected ───────────────────────────────────────────────
         if (event === 'connected') {
-            console.log(`[Exotel WS] Stream connected: callSid=${callSid}`);
+            console.log(`[📞 Exotel] Stream connected: callSid=${callSid}`);
         }
 
         // ─── start ───────────────────────────────────────────────────
         else if (event === 'start') {
             session.streamSid = msg.streamSid || msg.start?.streamSid;
-            const startData = msg.start || {};
-            console.log(`[Exotel WS] Stream started: streamSid=${session.streamSid}`);
+            console.log(`[📞 Exotel] Stream started: streamSid=${session.streamSid}`);
 
             // Resolve phone number + assistant from DB
             const { data: phoneConfig } = await supabase
@@ -746,7 +801,7 @@ async function handleExotelWebSocket(ws, req) {
 
             if (callLog) {
                 session.callLogId = callLog.id;
-                console.log(`[Exotel WS] Call logged: id=${callLog.id}`);
+                console.log(`[📞 Exotel] Call logged: id=${callLog.id}`);
             }
 
             // Send greeting if assistant has a first_message
@@ -761,9 +816,11 @@ async function handleExotelWebSocket(ws, req) {
                             event: 'media',
                             media: { payload: greetingAudio.toString('base64') }
                         }));
+                        console.log(`[🔊 TTS] Greeting sent: "${session.assistant.first_message.substring(0, 50)}..."`);
                     }
                 } catch (greetErr) {
-                    console.warn('[Exotel WS] Greeting TTS failed:', greetErr.message);
+                    console.warn('[🔊 TTS] Greeting TTS failed:', greetErr.message);
+                    // TTS fallback: Exotel cannot inject ExoML mid-stream, so just log
                 }
             }
         }
@@ -776,6 +833,9 @@ async function handleExotelWebSocket(ws, req) {
 
             const payload = msg.media?.payload;
             if (!payload) return;
+
+            // Reset no-audio timeout on every media chunk received
+            resetNoAudioTimer();
 
             const chunk = Buffer.from(payload, 'base64');
             session.audioBuffer.push(chunk);
@@ -809,18 +869,30 @@ async function handleExotelWebSocket(ws, req) {
 
         // ─── stop ────────────────────────────────────────────────────
         else if (event === 'stop') {
-            console.log(`[Exotel WS] Stream stopped: callSid=${callSid}`);
+            console.log(`[📞 Exotel] Stream stopped: callSid=${callSid}`);
+            if (noAudioTimer) clearTimeout(noAudioTimer);
             await finalizeExotelCall(session);
         }
     });
 
-    ws.on('close', () => {
-        console.log(`[Exotel WS] WebSocket closed: callSid=${callSid}`);
-        finalizeExotelCall(session).catch(e => console.warn('[Exotel WS] finalize on close error:', e.message));
+    ws.on('close', (code, reason) => {
+        console.log(`[📞 Exotel] WebSocket closed: callSid=${callSid}, code=${code}`);
+        if (noAudioTimer) clearTimeout(noAudioTimer);
+        _unregisterSession(userId, callSid);
+        finalizeExotelCall(session).catch(e => console.warn('[📞 Exotel] finalize on close error:', e.message));
     });
 
     ws.on('error', (err) => {
-        console.error(`[Exotel WS] WebSocket error: callSid=${callSid}`, err.message);
+        console.error(`[📞 Exotel] WebSocket error: callSid=${callSid}`, err.message);
+        if (noAudioTimer) clearTimeout(noAudioTimer);
+        _unregisterSession(userId, callSid);
+        // Gracefully close on any WebSocket error
+        try {
+            if (ws.readyState === 1 /* OPEN */ || ws.readyState === 0 /* CONNECTING */) {
+                ws.close(1011, 'WebSocket error');
+            }
+        } catch (_) { /* ignore close errors */ }
+        finalizeExotelCall(session).catch(e => console.warn('[📞 Exotel] finalize on error:', e.message));
     });
 }
 
@@ -840,7 +912,7 @@ async function processExotelTurn(ws, session, audioChunks) {
     try {
         const assistant = session.assistant;
         if (!assistant) {
-            console.warn('[Exotel WS] No assistant in session, skipping turn');
+            console.warn('[📞 Exotel] No assistant in session, skipping turn');
             return;
         }
 
@@ -856,17 +928,19 @@ async function processExotelTurn(ws, session, audioChunks) {
             } else {
                 transcribedText = await transcribeWithWhisper(audioBuffer);
             }
+            console.log(`[🎤 STT] Transcribed: "${transcribedText}"`);
         } catch (sttErr) {
-            console.warn('[Exotel WS] STT failed:', sttErr.message);
+            console.warn('[🎤 STT] STT failed:', sttErr.message);
+            // On STT failure: send a gentle error message via TTS and continue the loop
+            await _sendFallbackTTS(ws, session, 'Sorry, I could not hear you clearly. Please try again.');
             return;
         }
 
         if (!transcribedText || transcribedText.trim().length < 2) {
-            console.log('[Exotel WS] STT returned empty/short result, skipping');
+            console.log('[🎤 STT] Empty/short result, skipping turn');
             return;
         }
 
-        console.log(`[Exotel WS] STT: "${transcribedText}"`);
         session.conversationHistory.push({ role: 'user', content: transcribedText });
 
         // ─── RAG context ──────────────────────────────────────────────
@@ -876,7 +950,8 @@ async function processExotelTurn(ws, session, audioChunks) {
                 const ragResults = await searchKnowledgeBase(assistant.id, transcribedText);
                 ragContext = formatRAGContext(ragResults);
             } catch (ragErr) {
-                console.warn('[Exotel WS] RAG failed:', ragErr.message);
+                console.warn('[📞 Exotel] RAG failed:', ragErr.message);
+                // Non-fatal: proceed without RAG context
             }
         }
 
@@ -885,14 +960,14 @@ async function processExotelTurn(ws, session, audioChunks) {
         try {
             memoryContext = await formatMemoryForPrompt(session.userId, assistant.id);
         } catch (memErr) {
-            console.warn('[Exotel WS] Memory fetch failed:', memErr.message);
+            console.warn('[📞 Exotel] Memory fetch failed:', memErr.message);
+            // Non-fatal: proceed without memory
         }
 
         // ─── Build system prompt ──────────────────────────────────────
         let systemPrompt = assistant.system_prompt || `You are ${assistant.name || 'an AI assistant'} helping callers over the phone. Keep responses concise and conversational.`;
         if (ragContext) systemPrompt += `\n\nKnowledge Base:\n${ragContext}`;
         if (memoryContext) systemPrompt += `\n\nMemory from past interactions:\n${memoryContext}`;
-        // Hindi / Indian language support
         const isHindi = assistant.language === 'hi' || assistant.language === 'hi-IN';
         if (isHindi) {
             systemPrompt += '\n\nPlease respond in Hindi. The caller is speaking in Hindi. Use simple, clear Hindi suitable for a phone call.';
@@ -905,46 +980,59 @@ async function processExotelTurn(ws, session, audioChunks) {
             ...session.conversationHistory.slice(-10) // Last 10 turns
         ];
 
-        const openaiResp = await axios.post(
-            'https://api.openai.com/v1/chat/completions',
-            {
-                model: assistant.llm_model || 'gpt-4o-mini',
-                messages,
-                max_tokens: 150,
-                temperature: 0.7
-            },
-            {
-                headers: {
-                    Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-                    'Content-Type': 'application/json'
+        let aiResponse = '';
+        try {
+            const openaiResp = await axios.post(
+                'https://api.openai.com/v1/chat/completions',
+                {
+                    model: assistant.llm_model || 'gpt-4o-mini',
+                    messages,
+                    max_tokens: 150,
+                    temperature: 0.7
                 },
-                timeout: 8000
-            }
-        );
+                {
+                    headers: {
+                        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+                        'Content-Type': 'application/json'
+                    },
+                    timeout: 8000
+                }
+            );
 
-        const aiResponse = openaiResp.data.choices?.[0]?.message?.content?.trim();
-        if (!aiResponse) {
-            console.warn('[Exotel WS] GPT returned empty response');
+            aiResponse = openaiResp.data.choices?.[0]?.message?.content?.trim();
+            if (!aiResponse) {
+                throw new Error('GPT returned empty response');
+            }
+            console.log(`[🤖 GPT] Response: "${aiResponse}"`);
+        } catch (llmErr) {
+            console.warn('[🤖 GPT] LLM failed:', llmErr.message);
+            // On LLM failure: send fallback message via TTS, continue loop
+            await _sendFallbackTTS(ws, session, "I'm having trouble processing your request right now. Please go ahead and I'll do my best to help.");
             return;
         }
 
-        console.log(`[Exotel WS] GPT: "${aiResponse}"`);
         session.conversationHistory.push({ role: 'assistant', content: aiResponse });
 
         // Per-turn memory save (fire and forget)
         trimAndSaveMemory(session.userId, assistant.id, session.conversationHistory)
-            .catch(e => console.warn('[Exotel WS] Memory save failed:', e.message));
+            .catch(e => console.warn('[📞 Exotel] Memory save failed:', e.message));
 
         // ─── TTS ──────────────────────────────────────────────────────
         let ttsAudio = null;
         try {
             ttsAudio = await generateTTSForCall(aiResponse, assistant.voice_id);
         } catch (ttsErr) {
-            console.warn('[Exotel WS] TTS failed:', ttsErr.message);
+            console.warn('[🔊 TTS] TTS failed:', ttsErr.message);
+            // On TTS failure: cannot inject ExoML into an active WS stream,
+            // so send a plain audio buffer using Exotel's built-in TTS via a clear log
+            // The caller will hear silence; this is a known limitation of bidirectional streams.
+            // Log clearly so ops can investigate voice_id issues.
+            console.error(`[🔊 TTS] FALLBACK: Could not synthesize response for callSid=${session.callSid}. voice_id=${assistant.voice_id}`);
+            return;
         }
 
         if (!ttsAudio) {
-            console.warn('[Exotel WS] TTS returned null, cannot send audio response');
+            console.warn('[🔊 TTS] TTS returned null, skipping audio response');
             return;
         }
 
@@ -954,11 +1042,29 @@ async function processExotelTurn(ws, session, audioChunks) {
                 event: 'media',
                 media: { payload: ttsAudio.toString('base64') }
             }));
-            console.log(`[Exotel WS] Sent TTS audio: ${ttsAudio.length} bytes`);
+            console.log(`[🔊 TTS] Audio sent: ${ttsAudio.length} bytes for callSid=${session.callSid}`);
         }
 
     } catch (err) {
-        console.error('[Exotel WS] processExotelTurn error:', err.message);
+        console.error('[📞 Exotel] processExotelTurn error:', err.message);
+    }
+}
+
+// ─── Helper: send a fallback TTS message to the caller ───────────────────────
+async function _sendFallbackTTS(ws, session, text) {
+    if (!ws || ws.readyState !== 1 /* OPEN */) return;
+    try {
+        const fallbackAudio = await generateTTSForCall(text, session.assistant?.voice_id);
+        if (fallbackAudio) {
+            ws.send(JSON.stringify({
+                event: 'media',
+                media: { payload: fallbackAudio.toString('base64') }
+            }));
+            console.log(`[🔊 TTS] Fallback message sent: "${text}"`);
+        }
+    } catch (err) {
+        console.warn('[🔊 TTS] Fallback TTS also failed:', err.message);
+        // Nothing more we can do at this point — log and move on
     }
 }
 
@@ -966,6 +1072,8 @@ async function processExotelTurn(ws, session, audioChunks) {
 async function finalizeExotelCall(session) {
     if (session._finalized) return;
     session._finalized = true;
+
+    console.log(`[📞 Exotel] Finalizing call: callSid=${session.callSid}, turns=${session.conversationHistory.length}`);
 
     try {
         if (!session.callLogId) return;
@@ -993,8 +1101,9 @@ async function finalizeExotelCall(session) {
                     }
                 );
                 summary = sumResp.data.choices?.[0]?.message?.content?.trim() || '';
+                console.log(`[🤖 GPT] Call summary generated: "${summary.substring(0, 80)}..."`);
             } catch (sumErr) {
-                console.warn('[Exotel WS] Summary generation failed:', sumErr.message);
+                console.warn('[🤖 GPT] Summary generation failed:', sumErr.message);
             }
         }
 
@@ -1013,13 +1122,13 @@ async function finalizeExotelCall(session) {
         // Save memory after call ends
         if (history.length > 0 && session.userId && session.assistantId) {
             trimAndSaveMemory(session.userId, session.assistantId, history)
-                .catch(e => console.warn('[Exotel WS] Post-call memory save failed:', e.message));
+                .catch(e => console.warn('[📞 Exotel] Post-call memory save failed:', e.message));
         }
 
-        console.log(`[Exotel WS] Call finalized: callLogId=${session.callLogId}`);
+        console.log(`[📞 Exotel] Call end: callLogId=${session.callLogId}, transcript=${transcript.length} chars`);
 
     } catch (err) {
-        console.error('[Exotel WS] finalizeExotelCall error:', err.message);
+        console.error('[📞 Exotel] finalizeExotelCall error:', err.message);
     }
 }
 
