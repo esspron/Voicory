@@ -454,7 +454,7 @@ router.post('/:userId/voice', validateTwilioVoiceParams, async (req, res) => {
             res.type('text/xml');
             return res.send(`
                 <Response>
-                    <Say voice="Polly.Joanna">Sorry, this number is not configured. Goodbye.</Say>
+                    <Say voice="alice">Sorry, this number is not configured. Goodbye.</Say>
                     <Hangup/>
                 </Response>
             `);
@@ -472,7 +472,7 @@ router.post('/:userId/voice', validateTwilioVoiceParams, async (req, res) => {
             res.type('text/xml');
             return res.send(`
                 <Response>
-                    <Say voice="Polly.Joanna">Thank you for calling. This number is active but no AI assistant has been configured yet. Please contact the administrator to assign an assistant. Goodbye.</Say>
+                    <Say voice="alice">Thank you for calling. This number is active but no AI assistant has been configured yet. Please contact the administrator to assign an assistant. Goodbye.</Say>
                     <Hangup/>
                 </Response>
             `);
@@ -491,7 +491,7 @@ router.post('/:userId/voice', validateTwilioVoiceParams, async (req, res) => {
             res.type('text/xml');
             return res.send(`
                 <Response>
-                    <Say voice="Polly.Joanna">This service is currently unavailable. Please contact the business.</Say>
+                    <Say voice="alice">This service is currently unavailable. Please contact the business.</Say>
                     <Hangup/>
                 </Response>
             `);
@@ -548,10 +548,10 @@ router.post('/:userId/voice', validateTwilioVoiceParams, async (req, res) => {
             if (ttsUrl) {
                 firstMsgXml = `<Play>${ttsUrl}</Play>`;
             } else {
-                firstMsgXml = `<Say voice="Polly.Joanna">${escapeXml(resolvedFirstMsgForVoice)}</Say>`;
+                firstMsgXml = `<Say voice="alice">${escapeXml(resolvedFirstMsgForVoice)}</Say>`;
             }
         } else {
-            firstMsgXml = `<Say voice="Polly.Joanna">${escapeXml(resolvedFirstMsgForVoice)}</Say>`;
+            firstMsgXml = `<Say voice="alice">${escapeXml(resolvedFirstMsgForVoice)}</Say>`;
         }
         res.type('text/xml');
         res.send(`
@@ -559,7 +559,7 @@ router.post('/:userId/voice', validateTwilioVoiceParams, async (req, res) => {
                 ${firstMsgXml}
                 <Gather input="speech" timeout="5" speechTimeout="auto" language="${voiceTwilioLanguage}" action="/api/webhooks/twilio/${userId}/voice/gather" method="POST">
                 </Gather>
-                <Say voice="Polly.Joanna">I didn't hear anything. Goodbye!</Say>
+                <Say voice="alice">I didn't hear anything. Goodbye!</Say>
                 <Hangup/>
             </Response>
         `);
@@ -569,7 +569,7 @@ router.post('/:userId/voice', validateTwilioVoiceParams, async (req, res) => {
         res.type('text/xml');
         res.send(`
             <Response>
-                <Say voice="Polly.Joanna">We are experiencing technical difficulties. Please try again later.</Say>
+                <Say voice="alice">We are experiencing technical difficulties. Please try again later.</Say>
                 <Hangup/>
             </Response>
         `);
@@ -597,11 +597,11 @@ router.post('/:userId/voice/gather', validateTwilioVoiceParams, validateTwilioGa
             res.type('text/xml');
             return res.send(`
                 <Response>
-                    <Say voice="Polly.Joanna">I didn't catch that. Could you please repeat?</Say>
+                    <Say voice="alice">I didn't catch that. Could you please repeat?</Say>
                     <Gather input="speech" timeout="5" speechTimeout="auto" language="en-US" action="/api/webhooks/twilio/${userId}/voice/gather" method="POST">
-                        <Say voice="Polly.Joanna">I'm listening...</Say>
+                        <Say voice="alice">I'm listening...</Say>
                     </Gather>
-                    <Say voice="Polly.Joanna">Goodbye!</Say>
+                    <Say voice="alice">Goodbye!</Say>
                     <Hangup/>
                 </Response>
             `);
@@ -622,7 +622,7 @@ router.post('/:userId/voice/gather', validateTwilioVoiceParams, validateTwilioGa
             res.type('text/xml');
             return res.send(`
                 <Response>
-                    <Say voice="Polly.Joanna">Sorry, no assistant is available. Goodbye.</Say>
+                    <Say voice="alice">Sorry, no assistant is available. Goodbye.</Say>
                     <Hangup/>
                 </Response>
             `);
@@ -833,10 +833,10 @@ router.post('/:userId/voice/gather', validateTwilioVoiceParams, validateTwilioGa
             if (ttsUrl) {
                 aiResponseXml = `<Play>${ttsUrl}</Play>`;
             } else {
-                aiResponseXml = `<Say voice="Polly.Joanna">${escapeXml(aiResponse)}</Say>`;
+                aiResponseXml = `<Say voice="alice">${escapeXml(aiResponse)}</Say>`;
             }
         } else {
-            aiResponseXml = `<Say voice="Polly.Joanna">${escapeXml(aiResponse)}</Say>`;
+            aiResponseXml = `<Say voice="alice">${escapeXml(aiResponse)}</Say>`;
         }
         res.type('text/xml');
         res.send(`
@@ -844,7 +844,7 @@ router.post('/:userId/voice/gather', validateTwilioVoiceParams, validateTwilioGa
                 ${aiResponseXml}
                 <Gather input="speech" timeout="5" speechTimeout="auto" language="${twilioLanguage}" action="/api/webhooks/twilio/${userId}/voice/gather" method="POST">
                 </Gather>
-                <Say voice="Polly.Joanna">Goodbye!</Say>
+                <Say voice="alice">Goodbye!</Say>
                 <Hangup/>
             </Response>
         `);
@@ -854,7 +854,7 @@ router.post('/:userId/voice/gather', validateTwilioVoiceParams, validateTwilioGa
         res.type('text/xml');
         res.send(`
             <Response>
-                <Say voice="Polly.Joanna">We encountered an error processing your request. Goodbye.</Say>
+                <Say voice="alice">We encountered an error processing your request. Goodbye.</Say>
                 <Hangup/>
             </Response>
         `);
