@@ -1,4 +1,4 @@
-import { X, CircleNotch, Phone, ArrowSquareOut, Check, Copy, Robot, CaretDown, Link, GlobeHemisphereWest } from '@phosphor-icons/react';
+import { X, CircleNotch, Phone, ArrowSquareOut, Check, Copy, Robot, CaretDown, Link } from '@phosphor-icons/react';
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -14,14 +14,8 @@ interface PhoneNumberModalProps {
     onSuccess: (phoneNumber: PhoneNumber) => void;
 }
 
-// Server region options for webhook URL
-const SERVER_REGIONS = [
-    { id: 'INDIA', label: 'India (Asia South)', flag: '🇮🇳', url: API.BACKEND_URLS.INDIA },
-    { id: 'USA', label: 'USA (US Central)', flag: '🇺🇸', url: API.BACKEND_URLS.USA },
-    { id: 'EUROPE', label: 'Europe (EU West)', flag: '🇪🇺', url: API.BACKEND_URLS.EUROPE },
-] as const;
-
-type ServerRegion = 'INDIA' | 'USA' | 'EUROPE';
+// Single backend — no region selection needed
+const BACKEND_URL = API.BACKEND_URL;
 
 const PhoneNumberModal: React.FC<PhoneNumberModalProps> = ({ isOpen, onClose, onSuccess }) => {
     const { user } = useAuth();
@@ -29,9 +23,6 @@ const PhoneNumberModal: React.FC<PhoneNumberModalProps> = ({ isOpen, onClose, on
     const [error, setError] = useState<string | null>(null);
     const [step, setStep] = useState<'import' | 'success'>('import');
     const [importedPhoneNumber, setImportedPhoneNumber] = useState<PhoneNumber | null>(null);
-    
-    // Server region selection for webhook
-    const [serverRegion, setServerRegion] = useState<ServerRegion>('INDIA');
     
     // Twilio form fields - credentials needed for verification + outbound calls
     const [twilioPhoneNumber, setTwilioPhoneNumber] = useState('');
@@ -48,10 +39,9 @@ const PhoneNumberModal: React.FC<PhoneNumberModalProps> = ({ isOpen, onClose, on
     // Clipboard hook
     const { copy, copied } = useClipboard();
 
-    // Generate user-specific webhook URL using selected server region
+    // Generate user-specific webhook URL (single backend)
     const getWebhookUrl = () => {
-        const regionUrl = SERVER_REGIONS.find(r => r.id === serverRegion)?.url || API.BACKEND_URLS.INDIA;
-        return user?.id ? `${regionUrl}/api/webhooks/twilio/${user.id}/voice` : '';
+        return user?.id ? `${BACKEND_URL}/api/webhooks/twilio/${user.id}/voice` : '';
     };
     const webhookUrl = getWebhookUrl();
 
@@ -205,42 +195,12 @@ const PhoneNumberModal: React.FC<PhoneNumberModalProps> = ({ isOpen, onClose, on
                                 </div>
                             </div>
 
-                            {/* Server Region Selector */}
-                            <div className="p-3 bg-surface/50 border border-border rounded-xl">
-                                <div className="flex items-center gap-2 mb-2">
-                                    <GlobeHemisphereWest size={14} weight="bold" className="text-primary" />
-                                    <span className="text-xs font-medium text-textMain">Server Region</span>
-                                </div>
-                                <p className="text-[10px] text-textMuted mb-2">
-                                    Select the server closest to your phone number's country for optimal call latency.
-                                </p>
-                                <div className="grid grid-cols-3 gap-1.5">
-                                    {SERVER_REGIONS.map((region) => (
-                                        <button
-                                            key={region.id}
-                                            onClick={() => setServerRegion(region.id as ServerRegion)}
-                                            className={`flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg border text-xs transition-all ${
-                                                serverRegion === region.id
-                                                    ? 'bg-primary/10 border-primary/30 text-textMain font-medium'
-                                                    : 'bg-background border-border text-textMuted hover:border-primary/20'
-                                            }`}
-                                        >
-                                            <span>{region.flag}</span>
-                                            <span>{region.id}</span>
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
                             {/* Show user's unique webhook URL */}
                             {webhookUrl && (
                                 <div className="p-3 bg-primary/5 border border-primary/20 rounded-xl">
                                     <div className="flex items-center gap-2 mb-2">
                                         <Link size={14} weight="bold" className="text-primary" />
-                                        <span className="text-xs font-medium text-textMain">Your Unique Webhook URL</span>
-                                        <span className="text-[10px] text-primary/70 ml-auto">
-                                            {SERVER_REGIONS.find(r => r.id === serverRegion)?.label}
-                                        </span>
+                                        <span className="text-xs font-medium text-textMain">Your Webhook URL</span>
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <code className="flex-1 text-[10px] font-mono text-textMuted break-all bg-surface/50 px-2 py-1 rounded">
