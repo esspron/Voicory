@@ -16,7 +16,8 @@ const { pushCallToAllCRMs } = require('../services/crm');
 const { calculateCallCost, logCostToSupabase } = require('../services/costTracking');
 const { executeHTTPTrigger } = require('../services/httpIntegrationExecutor');
 const billing = require('../services/billing');
-const { generateTTSUrl, serveTTSAudio } = require('../services/elevenLabsTTS');
+// TTS now routes through the voice library (voices table) — supports ElevenLabs, OpenAI, Google
+const { generateTTSUrl, serveTTSAudio } = require('../services/tts');
 
 // ============================================
 // TWILIO PHONE NUMBER IMPORT
@@ -539,12 +540,11 @@ router.post('/:userId/voice', validateTwilioVoiceParams, async (req, res) => {
         );
 
         // Respond with first message and open speech gather for AI conversation loop
-        // Use ElevenLabs TTS if assistant has a voice_id, otherwise fall back to Polly
+        // TTS routes through voice library (voices table) — provider resolved by tts.js
         const voiceId = assistant.voice_id || null;
-        const modelId = assistant.elevenlabs_model_id || null;
         let firstMsgXml;
         if (voiceId) {
-            const ttsUrl = await generateTTSUrl(resolvedFirstMsgForVoice, voiceId, modelId, callData.CallSid);
+            const ttsUrl = await generateTTSUrl(resolvedFirstMsgForVoice, voiceId, callData.CallSid);
             if (ttsUrl) {
                 firstMsgXml = `<Play>${ttsUrl}</Play>`;
             } else {
@@ -825,12 +825,11 @@ router.post('/:userId/voice/gather', validateTwilioVoiceParams, validateTwilioGa
         }
 
         // Respond with AI message and keep gathering for multi-turn conversation
-        // Use ElevenLabs TTS if assistant has a voice_id, otherwise fall back to Polly
+        // TTS routes through voice library (voices table) — provider resolved by tts.js
         const gatherVoiceId = assistant.voice_id || null;
-        const gatherModelId = assistant.elevenlabs_model_id || null;
         let aiResponseXml;
         if (gatherVoiceId) {
-            const ttsUrl = await generateTTSUrl(aiResponse, gatherVoiceId, gatherModelId, CallSid);
+            const ttsUrl = await generateTTSUrl(aiResponse, gatherVoiceId, CallSid);
             if (ttsUrl) {
                 aiResponseXml = `<Play>${ttsUrl}</Play>`;
             } else {
