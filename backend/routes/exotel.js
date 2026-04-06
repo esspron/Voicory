@@ -34,6 +34,7 @@ const billing = require('../services/billing');
 const { pushCallToAllCRMs } = require('../services/crm');
 const { calculateCallCost, logCostToSupabase } = require('../services/costTracking');
 const { generateTTSForCall } = require('../services/tts');
+const { executeHTTPTrigger } = require('../services/httpIntegrationExecutor');
 
 // ============================================
 // CONSTANTS & HELPERS
@@ -363,78 +364,177 @@ router.post('/:userId/voice', async (req, res) => {
 // ============================================
 // STATUS CALLBACK
 // POST /api/webhooks/exotel/:userId/status
+//
+// Exotel POSTs call result with fields:
+//   CallSid, Status, Duration (seconds), RecordingUrl, From, To
 // ============================================
 router.post('/:userId/status', async (req, res) => {
+    // Always respond 200 immediately — Exotel retries on non-2xx
+    res.sendStatus(200);
+
     try {
         const { userId } = req.params;
-        const { CallSid, Status, RecordingUrl, CallDuration } = req.body;
+        // Exotel uses 'Duration' (not 'CallDuration') and 'Status' (not 'CallStatus')
+        const { CallSid, Status, Duration, RecordingUrl, From, To } = req.body;
 
-        console.log(`[Exotel] Status callback: CallSid=${CallSid}, Status=${Status}`);
+        console.log(`[Exotel] Status callback: CallSid=${CallSid}, Status=${Status}, Duration=${Duration}`);
 
-        if (!CallSid) return res.sendStatus(200);
+        if (!CallSid) return;
 
-        // Map Exotel status to our internal status
+        // Map Exotel status values → internal status
         const statusMap = {
-            'completed': 'completed',
-            'busy': 'busy',
-            'no-answer': 'no-answer',
-            'failed': 'failed',
-            'canceled': 'canceled',
-            'in-progress': 'in-progress'
+            'completed':   'completed',
+            'busy':        'busy',
+            'no-answer':   'no-answer',
+            'no_answer':   'no-answer',
+            'failed':      'failed',
+            'canceled':    'failed',
+            'in-progress': 'in_progress',
         };
         const mappedStatus = statusMap[Status?.toLowerCase()] || Status?.toLowerCase() || 'unknown';
 
+        // Parse duration (Exotel sends it as a string of seconds)
+        const durationSecs = parseInt(Duration, 10) || 0;
+
+        // Build update payload for call_logs
         const updateData = {
             status: mappedStatus,
-            ended_at: new Date().toISOString()
+            ended_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
         };
-        if (RecordingUrl) updateData.recording_url = RecordingUrl;
-        if (CallDuration) updateData.duration_seconds = parseInt(CallDuration, 10);
+        if (durationSecs > 0) updateData.duration_seconds = durationSecs;
+        if (RecordingUrl)     updateData.recording_url = RecordingUrl;
 
+        // Fetch and update the call_logs row (upsert-style: if WS already closed it, this is
+        // the authoritative final status from Exotel)
         const { data: callLog, error: updateErr } = await supabase
             .from('call_logs')
             .update(updateData)
             .eq('call_sid', CallSid)
-            .select()
-            .single();
+            .select(`*, assistant:assistants(id, name)`)
+            .maybeSingle();
 
         if (updateErr) {
             console.warn('[Exotel] Failed to update call_logs:', updateErr.message);
         }
 
-        // Deduct billing on terminal statuses
-        const terminalStatuses = ['completed', 'busy', 'no-answer', 'failed', 'canceled'];
-        if (terminalStatuses.includes(mappedStatus) && callLog?.user_id && callLog?.duration_seconds > 0) {
-            try {
-                await billing.deductVoiceCost(callLog.user_id, callLog.duration_seconds);
-                console.log(`[Exotel] Deducted billing for user=${callLog.user_id}, duration=${callLog.duration_seconds}s`);
-            } catch (billingErr) {
-                console.warn('[Exotel] Billing deduction failed:', billingErr.message);
-            }
+        // If the WebSocket 'start' event never fired (e.g. call was rejected before stream),
+        // there may be no call_logs row. Insert one now so billing/CRM still fire.
+        let log = callLog;
+        if (!log && From && To) {
+            // Look up the phone number record to get assistantId / phoneNumberId
+            const { data: phoneConfig } = await supabase
+                .from('phone_numbers')
+                .select('id, assistant_id, user_id')
+                .eq('phone_number', To)
+                .eq('provider', 'exotel')
+                .is('deleted_at', null)
+                .maybeSingle();
+
+            const insertPayload = {
+                call_sid:        CallSid,
+                user_id:         phoneConfig?.user_id || userId,
+                phone_number_id: phoneConfig?.id || null,
+                assistant_id:    phoneConfig?.assistant_id || null,
+                from_number:     From,
+                to_number:       To,
+                direction:       'inbound',
+                provider:        'exotel',
+                status:          mappedStatus,
+                started_at:      new Date().toISOString(),
+                ended_at:        new Date().toISOString(),
+                duration_seconds: durationSecs,
+                recording_url:   RecordingUrl || null,
+            };
+
+            const { data: inserted } = await supabase
+                .from('call_logs')
+                .insert(insertPayload)
+                .select(`*, assistant:assistants(id, name)`)
+                .maybeSingle();
+
+            log = inserted;
+            console.log(`[Exotel] Inserted missing call_logs row for CallSid=${CallSid}`);
         }
 
-        // Push to CRM on completion
-        if (mappedStatus === 'completed' && callLog) {
-            try {
-                await pushCallToAllCRMs(callLog.user_id, {
-                    callSid: CallSid,
-                    from: callLog.from_number,
-                    to: callLog.to_number,
-                    duration: callLog.duration_seconds,
-                    status: mappedStatus,
-                    recordingUrl: RecordingUrl,
-                    summary: callLog.summary
+        const terminalStatuses = ['completed', 'busy', 'no-answer', 'failed'];
+        if (!terminalStatuses.includes(mappedStatus)) return;
+
+        const effectiveUserId = log?.user_id || userId;
+
+        // ── Billing: deduct voice cost ─────────────────────────────────────────
+        if (durationSecs > 0 && effectiveUserId) {
+            billing.deductVoiceCost(effectiveUserId, {
+                durationMinutes: durationSecs / 60,
+                channel:         'exotel',
+                callSid:         CallSid,
+                callLogId:       log?.id || null,
+            }).then(billingResult => {
+                if (billingResult?.cost_usd > 0) {
+                    supabase
+                        .from('call_logs')
+                        .update({ cost: billingResult.cost_usd })
+                        .eq('call_sid', CallSid)
+                        .catch(e => console.warn('[Exotel] cost write-back error:', e.message));
+                }
+                console.log(`[Exotel] Billing deducted for user=${effectiveUserId}, duration=${durationSecs}s`);
+            }).catch(e => console.warn('[Exotel] Billing deduction failed:', e.message));
+        }
+
+        if (!log) return; // Nothing more to do without a log row
+
+        // ── CRM push (non-blocking) ────────────────────────────────────────────
+        if (mappedStatus === 'completed') {
+            const callDataForCRM = {
+                phoneNumber:   From || log.from_number,
+                direction:     log.direction || 'inbound',
+                duration:      durationSecs,
+                outcome:       mappedStatus,
+                summary:       log.summary || null,
+                transcript:    log.transcript || null,
+                startedAt:     log.started_at,
+                endedAt:       updateData.ended_at,
+                callSid:       CallSid,
+                assistantName: log.assistant?.name || 'AI Assistant',
+                recordingUrl:  RecordingUrl || null,
+            };
+
+            pushCallToAllCRMs(effectiveUserId, callDataForCRM)
+                .then(results => {
+                    const ok  = results.filter(r => r.success).length;
+                    const bad = results.filter(r => !r.success);
+                    if (ok > 0)  console.log(`[Exotel] CRM sync: ${ok} CRM(s) updated for ${CallSid}`);
+                    if (bad.length > 0) console.warn(`[Exotel] CRM sync failed: ${bad.map(r => r.provider).join(', ')}`);
+                })
+                .catch(e => console.warn('[Exotel] CRM push error:', e.message));
+
+            // ── HTTP trigger: call_ended (non-blocking) ────────────────────────
+            if (log.assistant_id) {
+                executeHTTPTrigger(log.assistant_id, 'call_ended', {
+                    callSid:     CallSid,
+                    phoneNumber: From || log.from_number,
+                    duration:    durationSecs,
+                    transcript:  log.transcript || '',
+                    summary:     log.summary || '',
+                    disposition: mappedStatus,
+                    call_date:   log.started_at,
+                    provider:    'exotel',
                 });
-            } catch (crmErr) {
-                console.warn('[Exotel] CRM push failed:', crmErr.message);
             }
         }
 
-        return res.sendStatus(200);
+        // ── Update phone_numbers.last_call_at ────────────────────────────────
+        if (log.phone_number_id) {
+            supabase
+                .from('phone_numbers')
+                .update({ last_call_at: updateData.ended_at })
+                .eq('id', log.phone_number_id)
+                .catch(e => console.warn('[Exotel] last_call_at update failed:', e.message));
+        }
 
     } catch (err) {
         console.error('[Exotel] status callback error:', err.message);
-        return res.sendStatus(200); // Always 200 to Exotel
+        // Response already sent (200) — no further action needed
     }
 });
 
