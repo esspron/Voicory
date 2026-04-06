@@ -22,7 +22,7 @@ router.get('/', async (req, res) => {
     const token = req.query['hub.verify_token'];
     const challenge = req.query['hub.challenge'];
 
-    console.log('Webhook verification request:', { mode, token, challenge });
+    console.log('Webhook verification request:', { mode, challenge }); // token omitted from logs
 
     if (mode === 'subscribe') {
         // Look up the verify token in our database
