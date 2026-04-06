@@ -5,6 +5,8 @@ import {
     FloppyDisk,
     Trash,
     Warning,
+    CaretDown,
+    CheckCircle,
 } from '@phosphor-icons/react';
 import { Button } from '../components/ui/Button';
 import { DateRangePicker, DaySelector, TimeRangePicker } from '../components/campaigns';
@@ -43,6 +45,7 @@ export default function CampaignEditor() {
     const [isSaving, setIsSaving] = useState(false);
     const [formError, setFormError] = useState<string | null>(null);
     const [assistants] = useState<{ id: string; name: string }[]>([]);
+    const [openDropdown, setOpenDropdown] = useState<string | null>(null);
     const [phoneNumbers] = useState<{ id: string; number: string; label?: string }[]>([]);
 
     useEffect(() => {
@@ -164,6 +167,15 @@ export default function CampaignEditor() {
         );
     }
 
+    // Close dropdown on outside click
+    useEffect(() => {
+        const handleClick = (e: MouseEvent) => {
+            if (!(e.target as Element).closest('.relative')) setOpenDropdown(null);
+        };
+        document.addEventListener('mousedown', handleClick);
+        return () => document.removeEventListener('mousedown', handleClick);
+    }, []);
+
     return (
         <div className="p-6 max-w-4xl mx-auto">
             <form onSubmit={handleSubmit} className="space-y-8">
@@ -240,33 +252,78 @@ export default function CampaignEditor() {
                             <label className="block text-sm font-medium text-textMuted mb-1.5">
                                 Campaign Type
                             </label>
-                            <select
-                                value={formData.campaignType || 'outbound_sales'}
-                                onChange={(e) => updateFormData({ campaignType: e.target.value as CampaignInput['campaignType'] })}
-                                className="w-full px-4 py-2.5 bg-surface/50 border border-white/10 rounded-xl text-sm text-textMain focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
-                            >
-                                <option value="outbound_sales">Outbound Sales</option>
-                                <option value="lead_qualification">Lead Qualification</option>
-                                <option value="appointment_setting">Appointment Setting</option>
-                                <option value="follow_up">Follow Up</option>
-                                <option value="survey">Survey</option>
-                            </select>
+                            <div className="relative">
+                                <button
+                                    type="button"
+                                    onClick={() => setOpenDropdown(openDropdown === 'campaignType' ? null : 'campaignType')}
+                                    className="w-full px-4 py-2.5 bg-surface/50 border border-white/10 rounded-xl text-sm text-textMain flex items-center justify-between hover:border-primary/50 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
+                                >
+                                    <span>{{ outbound_sales: 'Outbound Sales', lead_qualification: 'Lead Qualification', appointment_setting: 'Appointment Setting', follow_up: 'Follow Up', survey: 'Survey' }[formData.campaignType || 'outbound_sales']}</span>
+                                    <CaretDown size={14} className={`text-textMuted transition-transform ${openDropdown === 'campaignType' ? 'rotate-180' : ''}`} />
+                                </button>
+                                {openDropdown === 'campaignType' && (
+                                    <div className="absolute z-50 w-full mt-1 bg-surface border border-white/10 rounded-xl shadow-xl overflow-hidden">
+                                        {[
+                                            { value: 'outbound_sales', label: 'Outbound Sales' },
+                                            { value: 'lead_qualification', label: 'Lead Qualification' },
+                                            { value: 'appointment_setting', label: 'Appointment Setting' },
+                                            { value: 'follow_up', label: 'Follow Up' },
+                                            { value: 'survey', label: 'Survey' },
+                                        ].map(opt => (
+                                            <button
+                                                key={opt.value}
+                                                type="button"
+                                                onClick={() => { updateFormData({ campaignType: opt.value as CampaignInput['campaignType'] }); setOpenDropdown(null); }}
+                                                className={`w-full px-4 py-2.5 text-sm text-left flex items-center justify-between hover:bg-white/5 transition-colors ${formData.campaignType === opt.value ? 'text-primary' : 'text-textMain'}`}
+                                            >
+                                                {opt.label}
+                                                {formData.campaignType === opt.value && <CheckCircle size={14} weight="fill" className="text-primary" />}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
                         </div>
 
                         <div>
                             <label className="block text-sm font-medium text-textMuted mb-1.5">
                                 Timezone
                             </label>
-                            <select
-                                value={formData.timezone || 'America/New_York'}
-                                onChange={(e) => updateFormData({ timezone: e.target.value })}
-                                className="w-full px-4 py-2.5 bg-surface/50 border border-white/10 rounded-xl text-sm text-textMain focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
-                            >
-                                <option value="America/New_York">Eastern Time (ET)</option>
-                                <option value="America/Chicago">Central Time (CT)</option>
-                                <option value="America/Denver">Mountain Time (MT)</option>
-                                <option value="America/Los_Angeles">Pacific Time (PT)</option>
-                            </select>
+                            <div className="relative">
+                                <button
+                                    type="button"
+                                    onClick={() => setOpenDropdown(openDropdown === 'timezone' ? null : 'timezone')}
+                                    className="w-full px-4 py-2.5 bg-surface/50 border border-white/10 rounded-xl text-sm text-textMain flex items-center justify-between hover:border-primary/50 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
+                                >
+                                    <span>{{ 'America/New_York': 'Eastern Time (ET)', 'America/Chicago': 'Central Time (CT)', 'America/Denver': 'Mountain Time (MT)', 'America/Los_Angeles': 'Pacific Time (PT)', 'Asia/Kolkata': 'India (IST)', 'Asia/Dubai': 'Dubai (GST)', 'Europe/London': 'London (GMT)', 'Europe/Paris': 'Paris (CET)', 'Australia/Sydney': 'Sydney (AEST)' }[formData.timezone || 'America/New_York'] || formData.timezone}</span>
+                                    <CaretDown size={14} className={`text-textMuted transition-transform ${openDropdown === 'timezone' ? 'rotate-180' : ''}`} />
+                                </button>
+                                {openDropdown === 'timezone' && (
+                                    <div className="absolute z-50 w-full mt-1 bg-surface border border-white/10 rounded-xl shadow-xl overflow-hidden max-h-56 overflow-y-auto">
+                                        {[
+                                            { value: 'America/New_York', label: 'Eastern Time (ET)' },
+                                            { value: 'America/Chicago', label: 'Central Time (CT)' },
+                                            { value: 'America/Denver', label: 'Mountain Time (MT)' },
+                                            { value: 'America/Los_Angeles', label: 'Pacific Time (PT)' },
+                                            { value: 'Asia/Kolkata', label: 'India (IST)' },
+                                            { value: 'Asia/Dubai', label: 'Dubai (GST)' },
+                                            { value: 'Europe/London', label: 'London (GMT)' },
+                                            { value: 'Europe/Paris', label: 'Paris (CET)' },
+                                            { value: 'Australia/Sydney', label: 'Sydney (AEST)' },
+                                        ].map(opt => (
+                                            <button
+                                                key={opt.value}
+                                                type="button"
+                                                onClick={() => { updateFormData({ timezone: opt.value }); setOpenDropdown(null); }}
+                                                className={`w-full px-4 py-2.5 text-sm text-left flex items-center justify-between hover:bg-white/5 transition-colors ${formData.timezone === opt.value ? 'text-primary' : 'text-textMain'}`}
+                                            >
+                                                {opt.label}
+                                                {formData.timezone === opt.value && <CheckCircle size={14} weight="fill" className="text-primary" />}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
                 </section>
@@ -280,34 +337,70 @@ export default function CampaignEditor() {
                             <label className="block text-sm font-medium text-textMuted mb-1.5">
                                 Voice Assistant
                             </label>
-                            <select
-                                value={formData.assistantId || ''}
-                                onChange={(e) => updateFormData({ assistantId: e.target.value || undefined })}
-                                className="w-full px-4 py-2.5 bg-surface/50 border border-white/10 rounded-xl text-sm text-textMain focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
-                            >
-                                <option value="">Select an assistant...</option>
-                                {assistants.map(a => (
-                                    <option key={a.id} value={a.id}>{a.name}</option>
-                                ))}
-                            </select>
+                            <div className="relative">
+                                <button
+                                    type="button"
+                                    onClick={() => setOpenDropdown(openDropdown === 'assistant' ? null : 'assistant')}
+                                    className="w-full px-4 py-2.5 bg-surface/50 border border-white/10 rounded-xl text-sm flex items-center justify-between hover:border-primary/50 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
+                                >
+                                    <span className={formData.assistantId ? 'text-textMain' : 'text-textMuted'}>
+                                        {formData.assistantId ? assistants.find(a => a.id === formData.assistantId)?.name || 'Select an assistant...' : 'Select an assistant...'}
+                                    </span>
+                                    <CaretDown size={14} className={`text-textMuted transition-transform ${openDropdown === 'assistant' ? 'rotate-180' : ''}`} />
+                                </button>
+                                {openDropdown === 'assistant' && (
+                                    <div className="absolute z-50 w-full mt-1 bg-surface border border-white/10 rounded-xl shadow-xl overflow-hidden max-h-56 overflow-y-auto">
+                                        {assistants.length === 0 ? (
+                                            <div className="px-4 py-3 text-sm text-textMuted">No assistants found</div>
+                                        ) : assistants.map(a => (
+                                            <button
+                                                key={a.id}
+                                                type="button"
+                                                onClick={() => { updateFormData({ assistantId: a.id }); setOpenDropdown(null); }}
+                                                className={`w-full px-4 py-2.5 text-sm text-left flex items-center justify-between hover:bg-white/5 transition-colors ${formData.assistantId === a.id ? 'text-primary' : 'text-textMain'}`}
+                                            >
+                                                {a.name}
+                                                {formData.assistantId === a.id && <CheckCircle size={14} weight="fill" className="text-primary" />}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
                         </div>
 
                         <div>
                             <label className="block text-sm font-medium text-textMuted mb-1.5">
                                 Phone Number
                             </label>
-                            <select
-                                value={formData.phoneNumberId || ''}
-                                onChange={(e) => updateFormData({ phoneNumberId: e.target.value || undefined })}
-                                className="w-full px-4 py-2.5 bg-surface/50 border border-white/10 rounded-xl text-sm text-textMain focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
-                            >
-                                <option value="">Select a phone number...</option>
-                                {phoneNumbers.map(p => (
-                                    <option key={p.id} value={p.id}>
-                                        {p.number} {p.label && `(${p.label})`}
-                                    </option>
-                                ))}
-                            </select>
+                            <div className="relative">
+                                <button
+                                    type="button"
+                                    onClick={() => setOpenDropdown(openDropdown === 'phone' ? null : 'phone')}
+                                    className="w-full px-4 py-2.5 bg-surface/50 border border-white/10 rounded-xl text-sm flex items-center justify-between hover:border-primary/50 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
+                                >
+                                    <span className={formData.phoneNumberId ? 'text-textMain' : 'text-textMuted'}>
+                                        {formData.phoneNumberId ? (() => { const p = phoneNumbers.find(p => p.id === formData.phoneNumberId); return p ? `${p.number}${p.label ? ` (${p.label})` : ''}` : 'Select a phone number...'; })() : 'Select a phone number...'}
+                                    </span>
+                                    <CaretDown size={14} className={`text-textMuted transition-transform ${openDropdown === 'phone' ? 'rotate-180' : ''}`} />
+                                </button>
+                                {openDropdown === 'phone' && (
+                                    <div className="absolute z-50 w-full mt-1 bg-surface border border-white/10 rounded-xl shadow-xl overflow-hidden max-h-56 overflow-y-auto">
+                                        {phoneNumbers.length === 0 ? (
+                                            <div className="px-4 py-3 text-sm text-textMuted">No phone numbers found</div>
+                                        ) : phoneNumbers.map(p => (
+                                            <button
+                                                key={p.id}
+                                                type="button"
+                                                onClick={() => { updateFormData({ phoneNumberId: p.id }); setOpenDropdown(null); }}
+                                                className={`w-full px-4 py-2.5 text-sm text-left flex items-center justify-between hover:bg-white/5 transition-colors ${formData.phoneNumberId === p.id ? 'text-primary' : 'text-textMain'}`}
+                                            >
+                                                {p.number}{p.label && ` (${p.label})`}
+                                                {formData.phoneNumberId === p.id && <CheckCircle size={14} weight="fill" className="text-primary" />}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
                 </section>
