@@ -181,4 +181,7 @@ healthServer.listen(PORT, () => {
   console.log(`[Health] HTTP server listening on port ${PORT}`);
 });
 
-cli.runApp(new WorkerOptions({ agent: fileURLToPath(import.meta.url) }));
+cli.runApp(new WorkerOptions({
+  agent: fileURLToPath(import.meta.url),
+  agentName: 'voicory-agent', // Required for explicit dispatch from backend
+}));

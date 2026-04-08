@@ -327,7 +327,9 @@ router.post('/token', async (req, res) => {
 
         // Dispatch AI agent into the room
         try {
-            const agentDispatch = new AgentDispatchClient(LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET);
+        // AgentDispatchClient requires https:// URL (not wss://)
+        const dispatchUrl = LIVEKIT_URL.replace('wss://', 'https://').replace('ws://', 'http://');
+        const agentDispatch = new AgentDispatchClient(dispatchUrl, LIVEKIT_API_KEY, LIVEKIT_API_SECRET);
             await agentDispatch.createDispatch(roomName, 'voicory-agent', {
                 metadata: JSON.stringify({ assistantId, userId: user.id }),
             });
@@ -526,8 +528,9 @@ router.delete('/rooms/:roomName', async (req, res) => {
             .eq('room_name', roomName);
         
         // Use LiveKit SDK to actually close the room
-        // RoomServiceClient communicates with LiveKit server to force-terminate the room
-        const roomService = new RoomServiceClient(LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET);
+        // RoomServiceClient requires https:// URL (not wss://)
+        const roomServiceUrl = LIVEKIT_URL.replace('wss://', 'https://').replace('ws://', 'http://');
+        const roomService = new RoomServiceClient(roomServiceUrl, LIVEKIT_API_KEY, LIVEKIT_API_SECRET);
         await roomService.deleteRoom(roomName);
         
         return res.json({ success: true, roomName });
