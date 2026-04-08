@@ -173,12 +173,13 @@ async function processMessage(options) {
 
         console.log(`[AssistantProcessor] Calling ${model} with ${messages.length} messages (smart routing: isNonEnglish=${assistant.language_settings?.default !== 'en' && !assistant.language_settings?.default?.startsWith('en')}, ragEnabled=${assistant.rag_enabled}, memoryEnabled=${assistant.memory_enabled}, msgLen=${message.length})`);
 
-        const completion = await openai.chat.completions.create({
-            model,
-            messages,
-            temperature,
-            max_tokens: maxTokens,
-        });
+        // Reasoning models (o1/o3/o4) don't support temperature or max_tokens
+        const isReasoning = /^(o1|o3|o4)/.test(model);
+        const chatParams = isReasoning
+            ? { model, messages, max_completion_tokens: maxTokens }
+            : { model, messages, temperature, max_tokens: maxTokens };
+
+        const completion = await openai.chat.completions.create(chatParams);
 
         const response = completion.choices[0]?.message?.content;
 
