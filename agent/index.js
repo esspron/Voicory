@@ -101,20 +101,26 @@ export default defineAgent({
   entry: async (ctx) => {
     console.log('[Agent] Job started, room:', ctx.job.room?.name);
 
-    // Wait for user participant
+    // Get participant — user may already be in the room when agent joins
+    // waitForParticipant() resolves immediately if someone is already there
     const participant = await ctx.waitForParticipant();
-    console.log('[Agent] Participant joined:', participant.identity);
+    console.log('[Agent] Participant ready:', participant.identity);
 
-    // Parse metadata from participant (set by backend token endpoint)
+    // Parse metadata — job dispatch metadata is primary source (set by backend)
+    // Participant metadata is fallback (set on token)
     let assistantId = null;
     let userId = null;
     try {
-      const meta = JSON.parse(participant.metadata || ctx.job.metadata || '{}');
-      assistantId = meta.assistantId;
-      userId = meta.userId;
+      // ctx.job.metadata = dispatch metadata (from backend createDispatch call)
+      // participant.metadata = token metadata (fallback)
+      const jobMeta = JSON.parse(ctx.job.metadata || '{}');
+      const participantMeta = JSON.parse(participant.metadata || '{}');
+      assistantId = jobMeta.assistantId || participantMeta.assistantId;
+      userId = jobMeta.userId || participantMeta.userId;
+      console.log('[Agent] metadata source — job:', !!jobMeta.assistantId, 'participant:', !!participantMeta.assistantId);
       console.log('[Agent] assistantId:', assistantId, 'userId:', userId);
     } catch {
-      console.warn('[Agent] Failed to parse participant metadata');
+      console.warn('[Agent] Failed to parse metadata, using defaults');
     }
 
     // Fetch assistant config

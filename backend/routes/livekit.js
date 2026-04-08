@@ -85,13 +85,22 @@ async function checkUserCreditsAndLimits(userId) {
         const concurrentLimit = PRICING.DEFAULT_CONCURRENT_LINES + (addon?.quantity || 0);
         
         // Auto-expire stale sessions older than 5 minutes stuck in created/connecting
-        const staleThreshold = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+        // 'created'/'connecting' sessions older than 90s never became active — expire them
+        const createdStaleThreshold = new Date(Date.now() - 90 * 1000).toISOString();
+        // 'active' sessions older than 1 hour are zombies — expire them
+        const activeStaleThreshold = new Date(Date.now() - 60 * 60 * 1000).toISOString();
         await supabase
             .from('voice_sessions')
             .update({ status: 'ended', ended_at: new Date().toISOString() })
             .eq('user_id', userId)
             .in('status', ['created', 'connecting'])
-            .lt('created_at', staleThreshold);
+            .lt('created_at', createdStaleThreshold);
+        await supabase
+            .from('voice_sessions')
+            .update({ status: 'ended', ended_at: new Date().toISOString() })
+            .eq('user_id', userId)
+            .eq('status', 'active')
+            .lt('created_at', activeStaleThreshold);
 
         // Check current active sessions
         const { count: activeSessions } = await supabase
