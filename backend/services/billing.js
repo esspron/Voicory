@@ -154,8 +154,8 @@ async function deductVoiceCost(userId, {
     const twilioCost         = twilioCostPerMin * durationMinutes;
     const providerCostTotal  = twilioCost + sttCost + ttsCost;
 
-    const MARGIN             = PRICING.voicory.targetMarginPct / 100;   // 0.40
-    const totalCostUsd       = parseFloat((providerCostTotal * (1 + MARGIN)).toFixed(6));
+    const MARGIN_MULTIPLIER   = PRICING.voicory.marginMultiplier ?? 4.0; // charge 4x provider cost
+    const totalCostUsd       = parseFloat((providerCostTotal * MARGIN_MULTIPLIER).toFixed(6));
     const creditsToDeduct    = parseFloat((totalCostUsd / 0.01).toFixed(4)); // 1 credit = $0.01
 
     const usingActualMetrics = ttsCharacters !== null || sttMinutes !== null;
