@@ -24,6 +24,7 @@ import * as openaiPlugin from '@livekit/agents-plugin-openai';
 import * as silero from '@livekit/agents-plugin-silero';
 import { createClient } from '@supabase/supabase-js';
 import { fileURLToPath } from 'node:url';
+import { createServer } from 'node:http';
 
 // ─── Supabase ─────────────────────────────────────────────────────────────────
 const supabase = createClient(
@@ -64,9 +65,6 @@ function buildTTS(assistant) {
   const provider = voice?.tts_provider?.toLowerCase();
 
   if (provider === 'elevenlabs' && voice?.elevenlabs_voice_id) {
-    const modelId = voice.elevenlabs_model_id ||
-      assistant.elevenlabs_model_id ||
-      'eleven_turbo_v2_5';
     // ElevenLabs via OpenAI-compatible plugin is not available in agents-js
     // Use OpenAI TTS as fallback with provider_voice_id or alloy
     console.log(`[Agent] ElevenLabs voice requested (${voice.name}) — using OpenAI TTS fallback`);
@@ -102,7 +100,6 @@ export default defineAgent({
     console.log('[Agent] Job started, room:', ctx.job.room?.name);
 
     // Get participant — user may already be in the room when agent joins
-    // waitForParticipant() resolves immediately if someone is already there
     const participant = await ctx.waitForParticipant();
     console.log('[Agent] Participant ready:', participant.identity);
 
@@ -175,17 +172,29 @@ export default defineAgent({
   },
 });
 
-// Cloud Run requires an HTTP server listening on PORT.
-// We run a tiny health check server alongside the LiveKit agent worker.
-import { createServer } from 'http';
-const PORT = process.env.PORT || 8080;
-const healthServer = createServer((req, res) => {
-  res.writeHead(200, { 'Content-Type': 'application/json' });
-  res.end(JSON.stringify({ status: 'ok', service: 'voicory-agent' }));
-});
-healthServer.listen(PORT, () => {
-  console.log(`[Health] HTTP server listening on port ${PORT}`);
-});
+// ─── Cloud Run health server ───────────────────────────────────────────────────
+// CRITICAL: Only start in the main worker process, NOT in job subprocesses.
+// The agents SDK spawns child processes for each job (they re-import this file).
+// Child processes have LIVEKIT_AGENT_SUBPROCESS=1 set by the SDK.
+// If we bind PORT in children too, they crash with EADDRINUSE → "runner initialization timed out"
+// Subprocess detection: forked job processes have process.send defined (IPC channel)
+// Main worker process does NOT have process.send
+const isSubprocess = typeof process.send === 'function';
+
+if (!isSubprocess) {
+  const PORT = process.env.PORT || 8080;
+  const healthServer = createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ status: 'ok', service: 'voicory-agent' }));
+  });
+  healthServer.listen(PORT, () => {
+    console.log(`[Health] HTTP server listening on port ${PORT}`);
+  });
+  healthServer.on('error', (err) => {
+    // Non-fatal — don't crash the worker over a health server bind failure
+    console.warn(`[Health] Server error: ${err.message}`);
+  });
+}
 
 cli.runApp(new WorkerOptions({
   agent: fileURLToPath(import.meta.url),
