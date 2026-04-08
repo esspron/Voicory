@@ -17,6 +17,7 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 
 import { Button } from '../components/ui/Button';
 import { FadeIn } from '../components/ui/FadeIn';
+import OnboardingChecklist from '../components/onboarding/OnboardingChecklist';
 import Select, { type SelectOption } from '../components/ui/Select';
 import { supabase } from '../services/supabase';
 
@@ -238,6 +239,11 @@ const Overview: React.FC = () => {
                     <button onClick={handleRefresh} className="text-xs underline hover:text-red-300">Retry</button>
                 </div>
             )}
+
+            {/* Onboarding checklist — visible until all 4 steps complete */}
+            <FadeIn delay={0.05}>
+                <OnboardingChecklist />
+            </FadeIn>
 
             {/* Metrics Grid — 5 cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">

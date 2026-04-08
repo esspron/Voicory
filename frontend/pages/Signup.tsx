@@ -177,7 +177,7 @@ const Signup: React.FC = () => {
                 </p>
                 {referralValid && !referralChecking && (
                   <p className="text-xs text-textMuted mt-0.5">
-                    Top up ${MINIMUM_REFERRAL_PURCHASE}+ and you'll both get $1 credits!
+                    Top up ${MINIMUM_REFERRAL_PURCHASE}+ to activate your referral bonus!
                   </p>
                 )}
               </div>
