@@ -99,6 +99,10 @@ export default defineAgent({
   entry: async (ctx) => {
     console.log('[Agent] Job started, room:', ctx.job.room?.name);
 
+    // Connect to the LiveKit room first — required before any room operations
+    await ctx.connect();
+    console.log('[Agent] Connected to room ✅');
+
     // Get participant — user may already be in the room when agent joins
     const participant = await ctx.waitForParticipant();
     console.log('[Agent] Participant ready:', participant.identity);
