@@ -218,6 +218,7 @@ const AssistantEditor: React.FC = () => {
             name: data.name,
             title: data.title,
             instruction: data.instruction,
+            firstMessage: (data as any).firstMessage,
             // Settings
             voiceId: data.voiceId,
             llmProvider: data.llmProvider,
