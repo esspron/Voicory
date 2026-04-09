@@ -485,6 +485,7 @@ export function LiveKitVoiceCall({
     const [token, setToken] = useState<string | null>(null);
     const [livekitUrl, setLivekitUrl] = useState<string | null>(null);
     const [_roomName, setRoomName] = useState<string | null>(null); // Used for logging
+    const [sessionId, setSessionId] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
@@ -522,6 +523,7 @@ export function LiveKitVoiceCall({
                 setToken(data.token);
                 setLivekitUrl(data.livekitUrl);
                 setRoomName(data.roomName);
+                setSessionId(data.sessionId || null);
                 
                 logger.info('LiveKit token received', { context: { roomName: data.roomName } });
                 
@@ -544,19 +546,26 @@ export function LiveKitVoiceCall({
     
     // Handle room disconnect
     const handleDisconnected = useCallback(() => {
+        // Tell backend to end the session so concurrent limit is freed
+        if (sessionId) {
+            void authFetch(`/api/livekit/session/${sessionId}/end`, { method: 'POST' }).catch(() => {});
+        }
         if (transcript.length > 0) {
             onConversationEnd?.(transcript.filter(t => t.isFinal));
         }
         onClose();
-    }, [transcript, onConversationEnd, onClose]);
+    }, [sessionId, transcript, onConversationEnd, onClose]);
     
     // Handle close
     const handleClose = useCallback(() => {
+        if (sessionId) {
+            void authFetch(`/api/livekit/session/${sessionId}/end`, { method: 'POST' }).catch(() => {});
+        }
         if (transcript.length > 0) {
             onConversationEnd?.(transcript.filter(t => t.isFinal));
         }
         onClose();
-    }, [transcript, onConversationEnd, onClose]);
+    }, [sessionId, transcript, onConversationEnd, onClose]);
     
     if (!isOpen) return null;
     

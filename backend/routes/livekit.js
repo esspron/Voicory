@@ -85,8 +85,8 @@ async function checkUserCreditsAndLimits(userId) {
         const concurrentLimit = PRICING.DEFAULT_CONCURRENT_LINES + (addon?.quantity || 0);
         
         // Auto-expire stale sessions older than 5 minutes stuck in created/connecting
-        // 'created'/'connecting' sessions older than 90s never became active — expire them
-        const createdStaleThreshold = new Date(Date.now() - 90 * 1000).toISOString();
+        // 'created'/'connecting' sessions older than 30s never became active — expire them
+        const createdStaleThreshold = new Date(Date.now() - 30 * 1000).toISOString();
         // 'active' sessions older than 1 hour are zombies — expire them
         const activeStaleThreshold = new Date(Date.now() - 60 * 60 * 1000).toISOString();
         await supabase
@@ -661,6 +661,40 @@ router.get('/usage', async (req, res) => {
     } catch (error) {
         console.error('[LiveKit] Failed to get usage:', error);
         return res.status(500).json({ error: 'Failed to get usage data' });
+    }
+});
+
+// ─── End session (called by frontend on disconnect) ───────────────────────────
+router.post('/session/:sessionId/end', async (req, res) => {
+    try {
+        const authHeader = req.headers.authorization;
+        const token = authHeader?.replace('Bearer ', '');
+        if (!token) return res.status(401).json({ error: 'Unauthorized' });
+        const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+        if (authError || !user) return res.status(401).json({ error: 'Invalid token' });
+
+        const { sessionId } = req.params;
+        const { data: session } = await supabase
+            .from('voice_sessions')
+            .select('id, user_id, status, created_at')
+            .eq('id', sessionId)
+            .eq('user_id', user.id)
+            .single();
+
+        if (!session) return res.status(404).json({ error: 'Session not found' });
+        if (session.status === 'ended') return res.json({ ok: true, already: 'ended' });
+
+        const durationSeconds = Math.floor((Date.now() - new Date(session.created_at).getTime()) / 1000);
+        await supabase
+            .from('voice_sessions')
+            .update({ status: 'ended', ended_at: new Date().toISOString(), duration_seconds: durationSeconds })
+            .eq('id', sessionId);
+
+        console.log(`[LiveKit] Session ${sessionId} ended by client after ${durationSeconds}s`);
+        return res.json({ ok: true, durationSeconds });
+    } catch (error) {
+        console.error('[LiveKit] End session error:', error);
+        return res.status(500).json({ error: 'Failed to end session' });
     }
 });
 
