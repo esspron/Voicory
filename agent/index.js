@@ -69,11 +69,42 @@ async function searchKnowledgeBase(query, knowledgeBaseIds, threshold = 0.5, max
   }
 }
 
-// ─── Build system prompt ──────────────────────────────────────────────────────
-function buildInstructions(assistant, ragContext) {
+// ─── Resolve language config per provider ────────────────────────────────────
+// Each provider uses different language codes/config:
+// - OpenAI Whisper STT: BCP-47 code (e.g. 'hi', 'en') — null = auto-detect
+// - ElevenLabs TTS: multilingual by default, no language param needed
+// - Google TTS/STT: BCP-47 with region (e.g. 'hi-IN', 'en-US')
+function resolveLanguage(assistant) {
+  // Prefer language_settings.default if set, fall back to language field
+  const langSettings = assistant?.language_settings || {};
+  const autoDetect = langSettings.autoDetect === true;
+  const defaultLang = langSettings.default || assistant?.language || 'en';
+  
+  return {
+    sttLanguage: autoDetect ? null : defaultLang,  // null = Whisper auto-detect
+    ttsLanguage: defaultLang,
+    autoDetect,
+    raw: defaultLang,
+  };
+}
+
+// ─── Build system prompt with language instruction ────────────────────────────
+function buildInstructions(assistant, ragContext, lang) {
   let prompt = assistant?.instruction || DEFAULT_INSTRUCTIONS;
+
+  // Language instruction — tell LLM what language(s) to use
+  const langCode = lang?.raw || 'en';
+  const autoDetect = lang?.autoDetect;
+  if (autoDetect) {
+    prompt += `\n\nIMPORTANT: Detect the language the user is speaking and always respond in that same language. If the user switches languages, switch with them.`;
+  } else if (langCode && langCode !== 'en') {
+    const langNames = { 'hi': 'Hindi', 'hi-IN': 'Hindi', 'es': 'Spanish', 'fr': 'French', 'de': 'German', 'pt': 'Portuguese', 'ar': 'Arabic', 'zh': 'Chinese', 'ja': 'Japanese', 'ko': 'Korean' };
+    const langName = langNames[langCode] || langCode;
+    prompt += `\n\nIMPORTANT: Always respond in ${langName}. You can understand multiple languages but always reply in ${langName}.`;
+  }
+
   if (ragContext) {
-    prompt += `\n\n---\nKnowledge base context:\n${ragContext}\n---\nUse the above to answer accurately.`;
+    prompt += `\n\n---\nKnowledge base context:\n${ragContext}\n---\nUse the above to answer accurately. If a question is not related to the knowledge base, answer from your general knowledge — do NOT say "I don't have information in my knowledge base".`;
   }
   if (assistant?.rag_instructions) {
     prompt += `\n\n${assistant.rag_instructions}`;
@@ -133,10 +164,11 @@ export default defineAgent({
     const assistant = await fetchAssistant(assistantId);
     const firstMessage = assistant?.first_message || DEFAULT_FIRST_MESSAGE;
     const llmModel = assistant?.llm_model || DEFAULT_LLM_MODEL;
-    const language = assistant?.language || 'en';
     const assistantName = assistant?.name || 'Assistant';
 
-    console.log(`[Agent] "${assistantName}" | model:${llmModel} | lang:${language}`);
+    // Resolve language config across providers
+    const lang = resolveLanguage(assistant);
+    console.log(`[Agent] "${assistantName}" | model:${llmModel} | lang:${lang.raw} | autoDetect:${lang.autoDetect}`);
 
     // 4. RAG context
     let ragContext = '';
@@ -150,14 +182,18 @@ export default defineAgent({
     }
 
     // 5. Build pipeline
-    const instructions = buildInstructions(assistant, ragContext);
-    const sttLang = language.startsWith('hi') ? 'hi' : 'en';
+    const instructions = buildInstructions(assistant, ragContext, lang);
 
     const agent = new voice.Agent({ instructions });
 
+    // STT: null language = Whisper auto-detect (handles multilingual/autoDetect)
+    const sttOpts = lang.sttLanguage
+      ? { model: 'whisper-1', language: lang.sttLanguage }
+      : { model: 'whisper-1' };  // auto-detect
+
     const session = new voice.AgentSession({
       vad: ctx.proc.userData.vad,
-      stt: new openaiPlugin.STT({ model: 'whisper-1', language: sttLang }),
+      stt: new openaiPlugin.STT(sttOpts),
       llm: new openaiPlugin.LLM({ model: llmModel }),
       tts: buildTTS(assistant),
     });
