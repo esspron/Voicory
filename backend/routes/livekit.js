@@ -414,7 +414,7 @@ router.post('/webhook', express.raw({ type: 'application/webhook+json' }), async
                     // Calculate duration and update session
                     const { data: session } = await supabase
                         .from('voice_sessions')
-                        .select('id, connected_at, user_id')
+                        .select('id, connected_at, user_id, assistant_id, room_name')
                         .eq('room_name', roomName)
                         .single();
                     
@@ -426,17 +426,34 @@ router.post('/webhook', express.raw({ type: 'application/webhook+json' }), async
                     const durationMinutes = Math.ceil(durationSeconds / 60);
                     const costUsd = durationMinutes * PRICING.VOICE_CALL_PER_MINUTE;
                     
-                    // Update session with duration and cost
+                    // Update session — use duration_ms (actual DB column)
                     await supabase
                         .from('voice_sessions')
                         .update({
                             status: 'completed',
                             ended_at: new Date().toISOString(),
-                            duration_seconds: durationSeconds,
+                            duration_ms: durationSeconds * 1000,
                             cost_usd: costUsd,
                         })
                         .eq('room_name', roomName);
                     
+                    // Write to call_logs (what dashboard reads)
+                    if (session?.user_id) {
+                        const durationFormatted = `${Math.floor(durationSeconds / 60)}m ${durationSeconds % 60}s`;
+                        await supabase.from('call_logs').insert({
+                            user_id: session.user_id,
+                            assistant_id: session.assistant_id,
+                            call_sid: roomName,
+                            provider: 'livekit',
+                            direction: 'inbound',
+                            status: durationSeconds > 0 ? 'completed' : 'no-answer',
+                            duration: durationFormatted,
+                            cost: costUsd,
+                            started_at: session.connected_at,
+                            ended_at: new Date().toISOString(),
+                        });
+                    }
+
                     // Deduct credits from user's balance
                     if (session?.user_id && durationMinutes > 0) {
                         const deduction = await deductVoiceCredits(
@@ -608,19 +625,19 @@ router.get('/usage', async (req, res) => {
         
         const { data: monthlyStats } = await supabase
             .from('voice_sessions')
-            .select('duration_seconds, cost_usd')
+            .select('duration_ms, cost_usd')
             .eq('user_id', user.id)
             .eq('status', 'completed')
             .gte('created_at', startOfMonth.toISOString());
         
         // Calculate monthly totals
-        const totalMinutes = monthlyStats?.reduce((sum, s) => sum + Math.ceil((s.duration_seconds || 0) / 60), 0) || 0;
+        const totalMinutes = monthlyStats?.reduce((sum, s) => sum + Math.ceil(((s.duration_ms || 0) / 1000) / 60), 0) || 0;
         const totalCost = monthlyStats?.reduce((sum, s) => sum + (s.cost_usd || 0), 0) || 0;
         
         // Get recent sessions
         const { data: recentSessions } = await supabase
             .from('voice_sessions')
-            .select('id, duration_seconds, cost_usd, status, created_at')
+            .select('id, duration_ms, cost_usd, status, created_at')
             .eq('user_id', user.id)
             .order('created_at', { ascending: false })
             .limit(10);
@@ -651,7 +668,7 @@ router.get('/usage', async (req, res) => {
             },
             recentSessions: recentSessions?.map(s => ({
                 id: s.id,
-                durationMinutes: Math.ceil((s.duration_seconds || 0) / 60),
+                durationMinutes: Math.ceil(((s.duration_ms || 0) / 1000) / 60),
                 cost: s.cost_usd || 0,
                 status: s.status,
                 createdAt: s.created_at,
@@ -676,7 +693,7 @@ router.post('/session/:sessionId/end', async (req, res) => {
         const { sessionId } = req.params;
         const { data: session } = await supabase
             .from('voice_sessions')
-            .select('id, user_id, status, created_at')
+            .select('id, user_id, status, created_at, connected_at, assistant_id, room_name')
             .eq('id', sessionId)
             .eq('user_id', user.id)
             .single();
@@ -684,11 +701,36 @@ router.post('/session/:sessionId/end', async (req, res) => {
         if (!session) return res.status(404).json({ error: 'Session not found' });
         if (session.status === 'ended') return res.json({ ok: true, already: 'ended' });
 
-        const durationSeconds = Math.floor((Date.now() - new Date(session.created_at).getTime()) / 1000);
+        const startTime = session.connected_at || session.created_at;
+        const durationSeconds = Math.floor((Date.now() - new Date(startTime).getTime()) / 1000);
+        const durationMinutes = Math.ceil(durationSeconds / 60);
+        const costUsd = durationMinutes * PRICING.VOICE_CALL_PER_MINUTE;
+
         await supabase
             .from('voice_sessions')
-            .update({ status: 'ended', ended_at: new Date().toISOString(), duration_seconds: durationSeconds })
+            .update({ status: 'ended', ended_at: new Date().toISOString(), duration_ms: durationSeconds * 1000, cost_usd: costUsd })
             .eq('id', sessionId);
+
+        // Write to call_logs so dashboard shows it
+        if (durationSeconds > 0) {
+            const durationFormatted = `${Math.floor(durationSeconds / 60)}m ${durationSeconds % 60}s`;
+            await supabase.from('call_logs').insert({
+                user_id: user.id,
+                assistant_id: session.assistant_id,
+                call_sid: session.room_name || sessionId,
+                provider: 'livekit',
+                direction: 'inbound',
+                status: 'completed',
+                duration: durationFormatted,
+                cost: costUsd,
+                started_at: startTime,
+                ended_at: new Date().toISOString(),
+            });
+            // Deduct credits
+            if (durationMinutes > 0) {
+                await deductVoiceCredits(user.id, durationMinutes, sessionId);
+            }
+        }
 
         console.log(`[LiveKit] Session ${sessionId} ended by client after ${durationSeconds}s`);
         return res.json({ ok: true, durationSeconds });
