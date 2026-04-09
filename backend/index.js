@@ -43,6 +43,9 @@ if (process.env.OPENAI_API_KEY) {
 const app = express();
 const port = process.env.PORT || 3001;
 
+// Trust Cloud Run / GCP load balancer proxy headers (fixes rate-limit X-Forwarded-For warnings)
+app.set('trust proxy', 1);
+
 // CORS configuration for production
 app.use(cors({
     origin: [
