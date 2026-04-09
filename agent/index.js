@@ -10,7 +10,7 @@ import {
   WorkerOptions,
   cli,
   voice,
-  llm,
+  inference,
 } from '@livekit/agents';
 import * as openaiPlugin from '@livekit/agents-plugin-openai';
 import * as silero from '@livekit/agents-plugin-silero';
@@ -81,20 +81,26 @@ function buildInstructions(assistant, ragContext) {
   return prompt;
 }
 
-// ─── Build OpenAI TTS ─────────────────────────────────────────────────────────
+// ─── Build TTS (provider-aware via LiveKit Inference Gateway) ─────────────────
 function buildTTS(assistant) {
   const voiceRow = assistant?.voices;
   const provider = voiceRow?.tts_provider?.toLowerCase();
-  const voiceName = (provider === 'openai' && voiceRow?.provider_voice_id)
-    ? voiceRow.provider_voice_id
-    : 'alloy';
 
-  if (provider === 'elevenlabs') {
-    console.log(`[Agent] ElevenLabs voice "${voiceRow?.name}" — using OpenAI fallback (plugin not bundled)`);
+  if (provider === 'elevenlabs' && voiceRow?.elevenlabs_voice_id) {
+    console.log(`[Agent] TTS: elevenlabs/${voiceRow.name} (${voiceRow.elevenlabs_voice_id})`);
+    return new inference.TTS({
+      model: 'elevenlabs/eleven_flash_v2',
+      voice: voiceRow.elevenlabs_voice_id,
+    });
   }
 
-  console.log(`[Agent] TTS: openai/${voiceName}`);
-  return new openaiPlugin.TTS({ model: 'tts-1', voice: voiceName });
+  if (provider === 'openai' && voiceRow?.provider_voice_id) {
+    console.log(`[Agent] TTS: openai/${voiceRow.provider_voice_id}`);
+    return new openaiPlugin.TTS({ model: 'tts-1', voice: voiceRow.provider_voice_id });
+  }
+
+  console.log('[Agent] TTS: openai/alloy (fallback)');
+  return new openaiPlugin.TTS({ model: 'tts-1', voice: 'alloy' });
 }
 
 // ─── Agent definition ─────────────────────────────────────────────────────────
