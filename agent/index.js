@@ -170,11 +170,14 @@ export default defineAgent({
     const lang = resolveLanguage(assistant);
     console.log(`[Agent] "${assistantName}" | model:${llmModel} | lang:${lang.raw} | autoDetect:${lang.autoDetect}`);
 
-    // 4. RAG context
+    // 4. RAG context — seed with assistant's topic/role, not firstMessage
     let ragContext = '';
     if (assistant?.rag_enabled && assistant?.knowledge_base_ids?.length) {
+      // Use instruction as RAG seed to pre-load relevant context into system prompt
+      // The LLM will use this as background knowledge for the entire conversation
+      const ragSeedQuery = assistant?.instruction?.slice(0, 200) || assistantName;
       ragContext = await searchKnowledgeBase(
-        firstMessage,
+        ragSeedQuery,
         assistant.knowledge_base_ids,
         assistant.rag_similarity_threshold || 0.5,
         assistant.rag_max_results || 5,
