@@ -143,7 +143,7 @@ async function deductVoiceCredits(userId, durationMinutes, sessionId) {
     try {
         const amount = durationMinutes * PRICING.VOICE_CALL_PER_MINUTE;
         
-        // Use the deduct_credits RPC function
+        // Use the deduct_credits RPC function — pass p_metadata to disambiguate overloaded function
         const { data, error } = await supabase.rpc('deduct_credits', {
             p_user_id: userId,
             p_amount: amount,
@@ -151,6 +151,7 @@ async function deductVoiceCredits(userId, durationMinutes, sessionId) {
             p_description: `Voice call - ${durationMinutes} min @ $${PRICING.VOICE_CALL_PER_MINUTE}/min`,
             p_reference_type: 'voice_session',
             p_reference_id: sessionId,
+            p_metadata: { source: 'livekit', durationMinutes },
         });
         
         if (error) {
