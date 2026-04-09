@@ -99,8 +99,7 @@ export interface Assistant {
     
     // Unified instruction (like Vapi, Retell, LiveKit)
     instruction?: string;
-    
-    // Voice Settings
+    firstMessage?: string;
     elevenlabsModelId?: string;  // 'eleven_multilingual_v2' | 'eleven_turbo_v2_5' | 'eleven_flash_v2_5'
     language?: string;           // ISO language code (en, hi, ta, etc.) - DEPRECATED, use languageSettings
     
@@ -140,6 +139,7 @@ export interface AssistantInput {
     title?: string;  // Short title/role (e.g., Sales Support, Customer Support)
     // Unified instruction (like Vapi, Retell, LiveKit)
     instruction?: string;
+    firstMessage?: string;
     // Voice & Settings
     voiceId?: string;
     elevenlabsModelId?: string;

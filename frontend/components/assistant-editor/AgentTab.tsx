@@ -30,6 +30,7 @@ const TIMEZONES = [
 export interface AgentFormData {
     // Unified instruction (like Vapi, Retell, LiveKit)
     instruction: string;
+    firstMessage: string;
     // Shared settings
     voiceId: string | null;
     elevenlabsModelId: string;
@@ -203,6 +204,22 @@ You can be customized with specific knowledge, personality traits, and capabilit
                             {currentTimezone.label} ({currentTimezone.offset})
                         </button>
                     </div>
+                </div>
+
+                {/* First Message */}
+                <div className="mb-6">
+                    <div className="flex items-center gap-2 mb-2">
+                        <h3 className="text-sm font-semibold text-textMain">First Message</h3>
+                        <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-primary/10 text-primary">Greeting</span>
+                    </div>
+                    <p className="text-xs text-textMuted mb-2">What the assistant says when a call or session starts. Leave blank to skip greeting.</p>
+                    <input
+                        type="text"
+                        value={(formData as any).firstMessage || ''}
+                        onChange={(e) => setFormData((prev: any) => ({ ...prev, firstMessage: e.target.value }))}
+                        className="w-full bg-surface/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-textMain outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10 transition-all"
+                        placeholder="Hello! How can I help you today?"
+                    />
                 </div>
 
                 {/* Interruptible Setting */}

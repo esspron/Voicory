@@ -499,6 +499,7 @@ const mapAssistantFromDB = (a: any): Assistant => ({
     status: a.status as Assistant['status'],
     // Unified instruction (like Vapi, Retell, LiveKit)
     instruction: a.instruction || undefined,
+    firstMessage: a.first_message || undefined,
     elevenlabsModelId: a.elevenlabs_model_id || 'eleven_multilingual_v2',
     language: a.language || 'en',
     // Language & Style Settings (NEW)
@@ -604,6 +605,7 @@ export const createAssistant = async (input: AssistantInput): Promise<Assistant 
 
         // Optional fields
         if (input.instruction) insertData.instruction = input.instruction;
+        if (input.firstMessage !== undefined) insertData.first_message = input.firstMessage || null;
         if (input.voiceId) insertData.voice_id = input.voiceId;
         if (input.elevenlabsModelId) insertData.elevenlabs_model_id = input.elevenlabsModelId;
         if (input.language) insertData.language = input.language;
@@ -654,6 +656,7 @@ export const updateAssistant = async (id: string, input: Partial<AssistantInput>
         if (input.name !== undefined) updateData.name = input.name;
         if (input.title !== undefined) updateData.title = input.title || null;
         if (input.instruction !== undefined) updateData.instruction = input.instruction;
+        if (input.firstMessage !== undefined) updateData.first_message = input.firstMessage || null;
         if (input.voiceId !== undefined) updateData.voice_id = input.voiceId || null;
         if (input.elevenlabsModelId !== undefined) updateData.elevenlabs_model_id = input.elevenlabsModelId;
         if (input.language !== undefined) updateData.language = input.language;

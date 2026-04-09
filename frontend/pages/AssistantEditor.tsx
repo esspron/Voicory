@@ -98,6 +98,7 @@ interface AssistantFormData {
     title: string;  // Short title/role (e.g., Sales Support, Customer Support)
     // Unified instruction (like Vapi, Retell, LiveKit)
     instruction: string;
+    firstMessage: string;
     // Voice Settings
     voiceId: string | null;
     elevenlabsModelId: string;
@@ -277,6 +278,7 @@ const AssistantEditor: React.FC = () => {
                             title: assistant.title || '',  // Short title/role
                             // Unified instruction (like Vapi, Retell, LiveKit)
                             instruction: assistant.instruction || DEFAULT_FORM_DATA.instruction,
+                            firstMessage: assistant.firstMessage || '',
                             // Voice & Settings
                             voiceId: assistant.voiceId || null,
                             elevenlabsModelId: assistant.elevenlabsModelId || 'eleven_turbo_v2_5',
@@ -369,6 +371,7 @@ const AssistantEditor: React.FC = () => {
                 title: formData.title || undefined,  // Short title/role
                 // Unified instruction (like Vapi, Retell, LiveKit)
                 instruction: formData.instruction,
+                firstMessage: (formData as any).firstMessage || undefined,
                 // Voice & Settings
                 voiceId: formData.voiceId || undefined,
                 elevenlabsModelId: formData.elevenlabsModelId,
@@ -601,6 +604,7 @@ const AssistantEditor: React.FC = () => {
                 name: formData.name,
                 // Unified instruction (like Vapi, Retell, LiveKit)
                 instruction: formData.instruction,
+                firstMessage: (formData as any).firstMessage || undefined,
                 voiceId: formData.voiceId || undefined,
                 elevenlabsModelId: formData.elevenlabsModelId,
                 languageSettings: formData.languageSettings,
