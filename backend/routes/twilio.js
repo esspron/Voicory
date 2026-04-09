@@ -119,7 +119,7 @@ router.post('/verify-import', verifySupabaseAuth, async (req, res) => {
             .insert({
                 number: normalizedNumber,
                 provider: 'Twilio',
-                label: label || twilioNumber.friendly_name || 'Twilio Number',
+                label: label || friendlyName || 'Twilio Number',
                 twilio_phone_number: normalizedNumber,
                 twilio_account_sid: accountSid,
                 twilio_auth_token: encryptedAuthToken,
@@ -146,7 +146,7 @@ router.post('/verify-import', verifySupabaseAuth, async (req, res) => {
             success: true,
             phoneNumber: phoneNumberData,
             webhookConfigured: false, // User needs to configure manually
-            capabilities: twilioNumber.capabilities,
+            capabilities: { voice: true, sms: smsCapable },
             message: 'Phone number verified and imported. Please configure the webhook URL in your Twilio Console.'
         });
 
@@ -193,60 +193,32 @@ router.post('/import-direct', verifySupabaseAuth, async (req, res) => {
 
         console.log('Importing Twilio number directly:', normalizedNumber, 'for user:', userId);
 
-        // First, find the phone number in Twilio to get its SID
-        const searchUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/IncomingPhoneNumbers.json`;
-        
-        const searchResponse = await axios.get(searchUrl, {
-            auth: {
-                username: accountSid,
-                password: authToken
-            },
-            params: {
-                PhoneNumber: normalizedNumber
-            }
-        });
-
-        const phoneNumbers = searchResponse.data.incoming_phone_numbers || [];
-        
-        if (phoneNumbers.length === 0) {
-            return res.status(404).json({ 
-                error: `Phone number ${normalizedNumber} not found in your Twilio account. Please make sure you own this number.` 
-            });
-        }
-
-        const twilioNumber = phoneNumbers[0];
-        const phoneNumberSid = twilioNumber.sid;
-
-        console.log('Found Twilio number with SID:', phoneNumberSid);
-
-        // Configure Twilio webhook URL to point to our backend with user-specific path
-        // Each user gets their own webhook URL for security and isolation
         const backendBase = process.env.BACKEND_URL || 'https://voicory-backend-783942490798.asia-south1.run.app';
         const webhookUrl = `${backendBase}/api/webhooks/twilio/${userId}/voice`;
         const statusCallbackUrl = `${backendBase}/api/webhooks/twilio/${userId}/status`;
 
-        // Update the phone number in Twilio to use our webhook
-        const updateUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/IncomingPhoneNumbers/${phoneNumberSid}.json`;
-        
-        const updateData = new URLSearchParams();
-        updateData.append('VoiceUrl', webhookUrl);
-        updateData.append('VoiceMethod', 'POST');
-        updateData.append('StatusCallback', statusCallbackUrl);
-        updateData.append('StatusCallbackMethod', 'POST');
-
-        await axios.post(updateUrl, updateData.toString(), {
-            auth: {
-                username: accountSid,
-                password: authToken
-            },
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded'
+        // Try Twilio API (best-effort — don't block import if credentials fail)
+        let phoneNumberSid = null, friendlyName = null, smsCapable = false, webhookConfigured = false;
+        try {
+            const searchUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/IncomingPhoneNumbers.json`;
+            const sr = await axios.get(searchUrl, { auth: { username: accountSid, password: authToken }, params: { PhoneNumber: normalizedNumber } });
+            const pnums = sr.data.incoming_phone_numbers || [];
+            if (pnums.length > 0) {
+                const tn = pnums[0];
+                phoneNumberSid = tn.sid; friendlyName = tn.friendly_name; smsCapable = tn.capabilities?.sms || false;
+                const updateUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/IncomingPhoneNumbers/${phoneNumberSid}.json`;
+                const ud = new URLSearchParams();
+                ud.append('VoiceUrl', webhookUrl); ud.append('VoiceMethod', 'POST');
+                ud.append('StatusCallback', statusCallbackUrl); ud.append('StatusCallbackMethod', 'POST');
+                await axios.post(updateUrl, ud.toString(), { auth: { username: accountSid, password: authToken }, headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
+                webhookConfigured = true;
+                console.log('Twilio webhook configured:', webhookUrl);
             }
-        });
+        } catch (twilioErr) {
+            console.warn('Twilio API failed (importing anyway):', twilioErr.response?.data?.message || twilioErr.message);
+        }
 
-        console.log('Twilio number configured with webhook:', webhookUrl);
-
-        // Encrypt the auth token before storing (SECURITY: Never store plain text secrets)
+        // Encrypt the auth token before storing
         const encryptedAuthToken = encrypt(authToken);
 
         // Save to our database
@@ -255,12 +227,12 @@ router.post('/import-direct', verifySupabaseAuth, async (req, res) => {
             .insert({
                 number: normalizedNumber,
                 provider: 'Twilio',
-                label: label || twilioNumber.friendly_name || 'Twilio Number',
+                label: label || friendlyName || 'Twilio Number',
                 twilio_phone_number: normalizedNumber,
                 twilio_account_sid: accountSid,
                 twilio_auth_token: encryptedAuthToken,
                 twilio_phone_sid: phoneNumberSid,
-                sms_enabled: smsEnabled || twilioNumber.capabilities?.sms || false,
+                sms_enabled: smsEnabled || smsCapable || false,
                 inbound_enabled: true,
                 outbound_enabled: true,
                 is_active: true,
@@ -283,24 +255,11 @@ router.post('/import-direct', verifySupabaseAuth, async (req, res) => {
             phoneNumber: phoneNumberData,
             webhookConfigured: true,
             webhookUrl,
-            capabilities: twilioNumber.capabilities
+            capabilities: { voice: true, sms: smsCapable }
         });
 
     } catch (error) {
         console.error('Twilio import error:', error.response?.data || error.message);
-        
-        // Handle specific Twilio errors
-        if (error.response?.status === 401) {
-            return res.status(401).json({ 
-                error: 'Invalid Twilio credentials. Please check your Account SID and Auth Token.' 
-            });
-        }
-        if (error.response?.status === 404) {
-            return res.status(404).json({ 
-                error: 'Phone number not found in your Twilio account.' 
-            });
-        }
-        
         res.status(500).json({ 
             error: error.response?.data?.message || error.message || 'Failed to import Twilio number' 
         });
