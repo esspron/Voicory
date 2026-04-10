@@ -12,6 +12,7 @@ import {
     PRICING_CONFIG,
     QUICK_AMOUNTS
 } from '../../services/paddleService';
+import { useCurrency } from '../../contexts/CurrencyContext';
 
 interface BuyCreditsModalProps {
     isOpen: boolean;
@@ -32,6 +33,7 @@ const BuyCreditsModal: React.FC<BuyCreditsModalProps> = ({
     const [error, setError] = useState<string | null>(null);
     const [paymentResult, setPaymentResult] = useState<PaymentResult | null>(null);
     const [paddleReady, setPaddleReady] = useState(false);
+    const { currency, currencySymbol, formatAmount, isIndia } = useCurrency();
     
     // Coupon state
     const [couponCode, setCouponCode] = useState('');
@@ -184,7 +186,7 @@ const BuyCreditsModal: React.FC<BuyCreditsModalProps> = ({
                         <div>
                             <h2 className="text-xl font-bold text-textMain">Add Funds</h2>
                             <p className="text-sm text-textMuted">
-                                Balance: ${currentBalance.toFixed(2)}
+                                Balance: {formatAmount(currentBalance)}
                             </p>
                         </div>
                     </div>
@@ -247,7 +249,7 @@ const BuyCreditsModal: React.FC<BuyCreditsModalProps> = ({
                                     </button>
                                 </div>
                                 <p className="text-xs text-textMuted mt-2 text-center">
-                                    $1 = 1 credit • Min $20 • Max $10,000
+                                    {isIndia ? '₹84 = 1 credit • Min ₹1,500 • Max ₹8,40,000' : '$1 = 1 credit • Min $20 • Max $10,000'}
                                 </p>
                             </div>
 
@@ -265,7 +267,7 @@ const BuyCreditsModal: React.FC<BuyCreditsModalProps> = ({
                                                     : 'bg-white/[0.02] border-white/5 text-textMuted hover:bg-white/[0.05] hover:border-white/10'
                                             }`}
                                         >
-                                            ${quickAmount}
+                                            {isIndia ? `₹${Math.round(quickAmount * 84).toLocaleString('en-IN')}` : `$${quickAmount}`}
                                         </button>
                                     ))}
                                 </div>

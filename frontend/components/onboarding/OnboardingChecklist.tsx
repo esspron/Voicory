@@ -21,6 +21,7 @@ import {
     Confetti,
     Sparkle,
 } from '@phosphor-icons/react';
+import { useCurrency } from '../../contexts/CurrencyContext';
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -52,6 +53,7 @@ const DISMISSED_KEY = 'voicory_onboarding_dismissed';
 
 const OnboardingChecklist: React.FC = () => {
     const navigate = useNavigate();
+    const { isIndia } = useCurrency();
     const [state, setState] = useState<OnboardingState>({
         hasAssistant: false,
         hasPhoneNumber: false,
@@ -154,7 +156,7 @@ const OnboardingChecklist: React.FC = () => {
         {
             id: 'credits',
             title: 'Top up credits',
-            description: 'Add at least $20 to start making calls.',
+            description: {isIndia ? 'Add at least ₹1,500 to start making calls.' : 'Add at least $20 to start making calls.'},
             icon: CurrencyDollar,
             gradient: 'from-emerald-500 to-teal-600',
             done: state.hasCredits,

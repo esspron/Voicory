@@ -20,6 +20,7 @@ import { FadeIn } from '../components/ui/FadeIn';
 import OnboardingChecklist from '../components/onboarding/OnboardingChecklist';
 import Select, { type SelectOption } from '../components/ui/Select';
 import { supabase } from '../services/supabase';
+import { useCurrency } from '../contexts/CurrencyContext';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -126,7 +127,7 @@ const CallItem = ({ log }: { log: RecentCall }) => (
             </div>
         </div>
         <div className="text-right">
-            <p className="text-sm font-semibold text-textMain font-mono">${log.cost.toFixed(2)}</p>
+            <p className="text-sm font-semibold text-textMain font-mono">{formatAmount(log.cost)}</p>
             <p className="text-xs text-textMuted/70">{log.duration}</p>
         </div>
     </div>
@@ -142,6 +143,7 @@ const Overview: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [refreshing, setRefreshing] = useState(false);
+    const { formatAmount, isIndia } = useCurrency();
 
     const formatUSD = (cents: number): string => `$${(cents / 100).toFixed(2)}`;
 
@@ -272,7 +274,7 @@ const Overview: React.FC = () => {
                 <FadeIn delay={0.2}>
                     <StatCard
                         title="Total Cost"
-                        value={d ? formatUSD(d.totalCost) : '—'}
+                        value={d ? formatAmount(d.totalCost / 100) : '—'}
                         change={d?.totalCostChange ? `${Math.abs(parseFloat(d.totalCostChange))}%` : null}
                         trend={d?.totalCostTrend ?? 'up'}
                         icon={CurrencyDollar}
@@ -352,7 +354,7 @@ const Overview: React.FC = () => {
                                 </div>
                                 <div className="flex items-center gap-1.5">
                                     <div className="w-3 h-3 rounded-full bg-gradient-to-r from-[#8B5CF6] to-[#A78BFA]" />
-                                    <span className="text-xs text-textMuted">Cost ($)</span>
+                                    <span className="text-xs text-textMuted">Cost</span>
                                 </div>
                                 <div className="flex items-center gap-2 px-3 py-1.5 bg-primary/10 rounded-lg">
                                     <div className="w-2 h-2 rounded-full bg-primary" />
@@ -414,7 +416,7 @@ const Overview: React.FC = () => {
                                             labelStyle={{ color: '#9CA3AF', marginBottom: '4px' }}
                                         />
                                         <Area type="monotone" dataKey="calls" name="Calls" stroke="url(#strokeGradient)" strokeWidth={2.5} fillOpacity={1} fill="url(#colorCalls)" />
-                                        <Area type="monotone" dataKey="cost" name="Cost ($)" stroke="url(#strokeCostGradient)" strokeWidth={2.5} fillOpacity={1} fill="url(#colorCost)" />
+                                        <Area type="monotone" dataKey="cost" name="Cost" stroke="url(#strokeCostGradient)" strokeWidth={2.5} fillOpacity={1} fill="url(#colorCost)" />
                                     </AreaChart>
                                 </ResponsiveContainer>
                             )}

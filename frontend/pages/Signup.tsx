@@ -15,6 +15,8 @@ import {
   validateReferralCode,
   MINIMUM_REFERRAL_PURCHASE
 } from '../services/referralService';
+import { detectGeo } from '../services/geoService';
+import { updateUserProfile } from '../services/voicoryService';
 
 const GoogleIcon = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -112,6 +114,15 @@ const Signup: React.FC = () => {
         setError(error.message || 'Failed to create account. Please try again.');
       } else {
         setSuccess(true);
+
+        // Detect geo and set currency on user profile
+        detectGeo().then(geo => {
+          updateUserProfile({
+            country: geo.country,
+            currency: geo.currency,
+            currencySymbol: geo.currencySymbol,
+          }).catch(() => {});
+        });
 
         // Process referral if we have a valid code
         if (referralCode && referralValid) {
