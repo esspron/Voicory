@@ -156,7 +156,7 @@ const OnboardingChecklist: React.FC = () => {
         {
             id: 'credits',
             title: 'Top up credits',
-            description: {isIndia ? 'Add at least ₹1,500 to start making calls.' : 'Add at least $20 to start making calls.'},
+            description: isIndia ? 'Add at least ₹1,500 to start making calls.' : 'Add at least $20 to start making calls.',
             icon: CurrencyDollar,
             gradient: 'from-emerald-500 to-teal-600',
             done: state.hasCredits,
