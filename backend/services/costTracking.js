@@ -18,10 +18,12 @@ const MODEL_PRICING = {
 };
 
 const ELEVENLABS_PRICING = {
-  starter:  { perCharacter: PRICING.elevenlabs.starter.perCharacter },
-  creator:  { perCharacter: PRICING.elevenlabs.creator.perCharacter },
-  pro:      { perCharacter: PRICING.elevenlabs.pro.perCharacter },
-  default:  { perCharacter: PRICING.elevenlabs.default.perCharacter },
+  flash:        { perCharacter: PRICING.elevenlabs.flash.perCharacter },
+  multilingual: { perCharacter: PRICING.elevenlabs.multilingual.perCharacter },
+  starter:      { perCharacter: PRICING.elevenlabs.flash.perCharacter },  // legacy alias
+  creator:      { perCharacter: PRICING.elevenlabs.flash.perCharacter },  // legacy alias
+  pro:          { perCharacter: PRICING.elevenlabs.multilingual.perCharacter }, // legacy alias
+  default:      { perCharacter: PRICING.elevenlabs.default.perCharacter },
 };
 
 const LIVEKIT_PRICING = {

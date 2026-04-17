@@ -190,25 +190,6 @@ async function deductVoiceCost(userId, {
         }
       }),
     });
-      p_reference_id:  callLogId || null,
-      p_description:   `Voice call: ${durationMinutes.toFixed(2)} min | ${channel} | ${callSid || ''}`,
-      p_metadata:      JSON.stringify({
-        channel,
-        call_sid:         callSid,
-        twilio_account_sid: twilioAccountSid,
-        duration_minutes: durationMinutes,
-        cost_usd:         totalCostUsd,
-        provider_cost_usd: providerCostTotal,
-        margin_usd:       totalCostUsd - providerCostTotal,
-        breakdown: {
-          twilio:  parseFloat(twilioCost.toFixed(6)),
-          stt:     parseFloat(sttCost.toFixed(6)),
-          tts:     parseFloat(ttsCost.toFixed(6)),
-          tts_characters_actual: ttsCharacters !== null ? effectiveTtsChars : null,
-          stt_minutes_actual:    sttMinutes    !== null ? effectiveSttMins  : null,
-        }
-      }),
-    });
 
     if (error) {
       console.error('[billing] deductVoiceCost RPC error:', error.message);
