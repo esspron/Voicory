@@ -91,14 +91,28 @@ export function PricingSection() {
 
           {/* Price */}
           <div className="mb-6 pb-6 border-b border-border">
-            <div className="flex items-baseline gap-2 mb-2">
-              <span className="text-textMuted text-lg">₹</span>
-              <span className="text-5xl font-bold">0.03</span>
-              <span className="text-textMuted">/minute</span>
+            <div className="text-sm text-textMuted mb-3 uppercase tracking-wide font-semibold">Voice Call Rates</div>
+            <div className="space-y-2 mb-4">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-textMuted flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-blue-400 inline-block"/>OpenAI Voices</span>
+                <span className="font-bold text-textMain">$0.08<span className="text-textMuted font-normal">/min</span></span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-textMuted flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-green-400 inline-block"/>Google Voices</span>
+                <span className="font-bold text-textMain">$0.09<span className="text-textMuted font-normal">/min</span></span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-textMuted flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-primary inline-block"/>ElevenLabs Flash</span>
+                <span className="font-bold text-textMain">$0.15<span className="text-textMuted font-normal">/min</span></span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-textMuted flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-purple-400 inline-block"/>ElevenLabs HD</span>
+                <span className="font-bold text-textMain">$0.30<span className="text-textMuted font-normal">/min</span></span>
+              </div>
             </div>
             <div className="flex items-center gap-2 text-sm text-primary">
               <Gift size={16} weight="fill" />
-              <span>Pay only for what you use</span>
+              <span>WhatsApp & Chat: $0.001/message</span>
             </div>
           </div>
 

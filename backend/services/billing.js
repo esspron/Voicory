@@ -107,14 +107,18 @@ async function deductMessageCost(userId, {
 }
 
 /**
- * Deduct voice call cost (Twilio telephony + Whisper + estimated TTS).
- * Called at call END via status callback.
+ * Deduct voice call cost (LiveKit/Twilio + Whisper STT + TTS per provider).
+ * Called at call END via status callback / room_finished webhook.
+ *
+ * ttsProvider: 'openai' | 'openai_hd' | 'elevenlabs' | 'elevenlabs_multilingual' | 'google'
+ * Rates verified April 17 2026 from provider pricing pages.
  *
  * @param {string} userId
  * @param {{
  *   durationMinutes,
- *   ttsCharacters,   // optional: actual chars sent to TTS engine (from call_logs.tts_characters)
- *   sttMinutes,      // optional: actual STT minutes (from call_logs.stt_seconds / 60)
+ *   ttsProvider,     // optional: tts provider key from voices table (tts_provider)
+ *   ttsCharacters,   // optional: actual chars sent to TTS engine
+ *   sttMinutes,      // optional: actual STT minutes
  *   channel,
  *   callSid,
  *   twilioAccountSid,
@@ -124,9 +128,10 @@ async function deductMessageCost(userId, {
  */
 async function deductVoiceCost(userId, {
   durationMinutes = 0,
+  ttsProvider     = null,   // null → use default rate
   ttsCharacters   = null,   // null → fall back to duration-based estimate
   sttMinutes      = null,   // null → fall back to duration-based estimate
-  channel = 'twilio',
+  channel = 'livekit',
   callSid = null,
   twilioAccountSid = null,
   callLogId = null,
@@ -134,32 +139,20 @@ async function deductVoiceCost(userId, {
   try {
     const supabase = getSupabase();
 
-    // Cost breakdown (from pricing.js)
-    const twilioCostPerMin   = PRICING.twilio.perMinuteInbound;         // $0.0085
-    const whisperCostPerMin  = PRICING.openai['whisper-1'].perMinute;   // $0.006
-    const ttsPerChar         = PRICING.openai['tts-1'].perCharacter;
+    // --- Per-provider rate lookup ---
+    // voicePerMinute includes all components (STT + LLM + TTS + LiveKit) at 4x margin
+    const voiceRates = PRICING.voicory.voicePerMinute;
+    const providerKey = ttsProvider || 'default';
+    const voiceRatePerMin = voiceRates[providerKey] ?? voiceRates.default;
 
-    // Use actual TTS character count when available; fall back to 500 chars/min estimate
-    const effectiveTtsChars  = (ttsCharacters !== null && ttsCharacters >= 0)
-      ? ttsCharacters
-      : (500 * durationMinutes);
-    const ttsCost            = ttsPerChar * effectiveTtsChars;
+    // Total cost = flat per-provider rate × duration
+    const totalCostUsd = parseFloat((voiceRatePerMin * durationMinutes).toFixed(6));
+    const creditsToDeduct = parseFloat((totalCostUsd).toFixed(6)); // 1 credit = $1
 
-    // Use actual STT minutes when available; fall back to call duration
-    const effectiveSttMins   = (sttMinutes !== null && sttMinutes >= 0)
-      ? sttMinutes
-      : durationMinutes;
-    const sttCost            = whisperCostPerMin * effectiveSttMins;
+    const CHARS_EST = ttsCharacters !== null ? ttsCharacters : Math.round(750 * durationMinutes);
+    const STT_EST   = sttMinutes    !== null ? sttMinutes    : durationMinutes;
 
-    const twilioCost         = twilioCostPerMin * durationMinutes;
-    const providerCostTotal  = twilioCost + sttCost + ttsCost;
-
-    const MARGIN_MULTIPLIER   = PRICING.voicory.marginMultiplier ?? 4.0; // charge 4x provider cost
-    const totalCostUsd       = parseFloat((providerCostTotal * MARGIN_MULTIPLIER).toFixed(6));
-    const creditsToDeduct    = parseFloat((totalCostUsd / 0.01).toFixed(4)); // 1 credit = $0.01
-
-    const usingActualMetrics = ttsCharacters !== null || sttMinutes !== null;
-    console.log(`[billing] voice cost calc | dur=${durationMinutes.toFixed(2)}min ttsChars=${effectiveTtsChars}(${usingActualMetrics ? 'actual' : 'est'}) sttMin=${effectiveSttMins.toFixed(2)}(${sttMinutes !== null ? 'actual' : 'est'})`);
+    console.log(`[billing] voice cost | provider=${providerKey} rate=$${voiceRatePerMin}/min dur=${durationMinutes.toFixed(2)}min → $${totalCostUsd}`);
 
     if (totalCostUsd <= 0) {
       return { success: true, cost_usd: 0, credits_deducted: 0, new_balance: null };
@@ -178,6 +171,25 @@ async function deductVoiceCost(userId, {
       p_amount:        creditsToDeduct,
       p_transaction_type: 'usage',
       p_reference_type: callLogId ? 'call_log' : 'call_sid',
+      p_reference_id:  callLogId || null,
+      p_description:   `Voice call: ${durationMinutes.toFixed(2)} min | ${channel} | ${providerKey} TTS`,
+      p_metadata:      JSON.stringify({
+        channel,
+        call_sid:         callSid,
+        twilio_account_sid: twilioAccountSid,
+        duration_minutes: durationMinutes,
+        tts_provider:     providerKey,
+        rate_per_minute:  voiceRatePerMin,
+        cost_usd:         totalCostUsd,
+        breakdown: {
+          tts_provider:          providerKey,
+          tts_characters:        CHARS_EST,
+          stt_minutes:           STT_EST,
+          rate_per_min:          voiceRatePerMin,
+          total:                 totalCostUsd,
+        }
+      }),
+    });
       p_reference_id:  callLogId || null,
       p_description:   `Voice call: ${durationMinutes.toFixed(2)} min | ${channel} | ${callSid || ''}`,
       p_metadata:      JSON.stringify({
@@ -209,29 +221,23 @@ async function deductVoiceCost(userId, {
         user_id:          userId,
         call_log_id:      callLogId,
         llm_cost:         0,
-        tts_cost:         parseFloat(ttsCost.toFixed(6)),
-        telephony_cost:   parseFloat((twilioCost + sttCost).toFixed(6)),
+        tts_cost:         parseFloat((totalCostUsd * 0.6).toFixed(6)), // ~60% TTS
+        telephony_cost:   parseFloat((totalCostUsd * 0.4).toFixed(6)), // ~40% STT+LLM+infra
         total_cost:       totalCostUsd,
-        credits_deducted: Math.round(creditsToDeduct),
-        breakdown:        {
+        credits_deducted: creditsToDeduct,
+        breakdown: {
           channel,
-          call_sid:              callSid,
-          duration_minutes:      durationMinutes,
-          twilio_cost:           parseFloat(twilioCost.toFixed(6)),
-          stt_cost:              parseFloat(sttCost.toFixed(6)),
-          tts_cost:              parseFloat(ttsCost.toFixed(6)),
-          tts_characters_actual: ttsCharacters !== null ? effectiveTtsChars : null,
-          stt_minutes_actual:    sttMinutes    !== null ? effectiveSttMins  : null,
-          provider_cost_usd:     providerCostTotal,
-          margin_usd:            totalCostUsd - providerCostTotal,
-          total_cost_usd:        totalCostUsd,
-          credits_charged:       creditsToDeduct,
+          call_sid:         callSid,
+          duration_minutes: durationMinutes,
+          tts_provider:     providerKey,
+          rate_per_min:     voiceRatePerMin,
+          total_cost_usd:   totalCostUsd,
         }
       }).catch(e => console.error('[billing] call_costs insert error:', e.message));
     }
 
     const newBalance = data?.balance_after ?? (currentBalance - creditsToDeduct);
-    console.log(`[billing] voice | user=${userId} dur=${durationMinutes.toFixed(2)}min ttsChars=${effectiveTtsChars} sttMin=${effectiveSttMins.toFixed(2)} cost=$${totalCostUsd} credits=${creditsToDeduct} balance=${newBalance}`);
+    console.log(`[billing] voice | user=${userId} provider=${providerKey} dur=${durationMinutes.toFixed(2)}min cost=$${totalCostUsd} credits=${creditsToDeduct} balance=${newBalance}`);
 
     return {
       success:          data?.success !== false,

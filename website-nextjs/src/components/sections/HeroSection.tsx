@@ -84,7 +84,7 @@ export function HeroSection() {
       {/* Subtitle */}
       <p className="text-textMuted text-base md:text-lg lg:text-xl max-w-2xl mx-auto px-6 mt-6 md:mt-8">
         Create intelligent AI assistants for phone calls and WhatsApp in Hindi, English & 10+ Indian languages. 
-        Pay-as-you-go pricing starting at $0.03/min for voice calls.
+        Pay-as-you-go pricing from $0.08/min for voice calls. No monthly fees.
       </p>
 
       {/* CTA Buttons */}

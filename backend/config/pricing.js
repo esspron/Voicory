@@ -84,12 +84,23 @@ module.exports = {
       perCharacter: 0.000030,     // $30/1M chars
     },
   },
+  // ElevenLabs TTS — verified April 17 2026 from elevenlabs.io/pricing/api
+  // Flash/Turbo = eleven_flash_v2, eleven_turbo_v2_5 etc.
+  // Multilingual = eleven_multilingual_v2, eleven_multilingual_v3 etc.
   elevenlabs: {
-    starter:     { perCharacter: 0.000030 },
-    creator:     { perCharacter: 0.000024 },
-    pro:         { perCharacter: 0.000018 },
-    default:     { perCharacter: 0.000030 },
-    perCharacter: 0.0003,
+    flash:         { perCharacter: 0.00005  },  // $0.05/1K chars (Flash/Turbo models)
+    multilingual:  { perCharacter: 0.0001   },  // $0.10/1K chars (Multilingual v2/v3)
+    default:       { perCharacter: 0.00005  },  // default to Flash rate
+    // Voicory charge per minute at 4x (assuming ~750 chars/min of AI speech):
+    // Flash:        provider $0.038/min → Voicory $0.15/min
+    // Multilingual: provider $0.075/min → Voicory $0.30/min
+  },
+  // Google Cloud TTS — verified April 17 2026 from cloud.google.com/text-to-speech/pricing
+  google: {
+    'chirp3-hd':   { perCharacter: 0.00003  },  // $0.03/1K chars (Chirp 3 HD)
+    default:       { perCharacter: 0.00003  },
+    // Voicory charge per minute at 4x (~750 chars/min):
+    // Chirp3-HD: provider $0.023/min → Voicory $0.09/min
   },
   livekit: {
     perParticipantMinute: 0.001,
@@ -102,7 +113,16 @@ module.exports = {
   voicory: {
     creditCostUsd:    1.0,   // $1 = 1 credit
     marginMultiplier: 4.0,   // 4x provider cost = 300% margin
-    voicePerMinute:   0.03,  // $0.03/min voice calls
+    // Per-provider voice rates (charged to user per minute, verified April 17 2026)
+    // Includes STT ($0.006/min) + LLM ($0.002/min) + LiveKit ($0.001/min) + TTS (per provider)
+    voicePerMinute: {
+      openai:      0.08,  // tts-1: provider $0.020/min → 4x = $0.08/min
+      openai_hd:   0.12,  // tts-1-hd: provider $0.031/min → 4x = $0.12/min
+      elevenlabs:  0.15,  // Flash: provider $0.047/min → 4x = $0.19/min → rounded $0.15/min
+      elevenlabs_multilingual: 0.30, // Multilingual v2/v3: provider $0.084/min → 4x = $0.30/min
+      google:      0.09,  // Chirp3-HD: provider $0.031/min → 4x = $0.12/min → $0.09/min
+      default:     0.15,  // safe fallback
+    },
     chatPerMessage:   0.001, // $0.001/msg chat + WhatsApp
   },
 };
