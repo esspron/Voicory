@@ -96,10 +96,10 @@ export function HeroSection() {
           Get Started Free
         </Link>
         <Link
-          href="#demo"
+          href="#features"
           className="text-textMuted hover:text-textMain border border-border hover:border-textMuted px-8 py-3.5 rounded-full text-sm md:text-base font-medium transition-all duration-200"
         >
-          Watch Demo
+          See Features
         </Link>
       </div>
 

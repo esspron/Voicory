@@ -164,7 +164,7 @@ export function PricingSection() {
 
           {/* CTA */}
           <Link
-            href="https://app.voicory.com/contact-sales"
+            href="mailto:support@voicory.com"
             className="block text-center py-3.5 px-6 rounded-xl font-semibold bg-surface border border-border hover:border-primary/50 transition-all"
           >
             Contact Sales

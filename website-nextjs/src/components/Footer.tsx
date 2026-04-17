@@ -16,8 +16,8 @@ export function Footer() {
 
   const footerLinks = {
     product: [
-      { label: 'Voice Calls', href: '#demo' },
-      { label: 'WhatsApp Chatbot', href: '#demo' },
+      { label: 'Voice Calls', href: '#features' },
+      { label: 'WhatsApp Chatbot', href: '#features' },
       { label: 'Knowledge Base', href: '#customization' },
       { label: 'Pricing', href: '/pricing' },
     ],
@@ -25,13 +25,13 @@ export function Footer() {
       { label: 'Customer Memory', href: '#customization' },
       { label: 'Multi-Language', href: '#languages' },
       { label: 'Voice Library', href: '#customization' },
-      { label: 'Analytics', href: '#demo' },
+      { label: 'Analytics', href: '#features' },
     ],
     integrations: [
-      { label: 'Twilio', href: '#demo' },
-      { label: 'Vonage', href: '#demo' },
-      { label: 'WhatsApp Business', href: '#demo' },
-      { label: 'Custom SIP', href: '#demo' },
+      { label: 'Twilio', href: 'https://app.voicory.com/signup' },
+      { label: 'WhatsApp Business', href: 'https://app.voicory.com/signup' },
+      { label: 'ElevenLabs', href: 'https://app.voicory.com/signup' },
+      { label: 'OpenAI', href: 'https://app.voicory.com/signup' },
     ],
     legal: [
       { label: 'Privacy Policy', href: '/privacy' },
@@ -144,11 +144,9 @@ export function Footer() {
           {/* Social Links */}
           <div className="flex items-center gap-4">
             <a
-              href="https://twitter.com/voicoryai"
-              target="_blank"
-              rel="noopener noreferrer"
+              href="mailto:support@voicory.com"
               className="text-textMuted hover:text-primary transition-colors"
-              aria-label="Twitter"
+              aria-label="Email"
             >
               <TwitterLogo size={20} weight="fill" />
             </a>
@@ -160,15 +158,6 @@ export function Footer() {
               aria-label="LinkedIn"
             >
               <LinkedinLogo size={20} weight="fill" />
-            </a>
-            <a
-              href="https://wa.me/919876543210"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-textMuted hover:text-primary transition-colors"
-              aria-label="WhatsApp"
-            >
-              <WhatsappLogo size={20} weight="fill" />
             </a>
           </div>
         </div>

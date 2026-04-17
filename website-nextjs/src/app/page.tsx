@@ -3,9 +3,6 @@ import { HeroSection } from '@/components/sections/HeroSection'
 import { Navbar } from '@/components/Navbar'
 
 // Dynamic imports for below-the-fold content - improves initial load time
-const DemoSection = dynamic(() => import('@/components/sections/DemoSection').then(mod => ({ default: mod.DemoSection })), {
-  loading: () => <div className="min-h-[600px]" />,
-})
 const LanguageSection = dynamic(() => import('@/components/sections/LanguageSection').then(mod => ({ default: mod.LanguageSection })), {
   loading: () => <div className="min-h-[400px]" />,
 })
@@ -27,7 +24,6 @@ export default function Home() {
     <main className="min-h-screen bg-background text-textMain overflow-hidden">
       <Navbar />
       <HeroSection />
-      <DemoSection />
       <LanguageSection />
       <CustomizationSection />
       <TestimonialsSection />
