@@ -21,6 +21,7 @@ const router = express.Router();
 const { AccessToken, WebhookReceiver, RoomServiceClient, AgentDispatchClient } = require('livekit-server-sdk');
 const { supabase, redis } = require('../config');
 const { v4: uuidv4 } = require('uuid');
+const rateEngine = require('../services/voiceRateEngine');
 
 // LiveKit configuration
 const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY;
@@ -33,8 +34,10 @@ const LIVEKIT_URL = process.env.LIVEKIT_URL || 'wss://livekit.voicory.com';
 
 // Pricing configuration (USD)
 const PRICING = {
-    VOICE_CALL_PER_MINUTE: 0.03,        // $0.03/min for voice calls (Twilio+STT+TTS+margin)
-    MIN_CREDITS_REQUIRED: 0.03,            // Minimum $0.10 credits to start a call
+    // VOICE_CALL_PER_MINUTE is now DYNAMIC — computed by voiceRateEngine per assistant config
+    // Kept here only for pre-flight minimum balance check (use cheapest possible rate)
+    VOICE_CALL_PER_MINUTE_MIN: 0.07,       // minimum possible rate (OpenAI tts-1 + gpt-4o-mini)
+    MIN_CREDITS_REQUIRED: 0.07,            // Minimum to start a call (1 min at cheapest rate)
     DEFAULT_CONCURRENT_LINES: 1,           // Default concurrent calls (free)
     RESERVED_LINE_COST_MONTHLY: 10.00,     // $10/mo per reserved line
     TOKEN_TTL_MINUTES: 30,                 // Token expires in 30 min
@@ -133,50 +136,76 @@ async function checkUserCreditsAndLimits(userId) {
 }
 
 /**
- * Deduct credits for voice call usage
- * @param {string} userId - User ID
- * @param {number} durationMinutes - Call duration in minutes
- * @param {string} sessionId - Voice session ID for reference
- * @returns {Object} - { success: boolean, amountDeducted: number, newBalance: number }
+ * Deduct credits for voice call — uses voiceRateEngine for accurate per-provider cost
+ * @param {string} userId
+ * @param {number} durationSeconds — actual call duration in seconds
+ * @param {string} sessionId
+ * @param {Object} assistantConfig — { llmModel, ttsProvider, ttsModel, callLogId }
  */
-async function deductVoiceCredits(userId, durationMinutes, sessionId) {
+async function deductVoiceCredits(userId, durationSeconds, sessionId, assistantConfig = {}) {
     try {
-        const amount = durationMinutes * PRICING.VOICE_CALL_PER_MINUTE;
-        
-        // Use the deduct_credits RPC function — pass p_metadata to disambiguate overloaded function
+        const durationMinutes = durationSeconds / 60;
+
+        // Resolve TTS provider key from assistant's voice config
+        const ttsKey = rateEngine.resolveTtsProviderKey(
+            assistantConfig.ttsProvider || 'elevenlabs',
+            assistantConfig.ttsModel || ''
+        );
+        const llmModel = assistantConfig.llmModel || 'gpt-4o-mini';
+
+        // Compute exact cost using rate engine
+        const result = rateEngine.computeCallCost({
+            durationSeconds,
+            llmModel,
+            ttsProvider: ttsKey,
+            actualTtsChars:      assistantConfig.actualTtsChars      || null,
+            actualInputTokens:   assistantConfig.actualInputTokens   || null,
+            actualOutputTokens:  assistantConfig.actualOutputTokens  || null,
+        });
+
+        const amount = result.totalCostUsd;
+
+        console.log(`[livekit] billing | user=${userId} dur=${durationMinutes.toFixed(2)}min llm=${llmModel} tts=${ttsKey} rate=$${result.ratePerMin.toFixed(4)}/min total=$${amount}`);
+
         const { data, error } = await supabase.rpc('deduct_credits', {
             p_user_id: userId,
             p_amount: amount,
             p_transaction_type: 'voice_call',
-            p_description: `Voice call - ${durationMinutes} min @ $${PRICING.VOICE_CALL_PER_MINUTE}/min`,
+            p_description: `Voice call ${Math.ceil(durationMinutes)}min | ${llmModel} + ${ttsKey} TTS @ $${result.ratePerMin.toFixed(4)}/min`,
             p_reference_type: 'voice_session',
-            p_reference_id: sessionId,
-            p_metadata: { source: 'livekit', durationMinutes },
+            p_reference_id: assistantConfig.callLogId || sessionId,
+            p_metadata: {
+                source: 'livekit',
+                durationMinutes,
+                llmModel,
+                ttsProvider: ttsKey,
+                ratePerMin: result.ratePerMin,
+                breakdown: result.breakdown,
+            },
         });
-        
+
         if (error) {
-            console.error('Failed to deduct credits:', error);
+            console.error('[livekit] deductVoiceCredits RPC error:', error);
             // Fallback: direct update
             const { data: profile } = await supabase
                 .from('user_profiles')
                 .select('credits_balance')
                 .eq('user_id', userId)
                 .single();
-            
+
             const newBalance = Math.max(0, (profile?.credits_balance || 0) - amount);
-            
             await supabase
                 .from('user_profiles')
                 .update({ credits_balance: newBalance })
                 .eq('user_id', userId);
-            
+
             return { success: true, amountDeducted: amount, newBalance };
         }
-        
-        return { success: true, amountDeducted: amount, newBalance: data };
-        
+
+        return { success: true, amountDeducted: amount, newBalance: data, breakdown: result.breakdown };
+
     } catch (error) {
-        console.error('Credit deduction error:', error);
+        console.error('[livekit] deductVoiceCredits error:', error);
         return { success: false, error: error.message };
     }
 }
@@ -354,6 +383,7 @@ router.post('/token', async (req, res) => {
             roomName,
             livekitUrl: LIVEKIT_URL,
             sessionId: session?.id,
+            billing: await rateEngine.getRateForAssistant(supabase, assistantId),
         });
         
     } catch (error) {
@@ -412,22 +442,44 @@ router.post('/webhook', express.raw({ type: 'application/webhook+json' }), async
             case 'room_finished': {
                 const roomName = event.room?.name;
                 if (roomName) {
-                    // Calculate duration and update session
+                    // Fetch session + assistant config for accurate billing
                     const { data: session } = await supabase
                         .from('voice_sessions')
                         .select('id, connected_at, user_id, assistant_id, room_name')
                         .eq('room_name', roomName)
                         .single();
-                    
+
                     const durationSeconds = session?.connected_at
                         ? Math.floor((Date.now() - new Date(session.connected_at).getTime()) / 1000)
                         : 0;
-                    
-                    // Round up to nearest minute for billing
-                    const durationMinutes = Math.ceil(durationSeconds / 60);
-                    const costUsd = durationMinutes * PRICING.VOICE_CALL_PER_MINUTE;
-                    
-                    // Update session — use duration_ms (actual DB column)
+
+                    // Resolve assistant's LLM + TTS config for accurate billing
+                    let llmModel = 'gpt-4o-mini';
+                    let ttsProvider = 'elevenlabs';
+                    let ttsModel = '';
+                    if (session?.assistant_id) {
+                        const { data: asst } = await supabase
+                            .from('assistants')
+                            .select('llm_model, voice_id')
+                            .eq('id', session.assistant_id)
+                            .single();
+                        if (asst?.llm_model) llmModel = asst.llm_model;
+                        if (asst?.voice_id) {
+                            const { data: voice } = await supabase
+                                .from('voices')
+                                .select('tts_provider, model')
+                                .eq('id', asst.voice_id)
+                                .single();
+                            if (voice) { ttsProvider = voice.tts_provider || 'elevenlabs'; ttsModel = voice.model || ''; }
+                        }
+                    }
+
+                    // Compute accurate cost via rate engine
+                    const ttsKey = rateEngine.resolveTtsProviderKey(ttsProvider, ttsModel);
+                    const costResult = rateEngine.computeCallCost({ durationSeconds, llmModel, ttsProvider: ttsKey });
+                    const costUsd = costResult.totalCostUsd;
+
+                    // Update session
                     await supabase
                         .from('voice_sessions')
                         .update({
@@ -437,8 +489,8 @@ router.post('/webhook', express.raw({ type: 'application/webhook+json' }), async
                             cost_usd: costUsd,
                         })
                         .eq('room_name', roomName);
-                    
-                    // Write to call_logs (what dashboard reads)
+
+                    // Write to call_logs
                     if (session?.user_id) {
                         const durationFormatted = `${Math.floor(durationSeconds / 60)}m ${durationSeconds % 60}s`;
                         await supabase.from('call_logs').insert({
@@ -455,15 +507,15 @@ router.post('/webhook', express.raw({ type: 'application/webhook+json' }), async
                         });
                     }
 
-                    // Deduct credits from user's balance
-                    if (session?.user_id && durationMinutes > 0) {
+                    // Deduct credits using dynamic rate
+                    if (session?.user_id && durationSeconds > 0) {
                         const deduction = await deductVoiceCredits(
-                            session.user_id, 
-                            durationMinutes, 
-                            session.id
+                            session.user_id,
+                            durationSeconds,
+                            session.id,
+                            { llmModel, ttsProvider, ttsModel }
                         );
-                        
-                        console.log(`[LiveKit] Call ended - User: ${session.user_id}, Duration: ${durationMinutes}min, Cost: $${costUsd.toFixed(4)}, Deducted: ${deduction.success}`);
+                        console.log(`[LiveKit] room_finished | user=${session.user_id} dur=${(durationSeconds/60).toFixed(2)}min llm=${llmModel} tts=${ttsKey} cost=$${costUsd.toFixed(4)} deducted=${deduction.success}`);
                     }
                 }
                 break;
@@ -704,8 +756,32 @@ router.post('/session/:sessionId/end', async (req, res) => {
 
         const startTime = session.connected_at || session.created_at;
         const durationSeconds = Math.floor((Date.now() - new Date(startTime).getTime()) / 1000);
-        const durationMinutes = Math.ceil(durationSeconds / 60);
-        const costUsd = durationMinutes * PRICING.VOICE_CALL_PER_MINUTE;
+
+        // Resolve assistant's LLM + TTS config for accurate billing
+        let llmModel = 'gpt-4o-mini';
+        let ttsProvider = 'elevenlabs';
+        let ttsModel = '';
+        if (session.assistant_id) {
+            const { data: asst } = await supabase
+                .from('assistants')
+                .select('llm_model, voice_id')
+                .eq('id', session.assistant_id)
+                .single();
+            if (asst?.llm_model) llmModel = asst.llm_model;
+            if (asst?.voice_id) {
+                const { data: voice } = await supabase
+                    .from('voices')
+                    .select('tts_provider, model')
+                    .eq('id', asst.voice_id)
+                    .single();
+                if (voice) { ttsProvider = voice.tts_provider || 'elevenlabs'; ttsModel = voice.model || ''; }
+            }
+        }
+
+        const ttsKey = rateEngine.resolveTtsProviderKey(ttsProvider, ttsModel);
+        const costResult = rateEngine.computeCallCost({ durationSeconds, llmModel, ttsProvider: ttsKey });
+        const costUsd = costResult.totalCostUsd;
+        const durationMinutes = costResult.durationMinutes;
 
         await supabase
             .from('voice_sessions')
@@ -728,8 +804,8 @@ router.post('/session/:sessionId/end', async (req, res) => {
                 ended_at: new Date().toISOString(),
             });
             // Deduct credits
-            if (durationMinutes > 0) {
-                await deductVoiceCredits(user.id, durationMinutes, sessionId);
+            if (durationSeconds > 0) {
+                await deductVoiceCredits(user.id, durationSeconds, sessionId, { llmModel, ttsProvider, ttsModel });
             }
         }
 
