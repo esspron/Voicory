@@ -146,15 +146,18 @@ async function deductVoiceCredits(userId, durationSeconds, sessionId, assistantC
     try {
         const durationMinutes = durationSeconds / 60;
 
-        // Resolve TTS provider key from assistant's voice config
+        // Load DB pricing (cached in Redis)
+        const pricing = await rateEngine.loadPricing(supabase, redis);
+
+        // Resolve TTS provider key
         const ttsKey = rateEngine.resolveTtsProviderKey(
             assistantConfig.ttsProvider || 'elevenlabs',
             assistantConfig.ttsModel || ''
         );
         const llmModel = assistantConfig.llmModel || 'gpt-4o-mini';
 
-        // Compute exact cost using rate engine
-        const result = rateEngine.computeCallCost({
+        // Compute exact cost
+        const result = rateEngine.computeCallCost(pricing, {
             durationSeconds,
             llmModel,
             ttsProvider: ttsKey,
@@ -383,7 +386,7 @@ router.post('/token', async (req, res) => {
             roomName,
             livekitUrl: LIVEKIT_URL,
             sessionId: session?.id,
-            billing: await rateEngine.getRateForAssistant(supabase, assistantId),
+            billing: await rateEngine.getRateForAssistant(supabase, redis, assistantId),
         });
         
     } catch (error) {
@@ -474,9 +477,10 @@ router.post('/webhook', express.raw({ type: 'application/webhook+json' }), async
                         }
                     }
 
-                    // Compute accurate cost via rate engine
+                    // Compute accurate cost via rate engine (DB-driven pricing)
+                    const pricing = await rateEngine.loadPricing(supabase, redis);
                     const ttsKey = rateEngine.resolveTtsProviderKey(ttsProvider, ttsModel);
-                    const costResult = rateEngine.computeCallCost({ durationSeconds, llmModel, ttsProvider: ttsKey });
+                    const costResult = rateEngine.computeCallCost(pricing, { durationSeconds, llmModel, ttsProvider: ttsKey });
                     const costUsd = costResult.totalCostUsd;
 
                     // Update session
@@ -779,7 +783,8 @@ router.post('/session/:sessionId/end', async (req, res) => {
         }
 
         const ttsKey = rateEngine.resolveTtsProviderKey(ttsProvider, ttsModel);
-        const costResult = rateEngine.computeCallCost({ durationSeconds, llmModel, ttsProvider: ttsKey });
+        const pricing = await rateEngine.loadPricing(supabase, redis);
+        const costResult = rateEngine.computeCallCost(pricing, { durationSeconds, llmModel, ttsProvider: ttsKey });
         const costUsd = costResult.totalCostUsd;
         const durationMinutes = costResult.durationMinutes;
 

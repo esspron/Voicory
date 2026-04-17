@@ -3,16 +3,13 @@
  * billing.js — Central billing service for ALL Voicory channels
  * (test chat, WhatsApp, Twilio, LiveKit)
  *
- * Pricing (with 40% Voicory margin applied in Supabase RPC):
- *   gpt-4o:      input $2.50/1M, output $10/1M
- *   gpt-4o-mini: input $0.15/1M, output $0.60/1M
- *   1 credit = $0.01
- *
- * All credit deductions are atomic (row-level lock in Postgres).
+ * Pricing is DB-driven via service_pricing + llm_pricing tables.
+ * Cache: Redis 5-min TTL. Fallback: hardcoded safety values.
+ * 1 credit = $1 USD. All deductions are atomic via Supabase RPC.
  */
 
 const { createClient } = require('@supabase/supabase-js');
-const PRICING = require('../config/pricing');
+const rateEngine = require('./voiceRateEngine');
 
 let _supabase = null;
 function getSupabase() {
@@ -107,87 +104,93 @@ async function deductMessageCost(userId, {
 }
 
 /**
- * Deduct voice call cost (LiveKit/Twilio + Whisper STT + TTS per provider).
- * Called at call END via status callback / room_finished webhook.
- *
- * ttsProvider: 'openai' | 'openai_hd' | 'elevenlabs' | 'elevenlabs_multilingual' | 'google'
- * Rates verified April 17 2026 from provider pricing pages.
+ * Deduct voice call cost — DB-driven pricing via voiceRateEngine.
+ * Rates loaded from service_pricing + llm_pricing tables (Redis cached 5min).
  *
  * @param {string} userId
  * @param {{
  *   durationMinutes,
- *   ttsProvider,     // optional: tts provider key from voices table (tts_provider)
- *   ttsCharacters,   // optional: actual chars sent to TTS engine
- *   sttMinutes,      // optional: actual STT minutes
- *   channel,
- *   callSid,
- *   twilioAccountSid,
- *   callLogId
+ *   durationSeconds,     // preferred: exact seconds (more accurate than minutes)
+ *   ttsProvider,         // resolved provider key: 'openai'|'openai_hd'|'elevenlabs'|'elevenlabs_ml'|'google'
+ *   llmModel,            // e.g. 'gpt-4o-mini'
+ *   sttProvider,         // e.g. 'whisper-1'
+ *   actualTtsChars,      // optional: actual chars sent to TTS
+ *   actualInputTokens,   // optional: actual LLM input tokens
+ *   actualOutputTokens,  // optional: actual LLM output tokens
+ *   channel, callSid, twilioAccountSid, callLogId
  * }} params
- * @returns {{ success, cost_usd, credits_deducted, new_balance }}
  */
 async function deductVoiceCost(userId, {
-  durationMinutes = 0,
-  ttsProvider     = null,   // null → use default rate
-  ttsCharacters   = null,   // null → fall back to duration-based estimate
-  sttMinutes      = null,   // null → fall back to duration-based estimate
-  channel = 'livekit',
-  callSid = null,
+  durationMinutes  = 0,
+  durationSeconds  = null,
+  ttsProvider      = 'elevenlabs',
+  llmModel         = 'gpt-4o-mini',
+  sttProvider      = 'whisper-1',
+  actualTtsChars   = null,
+  actualInputTokens  = null,
+  actualOutputTokens = null,
+  channel          = 'livekit',
+  callSid          = null,
   twilioAccountSid = null,
-  callLogId = null,
+  callLogId        = null,
 } = {}) {
   try {
     const supabase = getSupabase();
 
-    // --- Per-provider rate lookup ---
-    // voicePerMinute includes all components (STT + LLM + TTS + LiveKit) at 4x margin
-    const voiceRates = PRICING.voicory.voicePerMinute;
-    const providerKey = ttsProvider || 'default';
-    const voiceRatePerMin = voiceRates[providerKey] ?? voiceRates.default;
+    // Use seconds if available for precision, else convert minutes
+    const seconds = durationSeconds !== null ? durationSeconds : durationMinutes * 60;
 
-    // Total cost = flat per-provider rate × duration
-    const totalCostUsd = parseFloat((voiceRatePerMin * durationMinutes).toFixed(6));
-    const creditsToDeduct = parseFloat((totalCostUsd).toFixed(6)); // 1 credit = $1
+    // Load DB pricing (cached in Redis if available)
+    const { redis } = require('../config');
+    const pricing = await rateEngine.loadPricing(supabase, redis);
 
-    const CHARS_EST = ttsCharacters !== null ? ttsCharacters : Math.round(750 * durationMinutes);
-    const STT_EST   = sttMinutes    !== null ? sttMinutes    : durationMinutes;
+    // Compute exact cost from DB rates
+    const result = rateEngine.computeCallCost(pricing, {
+      durationSeconds:   seconds,
+      llmModel,
+      ttsProvider,
+      sttProvider,
+      actualTtsChars,
+      actualInputTokens,
+      actualOutputTokens,
+    });
 
-    console.log(`[billing] voice cost | provider=${providerKey} rate=$${voiceRatePerMin}/min dur=${durationMinutes.toFixed(2)}min → $${totalCostUsd}`);
+    const totalCostUsd    = result.totalCostUsd;
+    const creditsToDeduct = totalCostUsd; // 1 credit = $1 USD
+    const durationMins    = result.durationMinutes;
+
+    console.log(`[billing] voice | user=${userId} tts=${ttsProvider} llm=${llmModel} dur=${durationMins.toFixed(2)}min rate=$${result.ratePerMin.toFixed(4)}/min total=$${totalCostUsd} source=${result.breakdown.pricing_source}`);
 
     if (totalCostUsd <= 0) {
       return { success: true, cost_usd: 0, credits_deducted: 0, new_balance: null };
     }
 
-    // Check balance first
+    // Check balance
     const { balance: currentBalance, hasCredits } = await checkBalance(userId);
     if (!hasCredits) {
       console.warn(`[billing] deductVoiceCost: zero balance for user=${userId}`);
       return { success: false, reason: 'insufficient_credits', new_balance: 0 };
     }
 
-    // Deduct via deduct_credits RPC
+    // Atomic deduct via RPC
     const { data, error } = await supabase.rpc('deduct_credits', {
-      p_user_id:       userId,
-      p_amount:        creditsToDeduct,
-      p_transaction_type: 'usage',
-      p_reference_type: callLogId ? 'call_log' : 'call_sid',
-      p_reference_id:  callLogId || null,
-      p_description:   `Voice call: ${durationMinutes.toFixed(2)} min | ${channel} | ${providerKey} TTS`,
-      p_metadata:      JSON.stringify({
+      p_user_id:           userId,
+      p_amount:            creditsToDeduct,
+      p_transaction_type:  'usage',
+      p_reference_type:    callLogId ? 'call_log' : 'call_sid',
+      p_reference_id:      callLogId || null,
+      p_description:       `Voice call: ${durationMins.toFixed(2)}min | ${channel} | ${ttsProvider} TTS | ${llmModel}`,
+      p_metadata:          JSON.stringify({
         channel,
-        call_sid:         callSid,
+        call_sid:          callSid,
         twilio_account_sid: twilioAccountSid,
-        duration_minutes: durationMinutes,
-        tts_provider:     providerKey,
-        rate_per_minute:  voiceRatePerMin,
-        cost_usd:         totalCostUsd,
-        breakdown: {
-          tts_provider:          providerKey,
-          tts_characters:        CHARS_EST,
-          stt_minutes:           STT_EST,
-          rate_per_min:          voiceRatePerMin,
-          total:                 totalCostUsd,
-        }
+        duration_minutes:  durationMins,
+        tts_provider:      ttsProvider,
+        llm_model:         llmModel,
+        rate_per_minute:   result.ratePerMin,
+        cost_usd:          totalCostUsd,
+        pricing_source:    result.breakdown.pricing_source,
+        breakdown:         result.breakdown,
       }),
     });
 
@@ -196,36 +199,28 @@ async function deductVoiceCost(userId, {
       return { success: false, reason: 'rpc_error', error: error.message };
     }
 
-    // Also insert into call_costs for P&L dashboard
+    // Insert into call_costs for P&L dashboard
     if (callLogId) {
       await supabase.from('call_costs').insert({
         user_id:          userId,
         call_log_id:      callLogId,
-        llm_cost:         0,
-        tts_cost:         parseFloat((totalCostUsd * 0.6).toFixed(6)), // ~60% TTS
-        telephony_cost:   parseFloat((totalCostUsd * 0.4).toFixed(6)), // ~40% STT+LLM+infra
+        llm_cost:         parseFloat(result.breakdown.llm_cost.toFixed(6)),
+        tts_cost:         parseFloat(result.breakdown.tts_cost.toFixed(6)),
+        telephony_cost:   parseFloat((result.breakdown.stt_cost + result.breakdown.infra_cost).toFixed(6)),
         total_cost:       totalCostUsd,
         credits_deducted: creditsToDeduct,
         breakdown: {
-          channel,
-          call_sid:         callSid,
-          duration_minutes: durationMinutes,
-          tts_provider:     providerKey,
-          rate_per_min:     voiceRatePerMin,
-          total_cost_usd:   totalCostUsd,
+          channel, call_sid: callSid, duration_minutes: durationMins,
+          tts_provider: ttsProvider, llm_model: llmModel,
+          rate_per_min: result.ratePerMin,
+          pricing_source: result.breakdown.pricing_source,
         }
       }).catch(e => console.error('[billing] call_costs insert error:', e.message));
     }
 
     const newBalance = data?.balance_after ?? (currentBalance - creditsToDeduct);
-    console.log(`[billing] voice | user=${userId} provider=${providerKey} dur=${durationMinutes.toFixed(2)}min cost=$${totalCostUsd} credits=${creditsToDeduct} balance=${newBalance}`);
+    return { success: data?.success !== false, cost_usd: totalCostUsd, credits_deducted: creditsToDeduct, new_balance: newBalance };
 
-    return {
-      success:          data?.success !== false,
-      cost_usd:         totalCostUsd,
-      credits_deducted: creditsToDeduct,
-      new_balance:      newBalance,
-    };
   } catch (err) {
     console.error('[billing] deductVoiceCost exception:', err.message);
     return { success: false, reason: 'exception', error: err.message };

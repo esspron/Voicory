@@ -7,9 +7,10 @@
 // ============================================
 const express = require('express');
 const router = express.Router();
-const { supabase } = require('../config');
+const { supabase, redis } = require('../config');
 const crypto = require('crypto');
 const { verifySupabaseAuth, rateLimit } = require('../lib/auth');
+const rateEngine = require('../services/voiceRateEngine');
 const { cacheGet, cacheSet, cacheDelete } = require('../services/cache');
 
 const CREDITS_CACHE_TTL = 60; // 60 seconds TTL for credit balance cache
@@ -801,6 +802,64 @@ router.post('/switch-billing-mode', verifySupabaseAuth, async (req, res) => {
         console.error('Switch billing mode error:', error);
         res.status(500).json({ error: error.message });
     }
+});
+
+// ─── Pricing Rates API ────────────────────────────────────────────────────────
+
+/**
+ * GET /api/paddle/pricing/rates
+ * Returns live per-minute rates for all TTS/LLM combos (from DB, Redis-cached).
+ * Public endpoint — used by frontend to display pricing before call.
+ */
+router.get('/pricing/rates', async (req, res) => {
+    try {
+        const pricing = await rateEngine.loadPricing(supabase, redis);
+        const combos = [
+            { label: 'OpenAI Voice (Standard)', tts: 'openai',        llm: 'gpt-4o-mini' },
+            { label: 'OpenAI Voice (HD)',        tts: 'openai_hd',     llm: 'gpt-4o-mini' },
+            { label: 'Google Chirp3-HD',          tts: 'google',        llm: 'gpt-4o-mini' },
+            { label: 'ElevenLabs Flash',          tts: 'elevenlabs',    llm: 'gpt-4o-mini' },
+            { label: 'ElevenLabs Multilingual',   tts: 'elevenlabs_ml', llm: 'gpt-4o-mini' },
+            { label: 'ElevenLabs Flash + GPT-4o', tts: 'elevenlabs',    llm: 'gpt-4o'      },
+        ];
+        const rates = combos.map(c => ({
+            ...c,
+            ...rateEngine.computeRatePerMinute(pricing, { llmModel: c.llm, ttsProvider: c.tts }),
+        }));
+        res.json({ rates, pricingSource: pricing ? 'database' : 'fallback', loadedAt: pricing?.loadedAt });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+/**
+ * GET /api/paddle/pricing/assistant/:assistantId
+ * Returns the exact rate for a specific assistant (based on its voice + LLM config).
+ * Authenticated — used by frontend pre-call.
+ */
+router.get('/pricing/assistant/:assistantId', verifySupabaseAuth, async (req, res) => {
+    try {
+        const { assistantId } = req.params;
+        const result = await rateEngine.getRateForAssistant(supabase, redis, assistantId);
+        res.json(result);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+/**
+ * POST /api/paddle/pricing/invalidate-cache
+ * Clears Redis pricing cache — call after updating service_pricing or llm_pricing in DB.
+ * Requires service role key in Authorization header.
+ */
+router.post('/pricing/invalidate-cache', async (req, res) => {
+    const authHeader = req.headers.authorization || '';
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!serviceKey || authHeader !== `Bearer ${serviceKey}`) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+    await rateEngine.invalidateCache(redis);
+    res.json({ ok: true, message: 'Pricing cache cleared — next request will reload from DB' });
 });
 
 module.exports = router;
