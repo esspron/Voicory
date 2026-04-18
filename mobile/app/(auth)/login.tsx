@@ -39,17 +39,11 @@ function VoicoryLogo({ size = 56 }: { size?: number }) {
         </SvgGrad>
       </Defs>
       <Circle cx="28" cy="28" r="28" fill="url(#bgGrad)" />
-      {/* Sound wave left */}
-      <Path d="M16 22C14 24 14 32 16 34" stroke="url(#logoGrad)" strokeWidth="2" strokeLinecap="round" opacity="0.5" />
-      <Path d="M12 19C9 23 9 33 12 37" stroke="url(#logoGrad)" strokeWidth="2" strokeLinecap="round" opacity="0.3" />
-      {/* Microphone */}
-      <Path d="M28 16C25.8 16 24 17.8 24 20V28C24 30.2 25.8 32 28 32C30.2 32 32 30.2 32 28V20C32 17.8 30.2 16 28 16Z" fill="url(#logoGrad)" />
-      <Path d="M21 27V28C21 31.9 24.1 35 28 35C31.9 35 35 31.9 35 28V27" stroke="url(#logoGrad)" strokeWidth="2" strokeLinecap="round" />
-      <Path d="M28 35V40" stroke="url(#logoGrad)" strokeWidth="2" strokeLinecap="round" />
-      <Path d="M24 40H32" stroke="url(#logoGrad)" strokeWidth="2" strokeLinecap="round" />
-      {/* Sound wave right */}
-      <Path d="M40 22C42 24 42 32 40 34" stroke="url(#logoGrad)" strokeWidth="2" strokeLinecap="round" opacity="0.5" />
-      <Path d="M44 19C47 23 47 33 44 37" stroke="url(#logoGrad)" strokeWidth="2" strokeLinecap="round" opacity="0.3" />
+      {/* V lettermark with sound waves */}
+      <Path d="M18 16L28 40L38 16" stroke="url(#logoGrad)" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      {/* Sound wave arcs */}
+      <Path d="M40 22C42 24 42 32 40 34" stroke="url(#logoGrad)" strokeWidth="1.8" strokeLinecap="round" opacity="0.5" />
+      <Path d="M43 19C46 23 46 33 43 37" stroke="url(#logoGrad)" strokeWidth="1.8" strokeLinecap="round" opacity="0.3" />
     </Svg>
   );
 }
