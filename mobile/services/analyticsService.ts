@@ -38,6 +38,8 @@ export interface DashboardData {
   dailyActivity: { date: string; count: number }[];
   /** Time-of-day greeting */
   greeting: string;
+  /** Number of assistants the user has created (from assistants table) */
+  assistantCount: number;
 }
 
 function getGreeting(): string {
@@ -62,7 +64,7 @@ export async function getDashboardData(userId: string): Promise<DashboardData> {
   const fourteenDaysAgo = new Date(now.getTime() - 14 * 86400000).toISOString();
 
   // Parallel fetch everything we need
-  const [profileRes, weekCallsRes, priorWeekCallsRes] = await Promise.all([
+  const [profileRes, weekCallsRes, priorWeekCallsRes, assistantsCountRes] = await Promise.all([
     supabase
       .from('user_profiles')
       .select('credits_balance')
@@ -80,11 +82,16 @@ export async function getDashboardData(userId: string): Promise<DashboardData> {
       .eq('user_id', userId)
       .gte('created_at', fourteenDaysAgo)
       .lt('created_at', sevenDaysAgo),
+    supabase
+      .from('assistants')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId),
   ]);
 
   const balanceUsd = profileRes.data?.credits_balance ?? 0;
   const weekCalls = weekCallsRes.data ?? [];
   const priorWeekCalls = priorWeekCallsRes.data ?? [];
+  const assistantCount = assistantsCountRes.count ?? 0;
 
   // ── Basic Stats ──
   const totalCalls = weekCalls.length;
@@ -171,6 +178,7 @@ export async function getDashboardData(userId: string): Promise<DashboardData> {
     agentPerformance,
     dailyActivity,
     greeting: getGreeting(),
+    assistantCount,
   };
 }
 

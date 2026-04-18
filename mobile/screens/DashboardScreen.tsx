@@ -328,7 +328,7 @@ export default function DashboardScreen() {
   const agents = data?.agentPerformance ?? [];
   const activity = data?.dailyActivity?.map(d => d.count) ?? [];
   const hasCalls = (stats?.totalCalls ?? 0) > 0;
-  const hasAgents = agents.length > 0;
+  const hasAgents = (data?.assistantCount ?? 0) > 0 || agents.length > 0;
 
   // Setup steps — derived from actual state
   const setupSteps: SetupStep[] = [
@@ -343,7 +343,7 @@ export default function DashboardScreen() {
     {
       key: 'agent',
       title: 'Create a voice agent',
-      subtitle: hasAgents ? `${agents.length} agent${agents.length > 1 ? 's' : ''} active` : 'Set up your AI assistant',
+      subtitle: hasAgents ? `${data?.assistantCount ?? agents.length} agent${(data?.assistantCount ?? agents.length) > 1 ? 's' : ''} created` : 'Set up your AI assistant',
       icon: 'hardware-chip',
       done: hasAgents,
       action: () => Linking.openURL('https://app.voicory.com/assistants'),
