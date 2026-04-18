@@ -58,7 +58,7 @@ export const useAuthStore = create<AuthStore>((set, _get) => ({
         .maybeSingle();
 
       if (profileError) {
-        console.error('[AuthStore] Failed to fetch user profile:', profileError.message);
+        if (__DEV__) console.error('[AuthStore] Failed to fetch user profile:', profileError.message);
         set({ isLoadingProfile: false });
         return;
       }
@@ -78,7 +78,7 @@ export const useAuthStore = create<AuthStore>((set, _get) => ({
         set({ profile: null, orgInfo: null, creditsBalance: 0 });
       }
     } catch (err) {
-      console.error('[AuthStore] Unexpected error fetching profile:', err);
+      if (__DEV__) console.error('[AuthStore] Unexpected error fetching profile:', err);
     } finally {
       set({ isLoadingProfile: false });
     }

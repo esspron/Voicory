@@ -12,6 +12,7 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
+    "description": "Voicory — AI-powered voice agents for your business. Deploy intelligent voice assistants that handle calls, qualify leads, and support customers 24/7.",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
@@ -19,7 +20,19 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.voicory.app"
+      "bundleIdentifier": "com.voicory.app",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "Voicory needs microphone access to enable voice conversations with your AI agents.",
+        "NSSpeechRecognitionUsageDescription": "Voicory uses speech recognition to process voice input for your AI agents.",
+        "NSCameraUsageDescription": "Voicory may use the camera for profile photo uploads.",
+        "NSPhotoLibraryUsageDescription": "Voicory may access your photo library for profile photo uploads.",
+        "UIBackgroundModes": ["audio"],
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "config": {
+        "usesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -27,7 +40,14 @@
         "backgroundColor": "#0a0f1a"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.voicory.app"
+      "package": "com.voicory.app",
+      "versionCode": 1,
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.INTERNET",
+        "android.permission.VIBRATE",
+        "android.permission.RECEIVE_BOOT_COMPLETED"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -37,6 +57,12 @@
       "expo-secure-store",
       "expo-font",
       "expo-web-browser"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "voicory-app"
+      }
+    },
+    "owner": "voicory"
   }
 }
