@@ -1,7 +1,24 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { theme } from '../lib/theme';
+
+// Design tokens
+const C = {
+  bg: '#050a12',
+  surface: '#0c1219',
+  surfaceRaised: '#111a24',
+  border: '#1a2332',
+  borderLight: '#1a233350',
+  primary: '#00d4aa',
+  primaryMuted: '#00d4aa18',
+  secondary: '#0099ff',
+  text: '#f0f2f5',
+  textMuted: '#7a8599',
+  textFaint: '#3d4a5c',
+  danger: '#ef4444',
+  warning: '#f59e0b',
+  success: '#22c55e',
+};
 
 interface EmptyStateProps {
   title?: string;
@@ -17,7 +34,7 @@ export function EmptyState({
   return (
     <View style={styles.container}>
       <View style={styles.iconContainer}>
-        <Ionicons name={icon} size={48} color={theme.colors.textTertiary} />
+        <Ionicons name={icon} size={48} color={C.textFaint} />
       </View>
       <Text style={styles.title}>{title}</Text>
       <Text style={styles.message}>{message}</Text>
@@ -34,28 +51,29 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
   },
   iconContainer: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: theme.colors.surface,
+    width: 64,
+    height: 64,
+    borderRadius: 20,
+    backgroundColor: C.surface,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 24,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: C.border,
   },
   title: {
-    color: theme.colors.text,
-    fontSize: 20,
-    fontWeight: theme.fontWeight.bold,
+    color: C.text,
+    fontSize: 16,
+    fontWeight: '700',
     marginBottom: 8,
     textAlign: 'center',
   },
   message: {
-    color: theme.colors.textSecondary,
-    fontSize: 15,
+    color: C.textMuted,
+    fontSize: 13,
     textAlign: 'center',
-    lineHeight: 22,
+    lineHeight: 19,
     maxWidth: 280,
+    fontWeight: '400',
   },
 });

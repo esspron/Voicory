@@ -6,6 +6,7 @@ import {
   RefreshControl,
   ActivityIndicator,
   Text,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SearchBar } from '../components/SearchBar';
@@ -14,8 +15,25 @@ import { CallCard } from '../components/CallCard';
 import { EmptyState } from '../components/EmptyState';
 import { getCalls } from '../services/callService';
 import { supabase } from '../lib/supabase';
-import { theme } from '../lib/theme';
 import { CallLog } from '../types';
+
+// Design tokens
+const C = {
+  bg: '#050a12',
+  surface: '#0c1219',
+  surfaceRaised: '#111a24',
+  border: '#1a2332',
+  borderLight: '#1a233350',
+  primary: '#00d4aa',
+  primaryMuted: '#00d4aa18',
+  secondary: '#0099ff',
+  text: '#f0f2f5',
+  textMuted: '#7a8599',
+  textFaint: '#3d4a5c',
+  danger: '#ef4444',
+  warning: '#f59e0b',
+  success: '#22c55e',
+};
 
 const FILTER_OPTIONS = [
   { label: 'All', value: 'all' },
@@ -92,8 +110,14 @@ export default function CallLogsScreen() {
   const ListHeader = () => (
     <View>
       <View style={styles.screenHeader}>
-        <Text style={styles.screenTitle}>Call Logs</Text>
-        <Text style={styles.subtitle}>Track all your voice interactions</Text>
+        <View style={styles.titleRow}>
+          <Text style={styles.screenTitle}>Calls</Text>
+          {calls.length > 0 && (
+            <View style={styles.countBadge}>
+              <Text style={styles.countText}>{calls.length}</Text>
+            </View>
+          )}
+        </View>
       </View>
       
       <SearchBar
@@ -119,7 +143,7 @@ export default function CallLogsScreen() {
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color={theme.colors.primary} />
+        <ActivityIndicator size="large" color={C.primary} />
       </View>
     );
   }
@@ -139,14 +163,14 @@ export default function CallLogsScreen() {
         ListEmptyComponent={
           <EmptyState
             icon="call"
-            title="No calls found"
-            message={search ? 'Try a different search.' : 'No calls yet.'}
+            title="No calls yet"
+            message="Calls from your voice agents will appear here"
           />
         }
         ListFooterComponent={
           loadingMore ? (
             <ActivityIndicator
-              color={theme.colors.primary}
+              color={C.primary}
               style={styles.loadingMore}
             />
           ) : null
@@ -155,8 +179,8 @@ export default function CallLogsScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={theme.colors.primary}
-            colors={[theme.colors.primary]}
+            tintColor={C.primary}
+            colors={[C.primary]}
           />
         }
         onEndReached={onLoadMore}
@@ -171,7 +195,7 @@ export default function CallLogsScreen() {
 const styles = StyleSheet.create({
   container: { 
     flex: 1, 
-    backgroundColor: theme.colors.background,
+    backgroundColor: C.bg,
   },
   listContent: { 
     paddingBottom: 32,
@@ -180,38 +204,50 @@ const styles = StyleSheet.create({
     flex: 1, 
     alignItems: 'center', 
     justifyContent: 'center', 
-    backgroundColor: theme.colors.background,
+    backgroundColor: C.bg,
   },
   screenHeader: {
     paddingHorizontal: 20,
-    paddingTop: 60,
+    paddingTop: Platform.OS === 'ios' ? 60 : 44,
     paddingBottom: 24,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   screenTitle: { 
     fontSize: 32,
-    fontWeight: theme.fontWeight.extrabold,
-    color: theme.colors.text,
+    fontWeight: '800',
+    color: C.text,
     letterSpacing: 0.5,
-    marginBottom: 4,
   },
-  subtitle: {
+  countBadge: {
+    backgroundColor: C.primaryMuted,
+    borderColor: C.primary,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  countText: {
     fontSize: 14,
-    fontWeight: theme.fontWeight.medium,
-    color: theme.colors.textSecondary,
+    fontWeight: '600',
+    color: C.primary,
   },
   errorBanner: {
-    backgroundColor: theme.colors.danger + '15',
+    backgroundColor: C.danger + '15',
     marginHorizontal: 20,
     marginVertical: 8,
-    borderRadius: theme.borderRadius.md,
+    borderRadius: 12,
     padding: 16,
     borderWidth: 1,
-    borderColor: theme.colors.danger + '30',
+    borderColor: C.danger + '30',
   },
   errorText: { 
-    color: theme.colors.danger, 
+    color: C.danger, 
     fontSize: 14,
-    fontWeight: theme.fontWeight.medium,
+    fontWeight: '500',
   },
   loadingMore: { 
     paddingVertical: 20,

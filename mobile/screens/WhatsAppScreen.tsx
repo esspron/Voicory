@@ -7,9 +7,26 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { theme } from '../lib/theme';
 import ContactAvatar from '../components/whatsapp/ContactAvatar';
 import { EmptyState } from '../components/EmptyState';
+
+// Design tokens
+const C = {
+  bg: '#050a12',
+  surface: '#0c1219',
+  surfaceRaised: '#111a24',
+  border: '#1a2332',
+  borderLight: '#1a233350',
+  primary: '#00d4aa',
+  primaryMuted: '#00d4aa18',
+  secondary: '#0099ff',
+  text: '#f0f2f5',
+  textMuted: '#7a8599',
+  textFaint: '#3d4a5c',
+  danger: '#ef4444',
+  warning: '#f59e0b',
+  success: '#22c55e',
+};
 
 interface WAContact {
   id: string;
@@ -102,16 +119,20 @@ export default function WhatsAppScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={theme.colors.surface} />
+      <StatusBar barStyle="light-content" backgroundColor={C.surface} />
       
       {/* Header */}
       <View style={styles.header}>
-        <View>
+        <View style={styles.titleRow}>
           <Text style={styles.headerTitle}>WhatsApp</Text>
-          <Text style={styles.subtitle}>Business conversations</Text>
+          {contacts.length > 0 && (
+            <View style={styles.countBadge}>
+              <Text style={styles.countText}>{contacts.length}</Text>
+            </View>
+          )}
         </View>
         <TouchableOpacity onPress={toggleSearch} style={styles.headerIcon}>
-          <Ionicons name="search" size={24} color={theme.colors.textSecondary} />
+          <Ionicons name="search" size={24} color={C.textMuted} />
         </TouchableOpacity>
       </View>
 
@@ -119,14 +140,14 @@ export default function WhatsAppScreen() {
       {searchVisible && (
         <View style={styles.searchContainer}>
           <View style={styles.searchBar}>
-            <Ionicons name="search" size={20} color={theme.colors.textTertiary} />
+            <Ionicons name="search" size={20} color={C.textFaint} />
             <TextInput 
               ref={searchRef} 
               style={styles.searchInput} 
               value={searchQuery} 
               onChangeText={setSearchQuery} 
               placeholder="Search conversations..." 
-              placeholderTextColor={theme.colors.textTertiary}
+              placeholderTextColor={C.textFaint}
               autoCapitalize="none"
               autoCorrect={false}
             />
@@ -136,7 +157,7 @@ export default function WhatsAppScreen() {
 
       {loading ? (
         <View style={styles.centered}>
-          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <ActivityIndicator size="large" color={C.primary} />
         </View>
       ) : error ? (
         <View style={styles.centered}>
@@ -175,8 +196,8 @@ export default function WhatsAppScreen() {
             <RefreshControl 
               refreshing={refreshing} 
               onRefresh={onRefresh} 
-              tintColor={theme.colors.primary} 
-              colors={[theme.colors.primary]} 
+              tintColor={C.primary} 
+              colors={[C.primary]} 
             />
           }
           ListEmptyComponent={
@@ -198,67 +219,79 @@ export default function WhatsAppScreen() {
 const styles = StyleSheet.create({
   container: { 
     flex: 1, 
-    backgroundColor: theme.colors.background,
+    backgroundColor: C.bg,
   },
   header: { 
     flexDirection: 'row', 
     alignItems: 'flex-end', 
     justifyContent: 'space-between', 
-    backgroundColor: theme.colors.surface, 
-    paddingTop: Platform.OS === 'ios' ? 60 : 20, 
+    backgroundColor: C.surface, 
+    paddingTop: Platform.OS === 'ios' ? 60 : 44, 
     paddingBottom: 20, 
     paddingHorizontal: 20,
     borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
+    borderBottomColor: C.border,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
   },
   headerTitle: { 
     fontSize: 32,
-    fontWeight: theme.fontWeight.extrabold,
-    color: theme.colors.text,
+    fontWeight: '800',
+    color: C.text,
     letterSpacing: 0.5,
   },
-  subtitle: {
+  countBadge: {
+    backgroundColor: C.primaryMuted,
+    borderColor: C.primary,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  countText: {
     fontSize: 14,
-    fontWeight: theme.fontWeight.medium,
-    color: theme.colors.textSecondary,
-    marginTop: 4,
+    fontWeight: '600',
+    color: C.primary,
   },
   headerIcon: { 
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: theme.colors.surfaceLight,
+    backgroundColor: C.surfaceRaised,
     alignItems: 'center',
     justifyContent: 'center',
   },
   searchContainer: {
-    backgroundColor: theme.colors.surface,
+    backgroundColor: C.surface,
     paddingHorizontal: 20,
     paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
+    borderBottomColor: C.border,
   },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.surfaceLight,
-    borderRadius: theme.borderRadius.md,
+    backgroundColor: C.surfaceRaised,
+    borderRadius: 12,
     paddingHorizontal: 16,
-    height: theme.input.height,
+    height: 44,
     gap: 12,
   },
   searchInput: { 
     flex: 1,
-    color: theme.colors.text,
+    color: C.text,
     fontSize: 16,
-    fontWeight: theme.fontWeight.medium,
+    fontWeight: '500',
   },
   conversationRow: { 
     flexDirection: 'row', 
     alignItems: 'center', 
     paddingHorizontal: 20, 
     paddingVertical: 16,
-    backgroundColor: theme.colors.background,
+    backgroundColor: C.bg,
   },
   conversationContent: { 
     flex: 1, 
@@ -272,24 +305,24 @@ const styles = StyleSheet.create({
   },
   contactName: { 
     fontSize: 16, 
-    fontWeight: theme.fontWeight.semibold, 
-    color: theme.colors.text, 
+    fontWeight: '600', 
+    color: C.text, 
     flex: 1, 
     marginRight: 12,
   },
   timeLabel: { 
     fontSize: 12, 
-    color: theme.colors.textSecondary,
-    fontWeight: theme.fontWeight.medium,
+    color: C.textMuted,
+    fontWeight: '500',
   },
   messagePreview: { 
     fontSize: 14, 
-    color: theme.colors.textSecondary,
-    fontWeight: theme.fontWeight.medium,
+    color: C.textMuted,
+    fontWeight: '500',
   },
   separator: { 
     height: 1, 
-    backgroundColor: theme.colors.border, 
+    backgroundColor: C.border, 
     marginLeft: 84,
   },
   centered: { 
@@ -300,20 +333,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
   },
   errorText: { 
-    color: theme.colors.danger, 
+    color: C.danger, 
     fontSize: 16, 
     textAlign: 'center',
-    fontWeight: theme.fontWeight.medium,
+    fontWeight: '500',
   },
   retryBtn: { 
-    backgroundColor: theme.colors.primary,
-    borderRadius: theme.borderRadius.md,
+    backgroundColor: C.primary,
+    borderRadius: 12,
     paddingHorizontal: 24, 
     paddingVertical: 12,
   },
   retryText: { 
-    color: theme.colors.background, 
-    fontWeight: theme.fontWeight.semibold, 
+    color: C.bg, 
+    fontWeight: '600', 
     fontSize: 15,
   },
 });

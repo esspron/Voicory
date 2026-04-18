@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   TouchableOpacity,
   Text,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -17,8 +18,25 @@ import { CustomerCard } from '../components/CustomerCard';
 import { EmptyState } from '../components/EmptyState';
 import { getCustomers } from '../services/customerService';
 import { supabase } from '../lib/supabase';
-import { theme } from '../lib/theme';
 import { Customer } from '../types';
+
+// Design tokens
+const C = {
+  bg: '#050a12',
+  surface: '#0c1219',
+  surfaceRaised: '#111a24',
+  border: '#1a2332',
+  borderLight: '#1a233350',
+  primary: '#00d4aa',
+  primaryMuted: '#00d4aa18',
+  secondary: '#0099ff',
+  text: '#f0f2f5',
+  textMuted: '#7a8599',
+  textFaint: '#3d4a5c',
+  danger: '#ef4444',
+  warning: '#f59e0b',
+  success: '#22c55e',
+};
 
 const FILTER_OPTIONS = [
   { label: 'All', value: 'all' },
@@ -91,8 +109,14 @@ export default function CustomersScreen() {
   const ListHeader = () => (
     <View>
       <View style={styles.screenHeader}>
-        <Text style={styles.screenTitle}>Customers</Text>
-        <Text style={styles.subtitle}>Manage your customer relationships</Text>
+        <View style={styles.titleRow}>
+          <Text style={styles.screenTitle}>Customers</Text>
+          {customers.length > 0 && (
+            <View style={styles.countBadge}>
+              <Text style={styles.countText}>{customers.length}</Text>
+            </View>
+          )}
+        </View>
       </View>
       
       <SearchBar
@@ -109,7 +133,7 @@ export default function CustomersScreen() {
       
       {error ? (
         <View style={styles.errorBanner}>
-          <Ionicons name="alert-circle" size={16} color={theme.colors.danger} />
+          <Ionicons name="alert-circle" size={16} color={C.danger} />
           <Text style={styles.errorText}>{error}</Text>
         </View>
       ) : null}
@@ -119,7 +143,7 @@ export default function CustomersScreen() {
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color={theme.colors.primary} />
+        <ActivityIndicator size="large" color={C.primary} />
       </View>
     );
   }
@@ -139,14 +163,14 @@ export default function CustomersScreen() {
         ListEmptyComponent={
           <EmptyState
             icon="people"
-            title="No customers found"
-            message={search ? 'Try a different search.' : 'Add your first customer.'}
+            title="No customers yet"
+            message="Customers are added automatically when they call your agents"
           />
         }
         ListFooterComponent={
           loadingMore ? (
             <ActivityIndicator 
-              color={theme.colors.primary} 
+              color={C.primary} 
               style={styles.loadingMore} 
             />
           ) : null
@@ -155,8 +179,8 @@ export default function CustomersScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={theme.colors.primary}
-            colors={[theme.colors.primary]}
+            tintColor={C.primary}
+            colors={[C.primary]}
           />
         }
         onEndReached={onLoadMore}
@@ -172,10 +196,10 @@ export default function CustomersScreen() {
         activeOpacity={0.8}
       >
         <LinearGradient
-          colors={[theme.colors.primary, theme.colors.primaryDark]}
+          colors={[C.primary, C.primary + 'dd']}
           style={styles.fabGradient}
         >
-          <Ionicons name="add" size={24} color={theme.colors.background} />
+          <Ionicons name="add" size={24} color={C.bg} />
         </LinearGradient>
       </TouchableOpacity>
     </View>
@@ -185,7 +209,7 @@ export default function CustomersScreen() {
 const styles = StyleSheet.create({
   container: { 
     flex: 1, 
-    backgroundColor: theme.colors.background,
+    backgroundColor: C.bg,
   },
   listContent: { 
     paddingBottom: 100,
@@ -194,41 +218,53 @@ const styles = StyleSheet.create({
     flex: 1, 
     alignItems: 'center', 
     justifyContent: 'center', 
-    backgroundColor: theme.colors.background,
+    backgroundColor: C.bg,
   },
   screenHeader: { 
     paddingHorizontal: 20, 
-    paddingTop: 60, 
+    paddingTop: Platform.OS === 'ios' ? 60 : 44, 
     paddingBottom: 24,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   screenTitle: { 
     fontSize: 32,
-    fontWeight: theme.fontWeight.extrabold,
-    color: theme.colors.text,
+    fontWeight: '800',
+    color: C.text,
     letterSpacing: 0.5,
-    marginBottom: 4,
   },
-  subtitle: {
+  countBadge: {
+    backgroundColor: C.primaryMuted,
+    borderColor: C.primary,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  countText: {
     fontSize: 14,
-    fontWeight: theme.fontWeight.medium,
-    color: theme.colors.textSecondary,
+    fontWeight: '600',
+    color: C.primary,
   },
   errorBanner: { 
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.danger + '15',
+    backgroundColor: C.danger + '15',
     marginHorizontal: 20,
     marginVertical: 8,
-    borderRadius: theme.borderRadius.md,
+    borderRadius: 12,
     padding: 16,
     borderWidth: 1,
-    borderColor: theme.colors.danger + '30',
+    borderColor: C.danger + '30',
     gap: 12,
   },
   errorText: { 
-    color: theme.colors.danger, 
+    color: C.danger, 
     fontSize: 14,
-    fontWeight: theme.fontWeight.medium,
+    fontWeight: '500',
   },
   loadingMore: { 
     paddingVertical: 20,
@@ -238,7 +274,11 @@ const styles = StyleSheet.create({
     bottom: 24,
     right: 24,
     borderRadius: 28,
-    ...theme.shadow.card,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
   },
   fabGradient: {
     width: 56,

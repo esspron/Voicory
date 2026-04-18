@@ -1,6 +1,23 @@
 import React from 'react';
 import { ScrollView, TouchableOpacity, Text, StyleSheet, ViewStyle } from 'react-native';
-import { theme } from '../lib/theme';
+
+// Design tokens
+const C = {
+  bg: '#050a12',
+  surface: '#0c1219',
+  surfaceRaised: '#111a24',
+  border: '#1a2332',
+  borderLight: '#1a233350',
+  primary: '#00d4aa',
+  primaryMuted: '#00d4aa18',
+  secondary: '#0099ff',
+  text: '#f0f2f5',
+  textMuted: '#7a8599',
+  textFaint: '#3d4a5c',
+  danger: '#ef4444',
+  warning: '#f59e0b',
+  success: '#22c55e',
+};
 
 interface FilterChipsProps {
   options: { label: string; value: string }[];
@@ -46,22 +63,22 @@ const styles = StyleSheet.create({
   chip: {
     paddingHorizontal: 20,
     paddingVertical: 10,
-    borderRadius: theme.borderRadius.full,
-    backgroundColor: theme.colors.surface,
-    borderWidth: theme.card.borderWidth,
-    borderColor: theme.colors.border,
+    borderRadius: 20,
+    backgroundColor: C.surface,
+    borderWidth: 1,
+    borderColor: C.border,
   },
   chipSelected: {
-    backgroundColor: theme.colors.primary + '15',
-    borderColor: theme.colors.primary,
+    backgroundColor: C.primaryMuted,
+    borderColor: C.primary,
   },
   label: {
-    color: theme.colors.textSecondary,
+    color: C.textMuted,
     fontSize: 14,
-    fontWeight: theme.fontWeight.semibold,
+    fontWeight: '600',
   },
   labelSelected: {
-    color: theme.colors.primary,
-    fontWeight: theme.fontWeight.bold,
+    color: C.primary,
+    fontWeight: '700',
   },
 });

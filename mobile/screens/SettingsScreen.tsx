@@ -9,12 +9,30 @@ import {
   Linking,
   Alert,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { supabase } from '../lib/supabase';
-import { theme } from '../lib/theme';
+
+// Design tokens
+const C = {
+  bg: '#050a12',
+  surface: '#0c1219',
+  surfaceRaised: '#111a24',
+  border: '#1a2332',
+  borderLight: '#1a233350',
+  primary: '#00d4aa',
+  primaryMuted: '#00d4aa18',
+  secondary: '#0099ff',
+  text: '#f0f2f5',
+  textMuted: '#7a8599',
+  textFaint: '#3d4a5c',
+  danger: '#ef4444',
+  warning: '#f59e0b',
+  success: '#22c55e',
+};
 
 const APP_VERSION = '1.0.0';
 
@@ -86,7 +104,7 @@ export default function SettingsScreen() {
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color={theme.colors.primary} />
+        <ActivityIndicator size="large" color={C.primary} />
       </View>
     );
   }
@@ -100,13 +118,12 @@ export default function SettingsScreen() {
       {/* Header */}
       <View style={styles.pageHeader}>
         <Text style={styles.pageTitle}>Settings</Text>
-        <Text style={styles.subtitle}>Manage your account and preferences</Text>
       </View>
 
       {/* Profile Section */}
       <View style={styles.profileCard}>
         <LinearGradient
-          colors={[theme.colors.primary, theme.colors.primaryDark]}
+          colors={[C.primary, C.primary + 'dd']}
           style={styles.avatar}
         >
           <Text style={styles.avatarText}>
@@ -159,8 +176,8 @@ export default function SettingsScreen() {
             <Switch
               value={notificationsEnabled}
               onValueChange={setNotificationsEnabled}
-              trackColor={{ false: theme.colors.border, true: theme.colors.primary + '60' }}
-              thumbColor={notificationsEnabled ? theme.colors.primary : theme.colors.textTertiary}
+              trackColor={{ false: C.border, true: C.primaryMuted }}
+              thumbColor={notificationsEnabled ? C.primary : C.textFaint}
             />
           }
         />
@@ -223,7 +240,7 @@ export default function SettingsScreen() {
         disabled={loggingOut}
         activeOpacity={0.7}
       >
-        <Ionicons name="log-out" size={20} color={theme.colors.danger} />
+        <Ionicons name="log-out" size={20} color={C.danger} />
         <Text style={styles.signOutText}>
           {loggingOut ? 'Signing out...' : 'Sign Out'}
         </Text>
@@ -254,7 +271,7 @@ function SettingsRow({
         <Ionicons 
           name={icon} 
           size={22} 
-          color={theme.colors.textSecondary} 
+          color={C.textMuted} 
           style={styles.rowIcon} 
         />
         <Text style={styles.rowLabel}>{label}</Text>
@@ -265,7 +282,7 @@ function SettingsRow({
           <Ionicons 
             name="chevron-forward" 
             size={18} 
-            color={theme.colors.textTertiary} 
+            color={C.textFaint} 
           />
         )}
       </View>
@@ -289,7 +306,7 @@ function Separator() {
 const styles = StyleSheet.create({
   container: { 
     flex: 1, 
-    backgroundColor: theme.colors.background,
+    backgroundColor: C.bg,
   },
   content: { 
     paddingBottom: 40,
@@ -298,36 +315,34 @@ const styles = StyleSheet.create({
     flex: 1, 
     alignItems: 'center', 
     justifyContent: 'center', 
-    backgroundColor: theme.colors.background,
+    backgroundColor: C.bg,
   },
   pageHeader: { 
     paddingHorizontal: 20, 
-    paddingTop: 60, 
+    paddingTop: Platform.OS === 'ios' ? 60 : 44, 
     paddingBottom: 32,
   },
   pageTitle: { 
     fontSize: 32,
-    fontWeight: theme.fontWeight.extrabold,
-    color: theme.colors.text,
+    fontWeight: '800',
+    color: C.text,
     letterSpacing: 0.5,
-    marginBottom: 4,
-  },
-  subtitle: {
-    fontSize: 14,
-    fontWeight: theme.fontWeight.medium,
-    color: theme.colors.textSecondary,
   },
   profileCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.surface,
+    backgroundColor: C.surface,
     marginHorizontal: 20,
-    borderRadius: theme.borderRadius.lg,
+    borderRadius: 16,
     padding: 24,
     marginBottom: 32,
-    borderWidth: theme.card.borderWidth,
-    borderColor: theme.colors.border,
-    ...theme.shadow.card,
+    borderWidth: 1,
+    borderColor: C.border,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   avatar: {
     width: 60,
@@ -338,9 +353,9 @@ const styles = StyleSheet.create({
     marginRight: 16,
   },
   avatarText: { 
-    color: theme.colors.text, 
+    color: C.text, 
     fontSize: 20,
-    fontWeight: theme.fontWeight.extrabold,
+    fontWeight: '800',
     textShadowColor: 'rgba(0,0,0,0.3)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
@@ -349,15 +364,15 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   profileName: { 
-    color: theme.colors.text, 
+    color: C.text, 
     fontSize: 18,
-    fontWeight: theme.fontWeight.bold,
+    fontWeight: '700',
     marginBottom: 4,
   },
   profileEmail: { 
-    color: theme.colors.textSecondary, 
+    color: C.textMuted, 
     fontSize: 14,
-    fontWeight: theme.fontWeight.medium,
+    fontWeight: '500',
     marginBottom: 12,
   },
   badgeRow: {
@@ -366,42 +381,46 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   planBadge: {
-    backgroundColor: theme.colors.primary + '20',
-    borderRadius: theme.borderRadius.full,
+    backgroundColor: C.primaryMuted,
+    borderRadius: 20,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderWidth: 1,
-    borderColor: theme.colors.primary + '40',
+    borderColor: C.primary + '40',
   },
   planText: {
-    color: theme.colors.primary,
+    color: C.primary,
     fontSize: 11,
-    fontWeight: theme.fontWeight.bold,
+    fontWeight: '700',
     letterSpacing: 0.5,
   },
   creditsBalance: {
-    color: theme.colors.success,
+    color: C.success,
     fontSize: 13,
-    fontWeight: theme.fontWeight.semibold,
+    fontWeight: '600',
   },
   sectionHeader: { 
-    color: theme.colors.textSecondary, 
+    color: C.textMuted, 
     fontSize: 12,
-    fontWeight: theme.fontWeight.semibold,
+    fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginHorizontal: 20,
     marginBottom: 12,
   },
   menuCard: {
-    backgroundColor: theme.colors.surface,
+    backgroundColor: C.surface,
     marginHorizontal: 20,
-    borderRadius: theme.borderRadius.lg,
-    borderWidth: theme.card.borderWidth,
-    borderColor: theme.colors.border,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: C.border,
     marginBottom: 24,
     overflow: 'hidden',
-    ...theme.shadow.card,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
   },
   settingsRow: {
     flexDirection: 'row',
@@ -419,9 +438,9 @@ const styles = StyleSheet.create({
     marginRight: 16,
   },
   rowLabel: { 
-    color: theme.colors.text, 
+    color: C.text, 
     fontSize: 16,
-    fontWeight: theme.fontWeight.medium,
+    fontWeight: '500',
   },
   rowRight: { 
     flexDirection: 'row', 
@@ -430,7 +449,7 @@ const styles = StyleSheet.create({
   },
   separator: { 
     height: 1, 
-    backgroundColor: theme.colors.border, 
+    backgroundColor: C.border, 
     marginLeft: 58,
   },
   signOutBtn: {
@@ -440,21 +459,21 @@ const styles = StyleSheet.create({
     gap: 12,
     marginHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: theme.colors.danger + '10',
-    borderRadius: theme.borderRadius.md,
+    backgroundColor: C.danger + '10',
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: theme.colors.danger + '30',
+    borderColor: C.danger + '30',
     marginBottom: 32,
   },
   signOutText: { 
-    color: theme.colors.danger, 
+    color: C.danger, 
     fontSize: 16,
-    fontWeight: theme.fontWeight.semibold,
+    fontWeight: '600',
   },
   version: { 
     textAlign: 'center', 
-    color: theme.colors.textTertiary, 
+    color: C.textFaint, 
     fontSize: 12,
-    fontWeight: theme.fontWeight.medium,
+    fontWeight: '500',
   },
 });

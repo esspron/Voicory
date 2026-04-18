@@ -1,7 +1,24 @@
 import React from 'react';
 import { View, TextInput, StyleSheet, ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { theme } from '../lib/theme';
+
+// Design tokens
+const C = {
+  bg: '#050a12',
+  surface: '#0c1219',
+  surfaceRaised: '#111a24',
+  border: '#1a2332',
+  borderLight: '#1a233350',
+  primary: '#00d4aa',
+  primaryMuted: '#00d4aa18',
+  secondary: '#0099ff',
+  text: '#f0f2f5',
+  textMuted: '#7a8599',
+  textFaint: '#3d4a5c',
+  danger: '#ef4444',
+  warning: '#f59e0b',
+  success: '#22c55e',
+};
 
 interface SearchBarProps {
   value: string;
@@ -21,7 +38,7 @@ export function SearchBar({
       <Ionicons 
         name="search" 
         size={20} 
-        color={theme.colors.textTertiary} 
+        color={C.textFaint} 
         style={styles.icon} 
       />
       <TextInput
@@ -29,7 +46,7 @@ export function SearchBar({
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
-        placeholderTextColor={theme.colors.textTertiary}
+        placeholderTextColor={C.textFaint}
         autoCapitalize="none"
         autoCorrect={false}
         clearButtonMode="while-editing"
@@ -42,22 +59,22 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.borderRadius.md,
-    borderWidth: theme.input.borderWidth,
-    borderColor: theme.colors.border,
+    backgroundColor: C.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: C.border,
     paddingHorizontal: 16,
     marginHorizontal: 20,
     marginVertical: 12,
-    height: theme.input.height,
+    height: 44,
   },
   icon: { 
     marginRight: 12,
   },
   input: {
     flex: 1,
-    color: theme.colors.text,
+    color: C.text,
     fontSize: 16,
-    fontWeight: theme.fontWeight.medium,
+    fontWeight: '500',
   },
 });

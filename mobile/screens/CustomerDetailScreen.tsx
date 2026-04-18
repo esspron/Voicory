@@ -10,6 +10,7 @@ import {
   TextInput,
   Alert,
   ScrollView,
+  Platform,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -19,15 +20,22 @@ import { getCustomerById, updateCustomer } from '../services/customerService';
 import { getCalls } from '../services/callService';
 import { Customer, CallLog } from '../types';
 
-const COLORS = {
-  background: '#0a0f1a',
-  surface: '#111827',
-  surfaceLight: '#1f2937',
+// Design tokens
+const C = {
+  bg: '#050a12',
+  surface: '#0c1219',
+  surfaceRaised: '#111a24',
+  border: '#1a2332',
+  borderLight: '#1a233350',
   primary: '#00d4aa',
-  text: '#ffffff',
-  textSecondary: '#9ca3af',
-  border: '#374151',
+  primaryMuted: '#00d4aa18',
+  secondary: '#0099ff',
+  text: '#f0f2f5',
+  textMuted: '#7a8599',
+  textFaint: '#3d4a5c',
   danger: '#ef4444',
+  warning: '#f59e0b',
+  success: '#22c55e',
 };
 
 const TAGS = ['hot_lead', 'follow_up', 'closed', 'vip', 'new'];
@@ -117,7 +125,7 @@ export default function CustomerDetailScreen() {
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
+        <ActivityIndicator size="large" color={C.primary} />
       </View>
     );
   }
@@ -125,7 +133,7 @@ export default function CustomerDetailScreen() {
   if (error || !customer) {
     return (
       <View style={styles.centered}>
-        <Ionicons name="warning-outline" size={40} color={COLORS.danger} />
+        <Ionicons name="warning-outline" size={40} color={C.danger} />
         <Text style={styles.errorText}>{error || 'Customer not found'}</Text>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Text style={styles.backBtnText}>Go Back</Text>
@@ -141,7 +149,7 @@ export default function CustomerDetailScreen() {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={22} color={COLORS.text} />
+          <Ionicons name="arrow-back" size={22} color={C.text} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
           <Text style={styles.headerName} numberOfLines={1}>{customer.name}</Text>
@@ -154,13 +162,13 @@ export default function CustomerDetailScreen() {
         <ActionButton
           icon="call"
           label="Call"
-          color={COLORS.primary}
+          color={C.primary}
           onPress={() => Linking.openURL(`tel:${customer.phone_number}`)}
         />
         <ActionButton
           icon="logo-whatsapp"
           label="WhatsApp"
-          color="#22c55e"
+          color={C.success}
           onPress={() =>
             Linking.openURL(`https://wa.me/${customer.phone_number.replace(/\D/g, '')}`)
           }
@@ -168,7 +176,7 @@ export default function CustomerDetailScreen() {
         <ActionButton
           icon="create-outline"
           label="Edit"
-          color="#818cf8"
+          color={C.secondary}
           onPress={() => router.push(`/customers/${customer.id}/edit` as any)}
         />
       </View>
@@ -250,7 +258,7 @@ export default function CustomerDetailScreen() {
             value={notes}
             onChangeText={setNotes}
             placeholder="Write notes about this customer..."
-            placeholderTextColor={COLORS.textSecondary}
+            placeholderTextColor={C.textMuted}
             multiline
             textAlignVertical="top"
           />
@@ -293,7 +301,7 @@ function ActionButton({
 function InfoRow({ icon, label, value }: { icon: any; label: string; value: string }) {
   return (
     <View style={styles.infoRow}>
-      <Ionicons name={icon} size={16} color={COLORS.textSecondary} style={{ marginRight: 8 }} />
+      <Ionicons name={icon} size={16} color={C.textMuted} style={{ marginRight: 8 }} />
       <Text style={styles.infoLabel}>{label}</Text>
       <Text style={styles.infoValue} numberOfLines={1}>{value}</Text>
     </View>
@@ -301,15 +309,15 @@ function InfoRow({ icon, label, value }: { icon: any; label: string; value: stri
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.background, gap: 12 },
-  errorText: { color: COLORS.danger, fontSize: 15 },
-  backBtn: { paddingHorizontal: 20, paddingVertical: 10, backgroundColor: COLORS.surfaceLight, borderRadius: 8 },
-  backBtnText: { color: COLORS.text, fontSize: 14 },
+  container: { flex: 1, backgroundColor: C.bg },
+  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: C.bg, gap: 12 },
+  errorText: { color: C.danger, fontSize: 15 },
+  backBtn: { paddingHorizontal: 20, paddingVertical: 10, backgroundColor: C.surfaceRaised, borderRadius: 8 },
+  backBtnText: { color: C.text, fontSize: 14 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: 52,
+    paddingTop: Platform.OS === 'ios' ? 60 : 44,
     paddingHorizontal: 16,
     paddingBottom: 12,
     gap: 12,
@@ -318,70 +326,70 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: COLORS.surfaceLight,
+    backgroundColor: C.surfaceRaised,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  headerName: { color: COLORS.text, fontSize: 18, fontWeight: '700' },
-  headerPhone: { color: COLORS.textSecondary, fontSize: 13, marginTop: 2 },
+  headerName: { color: C.text, fontSize: 18, fontWeight: '700' },
+  headerPhone: { color: C.textMuted, fontSize: 13, marginTop: 2 },
   actions: { flexDirection: 'row', paddingHorizontal: 16, marginBottom: 12, gap: 12 },
   actionBtn: { flex: 1, alignItems: 'center', gap: 6 },
   actionIcon: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
-  actionLabel: { color: COLORS.textSecondary, fontSize: 12 },
+  actionLabel: { color: C.textMuted, fontSize: 12 },
   infoCard: {
-    backgroundColor: COLORS.surface,
+    backgroundColor: C.surface,
     marginHorizontal: 16,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: C.border,
     padding: 14,
     marginBottom: 10,
     gap: 8,
   },
   infoRow: { flexDirection: 'row', alignItems: 'center' },
-  infoLabel: { color: COLORS.textSecondary, fontSize: 13, flex: 1 },
-  infoValue: { color: COLORS.text, fontSize: 13, fontWeight: '500', flex: 2, textAlign: 'right' },
+  infoLabel: { color: C.textMuted, fontSize: 13, flex: 1 },
+  infoValue: { color: C.text, fontSize: 13, fontWeight: '500', flex: 2, textAlign: 'right' },
   tagsScroll: { maxHeight: 48, marginBottom: 8 },
   tagsContent: { paddingHorizontal: 16, gap: 8, alignItems: 'center' },
   tag: {
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
-    backgroundColor: COLORS.surface,
+    backgroundColor: C.surface,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: C.border,
   },
-  tagActive: { backgroundColor: COLORS.primary + '22', borderColor: COLORS.primary },
-  tagText: { color: COLORS.textSecondary, fontSize: 12, textTransform: 'capitalize' },
-  tagTextActive: { color: COLORS.primary, fontWeight: '600' },
-  tabs: { flexDirection: 'row', marginHorizontal: 16, marginBottom: 8, backgroundColor: COLORS.surface, borderRadius: 8, padding: 3 },
+  tagActive: { backgroundColor: C.primaryMuted, borderColor: C.primary },
+  tagText: { color: C.textMuted, fontSize: 12, textTransform: 'capitalize' },
+  tagTextActive: { color: C.primary, fontWeight: '600' },
+  tabs: { flexDirection: 'row', marginHorizontal: 16, marginBottom: 8, backgroundColor: C.surface, borderRadius: 8, padding: 3 },
   tab: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 6 },
-  tabActive: { backgroundColor: COLORS.surfaceLight },
-  tabText: { color: COLORS.textSecondary, fontSize: 13, fontWeight: '500' },
-  tabTextActive: { color: COLORS.text, fontWeight: '600' },
+  tabActive: { backgroundColor: C.surfaceRaised },
+  tabText: { color: C.textMuted, fontSize: 13, fontWeight: '500' },
+  tabTextActive: { color: C.text, fontWeight: '600' },
   callsList: { paddingBottom: 32 },
   emptyTab: { paddingVertical: 32, alignItems: 'center' },
-  emptyText: { color: COLORS.textSecondary, fontSize: 14 },
+  emptyText: { color: C.textMuted, fontSize: 14 },
   notesSection: { flex: 1, paddingHorizontal: 16, paddingTop: 8 },
   notesInput: {
     flex: 1,
-    backgroundColor: COLORS.surface,
+    backgroundColor: C.surface,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: C.border,
     padding: 14,
-    color: COLORS.text,
+    color: C.text,
     fontSize: 14,
     lineHeight: 22,
     minHeight: 160,
     marginBottom: 12,
   },
   saveBtn: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: C.primary,
     borderRadius: 12,
     paddingVertical: 14,
     alignItems: 'center',
     marginBottom: 24,
   },
-  saveBtnText: { color: '#0a0f1a', fontSize: 15, fontWeight: '700' },
+  saveBtnText: { color: C.bg, fontSize: 15, fontWeight: '700' },
 });

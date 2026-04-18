@@ -1,8 +1,25 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { theme } from '../../lib/theme';
 import { Platform } from 'react-native';
+
+// Design tokens
+const C = {
+  bg: '#050a12',
+  surface: '#0c1219',
+  surfaceRaised: '#111a24',
+  border: '#1a2332',
+  borderLight: '#1a233350',
+  primary: '#00d4aa',
+  primaryMuted: '#00d4aa18',
+  secondary: '#0099ff',
+  text: '#f0f2f5',
+  textMuted: '#7a8599',
+  textFaint: '#3d4a5c',
+  danger: '#ef4444',
+  warning: '#f59e0b',
+  success: '#22c55e',
+};
 
 type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -52,18 +69,18 @@ export default function TabsLayout() {
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: theme.colors.surface,
-          borderTopColor: theme.colors.border,
+          backgroundColor: C.surface,
+          borderTopColor: C.border,
           borderTopWidth: 1,
-          height: Platform.OS === 'ios' ? 88 : 64,
-          paddingBottom: Platform.OS === 'ios' ? 28 : 8,
+          height: Platform.OS === 'ios' ? 84 : 60,
+          paddingBottom: Platform.OS === 'ios' ? 24 : 8,
           paddingTop: 8,
         },
-        tabBarActiveTintColor: theme.colors.primary,
-        tabBarInactiveTintColor: theme.colors.textTertiary,
+        tabBarActiveTintColor: C.primary,
+        tabBarInactiveTintColor: C.textFaint,
         tabBarLabelStyle: {
-          fontSize: 11,
-          fontWeight: theme.fontWeight.semibold,
+          fontSize: 10,
+          fontWeight: '600',
         },
       }}
     >
@@ -76,7 +93,7 @@ export default function TabsLayout() {
             tabBarIcon: ({ focused, color, size }) => (
               <Ionicons
                 name={focused ? tab.iconFocused : tab.icon}
-                size={26} // Slightly larger icons
+                size={24}
                 color={color}
               />
             ),
