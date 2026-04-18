@@ -437,13 +437,17 @@ app.get('/health', async (req, res) => {
     status = 'degraded';
   }
 
-  res.json({
+  const payload = {
     status,
     uptime_seconds: Math.floor(process.uptime()),
     timestamp: new Date().toISOString(),
     checks
-  });
+  };
+  res.json(payload);
 });
+
+// Alias for monitoring tools that expect /api/health
+app.get('/api/health', async (req, res) => res.redirect(307, '/health'));
 
 
 // ============================================
