@@ -112,7 +112,18 @@ npm run test:run   # Must pass
 
 ---
 
-## 🔄 Context Sync Rule (MANDATORY)
+## Zero Hallucination Rule (Read Before Writing Any Code)
+
+Before writing any code:
+1. Verify every function/method exists — `grep -n "functionName" <file>`
+2. Check Context7 for any third-party library — never use training memory alone
+3. Read the file before editing it
+4. Run the test/build/TypeScript check before reporting done — never say "should work"
+5. Show proof: test output, curl response, screenshot, `tsc --noEmit` clean
+
+Full protocol: `23-anti-hallucination.md`
+
+
 
 **Every commit that changes code MUST update the relevant context file in the same commit.**
 
