@@ -1,0 +1,10 @@
+export { VoicoryLogo } from './VoicoryLogo';
+export { VoiceWaveform } from './VoiceWaveform';
+export { AnalyticsDashboard } from './AnalyticsDashboard';
+export { MessagingBubbles } from './MessagingBubbles';
+export { PhoneCall } from './PhoneCall';
+export { EmptyInbox } from './EmptyInbox';
+export { CreditCard } from './CreditCard';
+export { TeamPeople } from './TeamPeople';
+export { SuccessCheckmark } from './SuccessCheckmark';
+export { OnboardingHero } from './OnboardingHero';
