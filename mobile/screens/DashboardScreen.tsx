@@ -32,11 +32,8 @@ import Svg, {
   LinearGradient as SvgGrad,
   RadialGradient,
   Stop,
-  G,
   Ellipse,
-  Polygon,
   Rect,
-  ClipPath,
 } from 'react-native-svg';
 import { getDashboardData, DashboardData, CreditHealth, AgentPerformance } from '../services/analyticsService';
 import { getCalls } from '../services/callService';
@@ -44,6 +41,9 @@ import { supabase } from '../lib/supabase';
 import { CallLog } from '../types';
 import { colors as C, shadows, radii, spacing } from '../lib/theme';
 import { SkeletonDashboard } from '../components/Skeleton';
+import { AnimatedNumber } from '../components/AnimatedNumber';
+import { MiniChart } from '../components/MiniChart';
+import { ProgressRing } from '../components/ProgressRing';
 
 const { width: SW } = Dimensions.get('window');
 
@@ -146,53 +146,6 @@ function WaveformIllustration() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// ANIMATED NUMBER COUNTER
-// ═══════════════════════════════════════════════════════════════════════════════
-
-interface AnimatedNumberProps {
-  value: number;
-  style?: object;
-  prefix?: string;
-  suffix?: string;
-  decimals?: number;
-  delay?: number;
-}
-
-function AnimatedNumber({ value, style, prefix = '', suffix = '', decimals = 0, delay = 0 }: AnimatedNumberProps) {
-  const [displayed, setDisplayed] = useState(0);
-  const startRef = useRef(0);
-  const frameRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    if (value === 0) { setDisplayed(0); return; }
-    const duration = 900;
-    const startTime = Date.now() + delay;
-    let rafId: ReturnType<typeof setTimeout>;
-
-    const step = () => {
-      const now = Date.now();
-      if (now < startTime) { rafId = setTimeout(step, 16); return; }
-      const elapsed = now - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-      // Ease out cubic
-      const eased = 1 - Math.pow(1 - progress, 3);
-      setDisplayed(startRef.current + (value - startRef.current) * eased);
-      if (progress < 1) { rafId = setTimeout(step, 16); }
-      else { setDisplayed(value); }
-    };
-
-    rafId = setTimeout(step, 16);
-    return () => clearTimeout(rafId);
-  }, [value, delay]);
-
-  const formatted = decimals > 0
-    ? displayed.toFixed(decimals)
-    : Math.floor(displayed).toLocaleString();
-
-  return <Text style={style}>{prefix}{formatted}{suffix}</Text>;
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
 // CREDIT CARD — Apple Card style gradient mesh
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -268,32 +221,6 @@ function CreditCard({ ch }: { ch: CreditHealth }) {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 const AGENT_RING_SZ = 44;
-const AGENT_RING_SW = 3.5;
-const AGENT_RING_R = (AGENT_RING_SZ - AGENT_RING_SW) / 2;
-const AGENT_RING_C = 2 * Math.PI * AGENT_RING_R;
-
-function AgentProgressRing({ rate, color }: { rate: number; color: string }) {
-  const offset = AGENT_RING_C * (1 - Math.min(rate / 100, 1));
-  return (
-    <View style={{ width: AGENT_RING_SZ, height: AGENT_RING_SZ, alignItems: 'center', justifyContent: 'center' }}>
-      <Svg width={AGENT_RING_SZ} height={AGENT_RING_SZ} style={StyleSheet.absoluteFill}>
-        <Circle
-          cx={AGENT_RING_SZ / 2} cy={AGENT_RING_SZ / 2} r={AGENT_RING_R}
-          stroke={C.border} strokeWidth={AGENT_RING_SW} fill="none"
-        />
-        <Circle
-          cx={AGENT_RING_SZ / 2} cy={AGENT_RING_SZ / 2} r={AGENT_RING_R}
-          stroke={color} strokeWidth={AGENT_RING_SW} fill="none"
-          strokeLinecap="round"
-          strokeDasharray={`${AGENT_RING_C}`}
-          strokeDashoffset={offset}
-          transform={`rotate(-90 ${AGENT_RING_SZ / 2} ${AGENT_RING_SZ / 2})`}
-        />
-      </Svg>
-      <Text style={[s.agentRingPct, { color }]}>{Math.round(rate)}%</Text>
-    </View>
-  );
-}
 
 function AgentRow({ agent, index }: { agent: AgentPerformance; index: number }) {
   const rateColor = agent.successRate > 80 ? C.success : agent.successRate > 50 ? C.warning : C.danger;
@@ -319,28 +246,15 @@ function AgentRow({ agent, index }: { agent: AgentPerformance; index: number }) 
         <Text style={s.agentName} numberOfLines={1}>{agent.assistantName}</Text>
         <Text style={s.agentSub}>{agent.totalCalls} calls · {Math.round(agent.avgDurationSec)}s avg</Text>
       </View>
-      <AgentProgressRing rate={agent.successRate} color={rateColor} />
+      <ProgressRing
+        value={agent.successRate}
+        size={AGENT_RING_SZ}
+        strokeWidth={3.5}
+        color={rateColor}
+        label={`${Math.round(agent.successRate)}%`}
+        labelStyle={{ fontSize: 10, fontWeight: '800' } as any}
+      />
     </Animated.View>
-  );
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// SPARKLINE
-// ═══════════════════════════════════════════════════════════════════════════════
-
-function Sparkline({ data }: { data: number[] }) {
-  const max = Math.max(...data, 1);
-  const h = 28;
-  return (
-    <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 3, height: h }}>
-      {data.map((v, i) => (
-        <View key={i} style={{
-          width: 4, borderRadius: 2,
-          height: Math.max((v / max) * h, 2),
-          backgroundColor: i === data.length - 1 ? C.primary : C.primary + '40',
-        }} />
-      ))}
-    </View>
   );
 }
 
@@ -726,7 +640,7 @@ export default function DashboardScreen() {
         <View style={s.weekSection}>
           <View style={s.weekHeader}>
             <Text style={s.sectionLabel}>This week</Text>
-            {activity.length > 0 && <Sparkline data={activity} />}
+            {activity.length > 0 && <MiniChart data={activity} width={72} height={28} />}
           </View>
 
           <LinearGradient
