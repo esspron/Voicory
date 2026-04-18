@@ -26,24 +26,25 @@ const { width: SCREEN_W } = Dimensions.get('window');
 // ─── Custom SVG Logo ─────────────────────────────────────────────────────────
 
 function VoicoryLogo({ size = 56 }: { size?: number }) {
+  const scale = size / 40;
   return (
-    <Svg width={size} height={size} viewBox="0 0 56 56" fill="none">
+    <Svg width={size} height={size} viewBox="0 0 40 40" fill="none">
       <Defs>
-        <SvgGrad id="logoGrad" x1="0" y1="0" x2="56" y2="56" gradientUnits="userSpaceOnUse">
-          <Stop offset="0" stopColor="#00d4aa" />
-          <Stop offset="1" stopColor="#0099ff" />
+        <SvgGrad id="vGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+          <Stop offset="0%" stopColor="#2EC7B7" />
+          <Stop offset="100%" stopColor="#26AFA1" />
         </SvgGrad>
-        <SvgGrad id="bgGrad" x1="0" y1="0" x2="56" y2="56" gradientUnits="userSpaceOnUse">
-          <Stop offset="0" stopColor="#162033" />
-          <Stop offset="1" stopColor="#0d1520" />
+        <SvgGrad id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <Stop offset="0%" stopColor="#1B1E23" />
+          <Stop offset="100%" stopColor="#15181C" />
         </SvgGrad>
       </Defs>
-      <Circle cx="28" cy="28" r="28" fill="url(#bgGrad)" />
-      {/* V lettermark with sound waves */}
-      <Path d="M18 16L28 40L38 16" stroke="url(#logoGrad)" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-      {/* Sound wave arcs */}
-      <Path d="M40 22C42 24 42 32 40 34" stroke="url(#logoGrad)" strokeWidth="1.8" strokeLinecap="round" opacity="0.5" />
-      <Path d="M43 19C46 23 46 33 43 37" stroke="url(#logoGrad)" strokeWidth="1.8" strokeLinecap="round" opacity="0.3" />
+      <Rect x="0" y="0" width="40" height="40" rx="8" ry="8" fill="url(#bgGrad)" />
+      <Rect x="0.5" y="0.5" width="39" height="39" rx="7.5" ry="7.5" stroke="#2EC7B7" strokeWidth="1" opacity="0.15" fill="none" />
+      <Path
+        d="M22.23 6.97C27.42 10.11 29.51 18.39 26.33 23.74C25.33 25.44 24.55 27.11 24.05 28.66C23.85 25.52 23.39 23.04 22.65 20.64C21.76 17.73 21.34 16.53 20.45 13.78C18.51 7.82 13.98 6.77 12.00 6.77C9.99 6.77 7.51 7.51 6.00 9.68L6.66 10.41C7.90 9.06 9.87 9.21 10.80 11.42C12.35 15.06 13.20 19.63 14.83 24.59C16.30 28.93 23.23 25.36 23.23 33.23L24.20 33.23C24.20 31.25 25.36 27.07 27.61 23.62C30.17 19.67 34.00 12.54 34.00 6.97Z"
+        fill="url(#vGradient)"
+      />
     </Svg>
   );
 }
