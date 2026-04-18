@@ -18,6 +18,7 @@ This folder contains modular copilot instructions for the Voicory project. Each 
 | [03-architecture.md](./03-architecture.md) | Stack, data flow, file structure, scaling |
 | [08-backend.md](./08-backend.md) | Backend routes, services, environment |
 | [09-deployment.md](./09-deployment.md) | CI/CD, Cloud Run, Vercel deployment |
+| [18-context7-dependencies.md](./18-context7-dependencies.md) | **MANDATORY: Context7 protocol + version registry** — always check before writing integration code |
 
 ## Frontend & UI
 

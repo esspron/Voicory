@@ -126,5 +126,6 @@ npm run test:run   # Must pass
 | Deploy/infra change | `09-deployment.md` |
 | DB schema change | `16-technical-requirements.md` |
 | UI/UX bar update | `17-design-standards.md` |
+| New/updated dependency | `18-context7-dependencies.md` — update version registry |
 
 These files are read by Cursor, Copilot, and every AI agent that touches this codebase. Stale docs = wrong code generation = production bugs. You are responsible for keeping them current.
