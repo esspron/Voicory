@@ -3,6 +3,30 @@ import { DashboardStats } from '../types';
 
 const USD_TO_INR = 84;
 
+// ─── Simple in-memory TTL cache ────────────────────────────────────────────────
+
+interface CacheEntry<T> {
+  data: T;
+  expiresAt: number;
+}
+
+const _cache = new Map<string, CacheEntry<unknown>>();
+const CACHE_TTL_MS = 60_000; // 1 minute
+
+function cacheGet<T>(key: string): T | null {
+  const entry = _cache.get(key);
+  if (!entry) return null;
+  if (Date.now() > entry.expiresAt) {
+    _cache.delete(key);
+    return null;
+  }
+  return entry.data as T;
+}
+
+function cacheSet<T>(key: string, data: T, ttlMs = CACHE_TTL_MS): void {
+  _cache.set(key, { data, expiresAt: Date.now() + ttlMs });
+}
+
 export interface CreditHealth {
   balanceUsd: number;
   balanceInr: number;
@@ -59,9 +83,16 @@ function getUrgency(daysRemaining: number): CreditHealth['urgency'] {
 }
 
 export async function getDashboardData(userId: string): Promise<DashboardData> {
-  const now = new Date();
-  const sevenDaysAgo = new Date(now.getTime() - 7 * 86400000).toISOString();
-  const fourteenDaysAgo = new Date(now.getTime() - 14 * 86400000).toISOString();
+  const cacheKey = `dashboard:${userId}`;
+
+  // Stale-while-revalidate: return cached data immediately if available
+  const cached = cacheGet<DashboardData>(cacheKey);
+
+  // Fetch in background (or foreground if no cache)
+  const fetchFresh = async (): Promise<DashboardData> => {
+    const now = new Date();
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 86400000).toISOString();
+    const fourteenDaysAgo = new Date(now.getTime() - 14 * 86400000).toISOString();
 
   // Parallel fetch everything we need
   const [profileRes, weekCallsRes, priorWeekCallsRes, assistantsCountRes] = await Promise.all([
@@ -180,6 +211,18 @@ export async function getDashboardData(userId: string): Promise<DashboardData> {
     greeting: getGreeting(),
     assistantCount,
   };
+  }; // end fetchFresh
+
+  if (cached) {
+    // Return stale data immediately, refresh in background
+    fetchFresh().then((fresh) => cacheSet(cacheKey, fresh)).catch(() => null);
+    return cached;
+  }
+
+  // No cache — wait for fresh data
+  const fresh = await fetchFresh();
+  cacheSet(cacheKey, fresh);
+  return fresh;
 }
 
 // Keep old export for backward compatibility

@@ -9,6 +9,9 @@ import { useFonts } from 'expo-font';
 import { AuthProvider, useAuth } from '../contexts/AuthContext';
 import { useAuthStore } from '../stores/authStore';
 import { ErrorBoundary } from '../components/ErrorBoundary';
+import { OfflineBanner } from '../components/OfflineBanner';
+import { registerUnauthorizedHandler } from '../lib/api';
+import { supabase } from '../lib/supabase';
 import { colors } from '../lib/theme';
 import { theme } from '../lib/theme';
 
@@ -21,6 +24,14 @@ function AuthGuard() {
   const clearAuthStore = useAuthStore((s) => s.clearAuthStore);
   const segments = useSegments();
   const router = useRouter();
+
+  // Register global 401 → auto-logout handler
+  useEffect(() => {
+    registerUnauthorizedHandler(async () => {
+      await supabase.auth.signOut().catch(() => null);
+      router.replace('/(auth)/login');
+    });
+  }, [router]);
 
   useEffect(() => {
     if (loading) return;
@@ -85,6 +96,7 @@ export default function RootLayout() {
           <AuthProvider>
             <StatusBar style="light" backgroundColor={colors.bg} />
             <AuthGuard />
+            <OfflineBanner />
             <Stack
               screenOptions={{
                 headerShown: false,
