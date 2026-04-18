@@ -225,18 +225,20 @@ export default function LoginScreen() {
 
             {/* Google */}
             <Pressable
-              style={({ pressed }) => [s.googleBtn, pressed && { opacity: 0.85 }]}
               onPress={handleGoogleSignIn}
               disabled={loading || googleLoading}
+              style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1 }]}
             >
-              {googleLoading ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <>
-                  <GoogleIcon size={18} />
-                  <Text style={s.googleBtnText}>Google</Text>
-                </>
-              )}
+              <View style={s.googleBtn}>
+                {googleLoading ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <>
+                    <GoogleIcon size={18} />
+                    <Text style={s.googleBtnText}>Google</Text>
+                  </>
+                )}
+              </View>
             </Pressable>
 
             {/* Signup */}
@@ -365,7 +367,6 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    width: '100%',
     gap: 10,
     backgroundColor: '#111827',
     borderRadius: 14,
