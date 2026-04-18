@@ -2,7 +2,7 @@ import '../global.css';
 import React, { useEffect } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { ActivityIndicator, View } from 'react-native';
+import { View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useFonts } from 'expo-font';
@@ -10,6 +10,7 @@ import { AuthProvider, useAuth } from '../contexts/AuthContext';
 import { useAuthStore } from '../stores/authStore';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { OfflineBanner } from '../components/OfflineBanner';
+import { SplashScreen } from '../components/SplashScreen';
 import { registerUnauthorizedHandler } from '../lib/api';
 import { supabase } from '../lib/supabase';
 import { colors } from '../lib/theme';
@@ -62,18 +63,7 @@ function AuthGuard() {
   useLastNotificationResponse();
 
   if (loading) {
-    return (
-      <View
-        style={{
-          flex: 1,
-          backgroundColor: theme.colors.background,
-          justifyContent: 'center',
-          alignItems: 'center',
-        }}
-      >
-        <ActivityIndicator size="large" color={theme.colors.primary} />
-      </View>
-    );
+    return <SplashScreen />;
   }
 
   return null;
@@ -87,11 +77,7 @@ export default function RootLayout() {
   });
 
   if (!fontsLoaded) {
-    return (
-      <View style={{ flex: 1, backgroundColor: theme.colors.background, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color={theme.colors.primary} />
-      </View>
-    );
+    return <SplashScreen />;
   }
 
   return (
