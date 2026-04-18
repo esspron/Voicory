@@ -101,9 +101,9 @@ const BillingAndAddons: React.FC = () => {
                 return;
             }
             try {
-                // Initialize Paddle for checkout
-                await initializePaddle();
-                
+                // Initialize Paddle in background — don't block data load
+                initializePaddle().catch(e => console.warn('Paddle init failed (non-critical):', e));
+
                 const [profile, summary, txns, billingStatusResult, addons, addonHistory, reloadSettings] = await Promise.all([
                     getUserProfile(),
                     getUsageSummary(30),
