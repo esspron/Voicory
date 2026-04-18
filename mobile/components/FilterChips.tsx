@@ -1,5 +1,6 @@
 import React from 'react';
 import { ScrollView, TouchableOpacity, Text, StyleSheet, ViewStyle } from 'react-native';
+import { theme } from '../lib/theme';
 
 interface FilterChipsProps {
   options: { label: string; value: string }[];
@@ -24,7 +25,9 @@ export function FilterChips({ options, selected, onSelect, style }: FilterChipsP
             onPress={() => onSelect(opt.value)}
             activeOpacity={0.7}
           >
-            <Text style={[styles.label, isSelected && styles.labelSelected]}>{opt.label}</Text>
+            <Text style={[styles.label, isSelected && styles.labelSelected]}>
+              {opt.label}
+            </Text>
           </TouchableOpacity>
         );
       })}
@@ -34,30 +37,31 @@ export function FilterChips({ options, selected, onSelect, style }: FilterChipsP
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    gap: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    gap: 12,
     flexDirection: 'row',
+    paddingBottom: 16,
   },
   chip: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 20,
-    backgroundColor: '#111827',
-    borderWidth: 1,
-    borderColor: '#374151',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: theme.borderRadius.full,
+    backgroundColor: theme.colors.surface,
+    borderWidth: theme.card.borderWidth,
+    borderColor: theme.colors.border,
   },
   chipSelected: {
-    backgroundColor: '#00d4aa22',
-    borderColor: '#00d4aa',
+    backgroundColor: theme.colors.primary + '15',
+    borderColor: theme.colors.primary,
   },
   label: {
-    color: '#9ca3af',
-    fontSize: 13,
-    fontWeight: '500',
+    color: theme.colors.textSecondary,
+    fontSize: 14,
+    fontWeight: theme.fontWeight.semibold,
   },
   labelSelected: {
-    color: '#00d4aa',
-    fontWeight: '600',
+    color: theme.colors.primary,
+    fontWeight: theme.fontWeight.bold,
   },
 });

@@ -1,34 +1,48 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-
-const COLORS = {
-  background: '#0a0f1a',
-  surface: '#111827',
-  surfaceLight: '#1f2937',
-  primary: '#00d4aa',
-  text: '#ffffff',
-  textSecondary: '#9ca3af',
-  border: '#374151',
-};
+import { LinearGradient } from 'expo-linear-gradient';
+import { theme } from '../lib/theme';
 
 interface StatCardProps {
-  title: string; // Changed from 'label' to 'title'
+  title: string;
   value: string;
   icon: keyof typeof Ionicons.glyphMap;
-  iconColor?: string; // Make optional with default
+  gradientColors?: [string, string, ...string[]];
   subtitle?: string;
 }
 
-export function StatCard({ title, value, icon, iconColor = '#00d4aa', subtitle }: StatCardProps) {
+export function StatCard({ 
+  title, 
+  value, 
+  icon, 
+  gradientColors = [theme.colors.primary, theme.colors.primaryDark] as [string, string],
+  subtitle 
+}: StatCardProps) {
   return (
     <View style={styles.card}>
-      <View style={[styles.iconWrap, { backgroundColor: iconColor + '22' }]}>
-        <Ionicons name={icon} size={20} color={iconColor} />
+      {/* Gradient accent bar at top */}
+      <LinearGradient
+        colors={gradientColors}
+        style={styles.accentBar}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+      />
+      
+      <View style={styles.content}>
+        {/* Icon in corner */}
+        <View style={styles.iconContainer}>
+          <Ionicons name={icon} size={24} color={gradientColors[0]} />
+        </View>
+
+        {/* Label */}
+        <Text style={styles.title}>{title.toUpperCase()}</Text>
+        
+        {/* Large value number */}
+        <Text style={styles.value}>{value}</Text>
+        
+        {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
       </View>
-      <Text style={styles.value}>{value}</Text>
-      <Text style={styles.title}>{title}</Text>
-      {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
     </View>
   );
 }
@@ -36,34 +50,44 @@ export function StatCard({ title, value, icon, iconColor = '#00d4aa', subtitle }
 const styles = StyleSheet.create({
   card: {
     flex: 1,
-    backgroundColor: COLORS.surface,
-    borderRadius: 12,
-    padding: 16,
-    margin: 4,
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.lg,
+    borderWidth: theme.card.borderWidth,
+    borderColor: theme.colors.border,
+    marginHorizontal: 4,
+    overflow: 'hidden',
+    ...theme.shadow.card,
   },
-  iconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 10,
+  accentBar: {
+    height: 3,
+    width: '100%',
+  },
+  content: {
+    padding: theme.card.padding,
+    position: 'relative',
+  },
+  iconContainer: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    opacity: 0.7,
+  },
+  title: {
+    fontSize: theme.fontSize.xs,
+    fontWeight: theme.fontWeight.semibold,
+    color: theme.colors.textSecondary,
+    letterSpacing: 0.5,
+    marginBottom: 8,
   },
   value: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: COLORS.text,
+    fontSize: 24,
+    fontWeight: theme.fontWeight.extrabold,
+    color: theme.colors.text,
     marginBottom: 2,
-  },
-  title: { // Changed from 'label' to 'title'
-    fontSize: 12,
-    color: COLORS.textSecondary,
   },
   subtitle: {
     fontSize: 11,
-    color: COLORS.textSecondary,
-    marginTop: 2,
+    color: theme.colors.textTertiary,
+    fontWeight: theme.fontWeight.medium,
   },
 });

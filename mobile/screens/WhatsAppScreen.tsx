@@ -3,10 +3,13 @@ import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
   RefreshControl, TextInput, StatusBar, Platform, ActivityIndicator,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
+import { theme } from '../lib/theme';
 import ContactAvatar from '../components/whatsapp/ContactAvatar';
+import { EmptyState } from '../components/EmptyState';
 
 interface WAContact {
   id: string;
@@ -88,57 +91,104 @@ export default function WhatsAppScreen() {
     router.push(`/chat/${encodeURIComponent(contact.phone_number)}`);
   };
 
+  const toggleSearch = () => {
+    setSearchVisible(v => !v);
+    if (!searchVisible) {
+      setTimeout(() => searchRef.current?.focus(), 100);
+    } else {
+      setSearchQuery('');
+    }
+  };
+
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#111827" />
+      <StatusBar barStyle="light-content" backgroundColor={theme.colors.surface} />
+      
+      {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>WhatsApp</Text>
-        <TouchableOpacity onPress={() => { setSearchVisible(v => !v); if (!searchVisible) setTimeout(() => searchRef.current?.focus(), 100); else setSearchQuery(''); }} style={styles.headerIcon}>
-          <Text style={{ fontSize: 20 }}>🔍</Text>
+        <View>
+          <Text style={styles.headerTitle}>WhatsApp</Text>
+          <Text style={styles.subtitle}>Business conversations</Text>
+        </View>
+        <TouchableOpacity onPress={toggleSearch} style={styles.headerIcon}>
+          <Ionicons name="search" size={24} color={theme.colors.textSecondary} />
         </TouchableOpacity>
       </View>
 
+      {/* Search Bar */}
       {searchVisible && (
-        <View style={styles.searchBar}>
-          <TextInput ref={searchRef} style={styles.searchInput} value={searchQuery} onChangeText={setSearchQuery} placeholder="Search..." placeholderTextColor="#8696a0" />
+        <View style={styles.searchContainer}>
+          <View style={styles.searchBar}>
+            <Ionicons name="search" size={20} color={theme.colors.textTertiary} />
+            <TextInput 
+              ref={searchRef} 
+              style={styles.searchInput} 
+              value={searchQuery} 
+              onChangeText={setSearchQuery} 
+              placeholder="Search conversations..." 
+              placeholderTextColor={theme.colors.textTertiary}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+          </View>
         </View>
       )}
 
       {loading ? (
-        <View style={styles.centered}><ActivityIndicator size="large" color="#00d4aa" /></View>
+        <View style={styles.centered}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+        </View>
       ) : error ? (
         <View style={styles.centered}>
           <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity onPress={loadContacts} style={styles.retryBtn}><Text style={styles.retryText}>Retry</Text></TouchableOpacity>
+          <TouchableOpacity onPress={loadContacts} style={styles.retryBtn}>
+            <Text style={styles.retryText}>Try again</Text>
+          </TouchableOpacity>
         </View>
       ) : (
         <FlatList
           data={filtered}
           keyExtractor={item => item.id}
           renderItem={({ item }) => (
-            <TouchableOpacity style={styles.row} onPress={() => handlePress(item)} activeOpacity={0.7}>
-              <ContactAvatar name={item.profile_name || item.phone_number} size={50} />
-              <View style={styles.rowContent}>
-                <View style={styles.rowTop}>
-                  <Text style={styles.contactName} numberOfLines={1}>{item.profile_name || item.phone_number}</Text>
-                  <Text style={styles.timeLabel}>{formatTime(item.last_message_at)}</Text>
+            <TouchableOpacity 
+              style={styles.conversationRow} 
+              onPress={() => handlePress(item)} 
+              activeOpacity={0.7}
+            >
+              <ContactAvatar name={item.profile_name || item.phone_number} size={48} />
+              <View style={styles.conversationContent}>
+                <View style={styles.conversationTop}>
+                  <Text style={styles.contactName} numberOfLines={1}>
+                    {item.profile_name || item.phone_number}
+                  </Text>
+                  <Text style={styles.timeLabel}>
+                    {formatTime(item.last_message_at)}
+                  </Text>
                 </View>
-                <Text style={styles.previewText} numberOfLines={1}>
+                <Text style={styles.messagePreview} numberOfLines={1}>
                   {item.total_messages ? `${item.total_messages} messages` : 'No messages yet'}
                 </Text>
               </View>
             </TouchableOpacity>
           )}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#00d4aa" colors={['#00d4aa']} />}
+          refreshControl={
+            <RefreshControl 
+              refreshing={refreshing} 
+              onRefresh={onRefresh} 
+              tintColor={theme.colors.primary} 
+              colors={[theme.colors.primary]} 
+            />
+          }
           ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Text style={{ fontSize: 56 }}>💬</Text>
-              <Text style={styles.emptyTitle}>No conversations yet</Text>
-              <Text style={styles.emptySubtitle}>Connect your WhatsApp Business number to start.</Text>
-            </View>
+            <EmptyState
+              icon="chatbubbles"
+              title="No conversations yet"
+              message="Connect your WhatsApp Business number to start messaging customers."
+            />
           }
           ItemSeparatorComponent={() => <View style={styles.separator} />}
-          contentContainerStyle={filtered.length === 0 ? { flexGrow: 1 } : undefined}
+          contentContainerStyle={filtered.length === 0 ? { flexGrow: 1 } : { paddingBottom: 20 }}
+          showsVerticalScrollIndicator={false}
         />
       )}
     </View>
@@ -146,24 +196,124 @@ export default function WhatsAppScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0a0f1a' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#111827', paddingTop: Platform.OS === 'ios' ? 56 : 16, paddingBottom: 14, paddingHorizontal: 16 },
-  headerTitle: { fontSize: 22, fontWeight: '700', color: '#ffffff' },
-  headerIcon: { padding: 4 },
-  searchBar: { backgroundColor: '#111827', paddingHorizontal: 16, paddingBottom: 12 },
-  searchInput: { backgroundColor: '#1f2c34', color: '#ffffff', borderRadius: 22, paddingHorizontal: 16, paddingVertical: 8, fontSize: 15 },
-  row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, gap: 14 },
-  rowContent: { flex: 1, gap: 4 },
-  rowTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  contactName: { fontSize: 16, fontWeight: '600', color: '#ffffff', flex: 1, marginRight: 8 },
-  timeLabel: { fontSize: 12, color: '#8696a0' },
-  previewText: { fontSize: 14, color: '#8696a0' },
-  separator: { height: StyleSheet.hairlineWidth, backgroundColor: '#1f2c34', marginLeft: 80 },
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
-  errorText: { color: '#ef4444', fontSize: 15, textAlign: 'center', paddingHorizontal: 24 },
-  retryBtn: { backgroundColor: '#00d4aa', borderRadius: 20, paddingHorizontal: 24, paddingVertical: 10 },
-  retryText: { color: '#ffffff', fontWeight: '600', fontSize: 15 },
-  emptyContainer: { alignItems: 'center', paddingHorizontal: 40, paddingTop: 80, gap: 12 },
-  emptyTitle: { fontSize: 18, fontWeight: '700', color: '#ffffff' },
-  emptySubtitle: { fontSize: 14, color: '#8696a0', textAlign: 'center', lineHeight: 20 },
+  container: { 
+    flex: 1, 
+    backgroundColor: theme.colors.background,
+  },
+  header: { 
+    flexDirection: 'row', 
+    alignItems: 'flex-end', 
+    justifyContent: 'space-between', 
+    backgroundColor: theme.colors.surface, 
+    paddingTop: Platform.OS === 'ios' ? 60 : 20, 
+    paddingBottom: 20, 
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+  },
+  headerTitle: { 
+    fontSize: 32,
+    fontWeight: theme.fontWeight.extrabold,
+    color: theme.colors.text,
+    letterSpacing: 0.5,
+  },
+  subtitle: {
+    fontSize: 14,
+    fontWeight: theme.fontWeight.medium,
+    color: theme.colors.textSecondary,
+    marginTop: 4,
+  },
+  headerIcon: { 
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: theme.colors.surfaceLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  searchContainer: {
+    backgroundColor: theme.colors.surface,
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+  },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.surfaceLight,
+    borderRadius: theme.borderRadius.md,
+    paddingHorizontal: 16,
+    height: theme.input.height,
+    gap: 12,
+  },
+  searchInput: { 
+    flex: 1,
+    color: theme.colors.text,
+    fontSize: 16,
+    fontWeight: theme.fontWeight.medium,
+  },
+  conversationRow: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    paddingHorizontal: 20, 
+    paddingVertical: 16,
+    backgroundColor: theme.colors.background,
+  },
+  conversationContent: { 
+    flex: 1, 
+    marginLeft: 16,
+  },
+  conversationTop: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  contactName: { 
+    fontSize: 16, 
+    fontWeight: theme.fontWeight.semibold, 
+    color: theme.colors.text, 
+    flex: 1, 
+    marginRight: 12,
+  },
+  timeLabel: { 
+    fontSize: 12, 
+    color: theme.colors.textSecondary,
+    fontWeight: theme.fontWeight.medium,
+  },
+  messagePreview: { 
+    fontSize: 14, 
+    color: theme.colors.textSecondary,
+    fontWeight: theme.fontWeight.medium,
+  },
+  separator: { 
+    height: 1, 
+    backgroundColor: theme.colors.border, 
+    marginLeft: 84,
+  },
+  centered: { 
+    flex: 1, 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    gap: 16,
+    paddingHorizontal: 32,
+  },
+  errorText: { 
+    color: theme.colors.danger, 
+    fontSize: 16, 
+    textAlign: 'center',
+    fontWeight: theme.fontWeight.medium,
+  },
+  retryBtn: { 
+    backgroundColor: theme.colors.primary,
+    borderRadius: theme.borderRadius.md,
+    paddingHorizontal: 24, 
+    paddingVertical: 12,
+  },
+  retryText: { 
+    color: theme.colors.background, 
+    fontWeight: theme.fontWeight.semibold, 
+    fontSize: 15,
+  },
 });

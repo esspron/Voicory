@@ -14,19 +14,14 @@ import { CallCard } from '../components/CallCard';
 import { EmptyState } from '../components/EmptyState';
 import { getCalls } from '../services/callService';
 import { supabase } from '../lib/supabase';
+import { theme } from '../lib/theme';
 import { CallLog } from '../types';
-
-const COLORS = {
-  background: '#0a0f1a',
-  text: '#ffffff',
-  textSecondary: '#9ca3af',
-  primary: '#00d4aa',
-};
 
 const FILTER_OPTIONS = [
   { label: 'All', value: 'all' },
+  { label: 'Inbound', value: 'inbound' },
+  { label: 'Outbound', value: 'outbound' },
   { label: 'Completed', value: 'completed' },
-  { label: 'Missed', value: 'missed' },
   { label: 'Failed', value: 'failed' },
 ];
 
@@ -98,13 +93,21 @@ export default function CallLogsScreen() {
     <View>
       <View style={styles.screenHeader}>
         <Text style={styles.screenTitle}>Call Logs</Text>
+        <Text style={styles.subtitle}>Track all your voice interactions</Text>
       </View>
+      
       <SearchBar
         value={search}
         onChangeText={setSearch}
         placeholder="Search by phone number..."
       />
-      <FilterChips options={FILTER_OPTIONS} selected={filter} onSelect={setFilter} />
+      
+      <FilterChips 
+        options={FILTER_OPTIONS} 
+        selected={filter} 
+        onSelect={setFilter} 
+      />
+      
       {error ? (
         <View style={styles.errorBanner}>
           <Text style={styles.errorText}>{error}</Text>
@@ -116,69 +119,101 @@ export default function CallLogsScreen() {
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
+        <ActivityIndicator size="large" color={theme.colors.primary} />
       </View>
     );
   }
 
   return (
-    <FlatList
-      style={styles.container}
-      data={calls}
-      keyExtractor={(item) => item.id}
-      ListHeaderComponent={ListHeader}
-      renderItem={({ item }) => (
-        <CallCard
-          call={item}
-          onPress={(call) => router.push(`/calls/${call.id}` as any)}
-        />
-      )}
-      ListEmptyComponent={
-        <EmptyState
-          icon="call-outline"
-          title="No calls found"
-          message={search ? 'Try a different search.' : 'No calls yet.'}
-        />
-      }
-      ListFooterComponent={
-        loadingMore ? (
-          <ActivityIndicator
-            color={COLORS.primary}
-            style={{ paddingVertical: 16 }}
+    <View style={styles.container}>
+      <FlatList
+        data={calls}
+        keyExtractor={(item) => item.id}
+        ListHeaderComponent={ListHeader}
+        renderItem={({ item }) => (
+          <CallCard
+            call={item}
+            onPress={(call) => router.push(`/calls/${call.id}` as any)}
           />
-        ) : null
-      }
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={onRefresh}
-          tintColor={COLORS.primary}
-          colors={[COLORS.primary]}
-        />
-      }
-      onEndReached={onLoadMore}
-      onEndReachedThreshold={0.3}
-      contentContainerStyle={styles.listContent}
-    />
+        )}
+        ListEmptyComponent={
+          <EmptyState
+            icon="call"
+            title="No calls found"
+            message={search ? 'Try a different search.' : 'No calls yet.'}
+          />
+        }
+        ListFooterComponent={
+          loadingMore ? (
+            <ActivityIndicator
+              color={theme.colors.primary}
+              style={styles.loadingMore}
+            />
+          ) : null
+        }
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={theme.colors.primary}
+            colors={[theme.colors.primary]}
+          />
+        }
+        onEndReached={onLoadMore}
+        onEndReachedThreshold={0.3}
+        contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
-  listContent: { paddingBottom: 32 },
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.background },
+  container: { 
+    flex: 1, 
+    backgroundColor: theme.colors.background,
+  },
+  listContent: { 
+    paddingBottom: 32,
+  },
+  centered: { 
+    flex: 1, 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    backgroundColor: theme.colors.background,
+  },
   screenHeader: {
     paddingHorizontal: 20,
-    paddingTop: 56,
-    paddingBottom: 8,
+    paddingTop: 60,
+    paddingBottom: 24,
   },
-  screenTitle: { fontSize: 28, fontWeight: '700', color: COLORS.text },
-  errorBanner: {
-    backgroundColor: '#ef444422',
-    marginHorizontal: 16,
+  screenTitle: { 
+    fontSize: 32,
+    fontWeight: theme.fontWeight.extrabold,
+    color: theme.colors.text,
+    letterSpacing: 0.5,
     marginBottom: 4,
-    borderRadius: 8,
-    padding: 12,
   },
-  errorText: { color: '#ef4444', fontSize: 13 },
+  subtitle: {
+    fontSize: 14,
+    fontWeight: theme.fontWeight.medium,
+    color: theme.colors.textSecondary,
+  },
+  errorBanner: {
+    backgroundColor: theme.colors.danger + '15',
+    marginHorizontal: 20,
+    marginVertical: 8,
+    borderRadius: theme.borderRadius.md,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: theme.colors.danger + '30',
+  },
+  errorText: { 
+    color: theme.colors.danger, 
+    fontSize: 14,
+    fontWeight: theme.fontWeight.medium,
+  },
+  loadingMore: { 
+    paddingVertical: 20,
+  },
 });

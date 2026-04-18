@@ -1,14 +1,43 @@
 import React from 'react';
 import { View, Text, StyleSheet, ViewStyle } from 'react-native';
+import { theme } from '../lib/theme';
 
-const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
-  completed: { bg: '#22c55e22', text: '#22c55e' },
-  failed: { bg: '#ef444422', text: '#ef4444' },
-  busy: { bg: '#f59e0b22', text: '#f59e0b' },
-  'no-answer': { bg: '#9ca3af22', text: '#9ca3af' },
-  'in-progress': { bg: '#00d4aa22', text: '#00d4aa' },
-  queued: { bg: '#818cf822', text: '#818cf8' },
-  ringing: { bg: '#06b6d422', text: '#06b6d4' },
+const STATUS_CONFIG: Record<string, { dotColor: string; textColor: string; text: string }> = {
+  completed: { 
+    dotColor: theme.colors.success, 
+    textColor: theme.colors.success, 
+    text: 'Completed' 
+  },
+  failed: { 
+    dotColor: theme.colors.danger, 
+    textColor: theme.colors.danger, 
+    text: 'Failed' 
+  },
+  'in-progress': { 
+    dotColor: theme.colors.warning, 
+    textColor: theme.colors.warning, 
+    text: 'In Progress' 
+  },
+  busy: { 
+    dotColor: '#f97316', 
+    textColor: '#f97316', 
+    text: 'Busy' 
+  },
+  'no-answer': { 
+    dotColor: theme.colors.textTertiary, 
+    textColor: theme.colors.textTertiary, 
+    text: 'No Answer' 
+  },
+  queued: { 
+    dotColor: theme.colors.secondary, 
+    textColor: theme.colors.secondary, 
+    text: 'Queued' 
+  },
+  ringing: { 
+    dotColor: theme.colors.primary, 
+    textColor: theme.colors.primary, 
+    text: 'Ringing' 
+  },
 };
 
 interface StatusBadgeProps {
@@ -17,24 +46,33 @@ interface StatusBadgeProps {
 }
 
 export function StatusBadge({ status, style }: StatusBadgeProps) {
-  const colors = STATUS_COLORS[status] || { bg: '#37415122', text: '#9ca3af' };
+  const config = STATUS_CONFIG[status] || { 
+    dotColor: theme.colors.textTertiary, 
+    textColor: theme.colors.textTertiary,
+    text: status.replace('-', ' ') 
+  };
+
   return (
-    <View style={[styles.badge, { backgroundColor: colors.bg }, style]}>
-      <Text style={[styles.text, { color: colors.text }]}>{status.replace('-', ' ')}</Text>
+    <View style={[styles.badge, style]}>
+      <View style={[styles.dot, { backgroundColor: config.dotColor }]} />
+      <Text style={[styles.text, { color: config.textColor }]}>{config.text}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   badge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 20,
-    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
   text: {
-    fontSize: 11,
-    fontWeight: '600',
-    textTransform: 'capitalize',
+    fontSize: 12,
+    fontWeight: theme.fontWeight.medium,
   },
 });

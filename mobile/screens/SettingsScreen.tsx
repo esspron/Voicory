@@ -11,19 +11,10 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { supabase } from '../lib/supabase';
-
-const COLORS = {
-  background: '#0a0f1a',
-  surface: '#111827',
-  surfaceLight: '#1f2937',
-  primary: '#00d4aa',
-  text: '#ffffff',
-  textSecondary: '#9ca3af',
-  border: '#374151',
-  danger: '#ef4444',
-};
+import { theme } from '../lib/theme';
 
 const APP_VERSION = '1.0.0';
 
@@ -86,100 +77,156 @@ export default function SettingsScreen() {
 
   const openLink = (url: string) => Linking.openURL(url).catch(() => {});
 
+  const getInitials = (email?: string): string => {
+    if (!email) return 'U';
+    const name = email.split('@')[0];
+    return name.slice(0, 2).toUpperCase();
+  };
+
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
+        <ActivityIndicator size="large" color={theme.colors.primary} />
       </View>
     );
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView 
+      style={styles.container} 
+      contentContainerStyle={styles.content}
+      showsVerticalScrollIndicator={false}
+    >
       {/* Header */}
       <View style={styles.pageHeader}>
         <Text style={styles.pageTitle}>Settings</Text>
+        <Text style={styles.subtitle}>Manage your account and preferences</Text>
       </View>
 
-      {/* Profile Card */}
+      {/* Profile Section */}
       <View style={styles.profileCard}>
-        <View style={styles.avatar}>
+        <LinearGradient
+          colors={[theme.colors.primary, theme.colors.primaryDark]}
+          style={styles.avatar}
+        >
           <Text style={styles.avatarText}>
-            {(user?.email || 'U')[0].toUpperCase()}
+            {getInitials(user?.email)}
           </Text>
-        </View>
+        </LinearGradient>
+        
         <View style={styles.profileInfo}>
-          <Text style={styles.profileName}>{user?.email?.split('@')[0] || 'User'}</Text>
+          <Text style={styles.profileName}>
+            {profile?.organization_name || user?.email?.split('@')[0] || 'User'}
+          </Text>
           <Text style={styles.profileEmail}>{user?.email || ''}</Text>
-          {profile?.organization_name ? (
-            <Text style={styles.profileOrg}>{profile.organization_name}</Text>
-          ) : null}
-          {profile?.plan_type && (
-            <Text style={styles.profilePlan}>Plan: {profile.plan_type}</Text>
-          )}
-          {profile?.credits_balance !== undefined && (
-            <Text style={styles.profileCredits}>₹{(profile.credits_balance * 84).toFixed(2)} credits</Text>
-          )}
+          
+          <View style={styles.badgeRow}>
+            {profile?.plan_type && (
+              <View style={styles.planBadge}>
+                <Text style={styles.planText}>{profile.plan_type.toUpperCase()}</Text>
+              </View>
+            )}
+            {profile?.credits_balance !== undefined && (
+              <Text style={styles.creditsBalance}>
+                ₹{(profile.credits_balance * 84).toFixed(0)} credits
+              </Text>
+            )}
+          </View>
         </View>
       </View>
 
-      {/* Preferences Section */}
-      <Text style={styles.sectionLabel}>Preferences</Text>
+      {/* Account Section */}
+      <Text style={styles.sectionHeader}>ACCOUNT</Text>
       <View style={styles.menuCard}>
         <SettingsRow
-          icon="notifications-outline"
+          icon="person"
+          label="Profile"
+          chevron
+          onPress={() => router.push('/profile' as any)}
+        />
+        <Separator />
+        <SettingsRow
+          icon="card"
+          label="Billing"
+          chevron
+          onPress={() => router.push('/billing' as any)}
+        />
+        <Separator />
+        <SettingsRow
+          icon="notifications"
           label="Notifications"
           right={
             <Switch
               value={notificationsEnabled}
               onValueChange={setNotificationsEnabled}
-              trackColor={{ false: COLORS.border, true: COLORS.primary + '99' }}
-              thumbColor={notificationsEnabled ? COLORS.primary : '#9ca3af'}
+              trackColor={{ false: theme.colors.border, true: theme.colors.primary + '60' }}
+              thumbColor={notificationsEnabled ? theme.colors.primary : theme.colors.textTertiary}
             />
           }
         />
+      </View>
+
+      {/* Support Section */}
+      <Text style={styles.sectionHeader}>SUPPORT</Text>
+      <View style={styles.menuCard}>
+        <SettingsRow
+          icon="help-circle"
+          label="Help Center"
+          chevron
+          onPress={() => openLink('https://help.voicory.com')}
+        />
         <Separator />
         <SettingsRow
-          icon="moon-outline"
-          label="Theme"
-          right={<Text style={styles.valueText}>Dark</Text>}
+          icon="mail"
+          label="Contact Support"
+          chevron
+          onPress={() => openLink('mailto:support@voicory.com')}
+        />
+        <Separator />
+        <SettingsRow
+          icon="bug"
+          label="Report Issue"
+          chevron
+          onPress={() => openLink('mailto:bugs@voicory.com')}
         />
       </View>
 
-      {/* About Section */}
-      <Text style={styles.sectionLabel}>About</Text>
+      {/* Legal Section */}
+      <Text style={styles.sectionHeader}>LEGAL</Text>
       <View style={styles.menuCard}>
         <SettingsRow
-          icon="information-circle-outline"
-          label="About Voicory"
-          chevron
-          onPress={() => require('react-native').Linking.openURL('https://www.voicory.com')}
-        />
-        <Separator />
-        <SettingsRow
-          icon="shield-outline"
+          icon="shield-checkmark"
           label="Privacy Policy"
           chevron
           onPress={() => openLink('https://voicory.com/privacy')}
         />
         <Separator />
         <SettingsRow
-          icon="document-text-outline"
+          icon="document-text"
           label="Terms of Service"
           chevron
           onPress={() => openLink('https://voicory.com/terms')}
         />
+        <Separator />
+        <SettingsRow
+          icon="information-circle"
+          label="About Voicory"
+          chevron
+          onPress={() => openLink('https://www.voicory.com')}
+        />
       </View>
 
-      {/* Logout */}
+      {/* Sign Out Button */}
       <TouchableOpacity
-        style={[styles.logoutBtn, loggingOut && { opacity: 0.6 }]}
+        style={[styles.signOutBtn, loggingOut && { opacity: 0.6 }]}
         onPress={handleLogout}
         disabled={loggingOut}
-        activeOpacity={0.75}
+        activeOpacity={0.7}
       >
-        <Ionicons name="log-out-outline" size={20} color={COLORS.danger} />
-        <Text style={styles.logoutText}>{loggingOut ? 'Logging out...' : 'Logout'}</Text>
+        <Ionicons name="log-out" size={20} color={theme.colors.danger} />
+        <Text style={styles.signOutText}>
+          {loggingOut ? 'Signing out...' : 'Sign Out'}
+        </Text>
       </TouchableOpacity>
 
       {/* Version */}
@@ -204,13 +251,22 @@ function SettingsRow({
   const inner = (
     <View style={styles.settingsRow}>
       <View style={styles.rowLeft}>
-        <Ionicons name={icon} size={20} color={COLORS.textSecondary} style={{ marginRight: 12 }} />
+        <Ionicons 
+          name={icon} 
+          size={22} 
+          color={theme.colors.textSecondary} 
+          style={styles.rowIcon} 
+        />
         <Text style={styles.rowLabel}>{label}</Text>
       </View>
       <View style={styles.rowRight}>
         {right}
         {chevron && (
-          <Ionicons name="chevron-forward" size={16} color={COLORS.textSecondary} />
+          <Ionicons 
+            name="chevron-forward" 
+            size={18} 
+            color={theme.colors.textTertiary} 
+          />
         )}
       </View>
     </View>
@@ -231,72 +287,174 @@ function Separator() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
-  content: { paddingBottom: 40 },
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.background },
-  pageHeader: { paddingHorizontal: 20, paddingTop: 56, paddingBottom: 16 },
-  pageTitle: { fontSize: 28, fontWeight: '700', color: COLORS.text },
+  container: { 
+    flex: 1, 
+    backgroundColor: theme.colors.background,
+  },
+  content: { 
+    paddingBottom: 40,
+  },
+  centered: { 
+    flex: 1, 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    backgroundColor: theme.colors.background,
+  },
+  pageHeader: { 
+    paddingHorizontal: 20, 
+    paddingTop: 60, 
+    paddingBottom: 32,
+  },
+  pageTitle: { 
+    fontSize: 32,
+    fontWeight: theme.fontWeight.extrabold,
+    color: theme.colors.text,
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  subtitle: {
+    fontSize: 14,
+    fontWeight: theme.fontWeight.medium,
+    color: theme.colors.textSecondary,
+  },
   profileCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.surface,
-    marginHorizontal: 16,
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    gap: 14,
+    backgroundColor: theme.colors.surface,
+    marginHorizontal: 20,
+    borderRadius: theme.borderRadius.lg,
+    padding: 24,
+    marginBottom: 32,
+    borderWidth: theme.card.borderWidth,
+    borderColor: theme.colors.border,
+    ...theme.shadow.card,
   },
   avatar: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: COLORS.primary + '33',
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     alignItems: 'center',
     justifyContent: 'center',
+    marginRight: 16,
   },
-  avatarText: { color: COLORS.primary, fontSize: 22, fontWeight: '800' },
-  profileInfo: { flex: 1 },
-  profileName: { color: COLORS.text, fontSize: 17, fontWeight: '700' },
-  profileEmail: { color: COLORS.textSecondary, fontSize: 13, marginTop: 2 },
-  profileOrg: { color: COLORS.primary, fontSize: 12, marginTop: 2 },
-  profilePlan: { color: COLORS.textSecondary, fontSize: 12, marginTop: 1 },
-  profileCredits: { color: COLORS.primary, fontSize: 11, marginTop: 1 },
-  sectionLabel: { color: COLORS.textSecondary, fontSize: 12, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.8, marginHorizontal: 20, marginBottom: 6 },
-  menuCard: {
-    backgroundColor: COLORS.surface,
-    marginHorizontal: 16,
-    borderRadius: 12,
+  avatarText: { 
+    color: theme.colors.text, 
+    fontSize: 20,
+    fontWeight: theme.fontWeight.extrabold,
+    textShadowColor: 'rgba(0,0,0,0.3)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  profileInfo: { 
+    flex: 1,
+  },
+  profileName: { 
+    color: theme.colors.text, 
+    fontSize: 18,
+    fontWeight: theme.fontWeight.bold,
+    marginBottom: 4,
+  },
+  profileEmail: { 
+    color: theme.colors.textSecondary, 
+    fontSize: 14,
+    fontWeight: theme.fontWeight.medium,
+    marginBottom: 12,
+  },
+  badgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  planBadge: {
+    backgroundColor: theme.colors.primary + '20',
+    borderRadius: theme.borderRadius.full,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
     borderWidth: 1,
-    borderColor: COLORS.border,
-    marginBottom: 20,
+    borderColor: theme.colors.primary + '40',
+  },
+  planText: {
+    color: theme.colors.primary,
+    fontSize: 11,
+    fontWeight: theme.fontWeight.bold,
+    letterSpacing: 0.5,
+  },
+  creditsBalance: {
+    color: theme.colors.success,
+    fontSize: 13,
+    fontWeight: theme.fontWeight.semibold,
+  },
+  sectionHeader: { 
+    color: theme.colors.textSecondary, 
+    fontSize: 12,
+    fontWeight: theme.fontWeight.semibold,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginHorizontal: 20,
+    marginBottom: 12,
+  },
+  menuCard: {
+    backgroundColor: theme.colors.surface,
+    marginHorizontal: 20,
+    borderRadius: theme.borderRadius.lg,
+    borderWidth: theme.card.borderWidth,
+    borderColor: theme.colors.border,
+    marginBottom: 24,
     overflow: 'hidden',
+    ...theme.shadow.card,
   },
   settingsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
   },
-  rowLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
-  rowLabel: { color: COLORS.text, fontSize: 15 },
-  rowRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  valueText: { color: COLORS.textSecondary, fontSize: 14 },
-  separator: { height: 1, backgroundColor: COLORS.border, marginHorizontal: 16 },
-  logoutBtn: {
+  rowLeft: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    flex: 1,
+  },
+  rowIcon: {
+    marginRight: 16,
+  },
+  rowLabel: { 
+    color: theme.colors.text, 
+    fontSize: 16,
+    fontWeight: theme.fontWeight.medium,
+  },
+  rowRight: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: 12,
+  },
+  separator: { 
+    height: 1, 
+    backgroundColor: theme.colors.border, 
+    marginLeft: 58,
+  },
+  signOutBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    marginHorizontal: 16,
+    gap: 12,
+    marginHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: COLORS.danger + '18',
-    borderRadius: 12,
+    backgroundColor: theme.colors.danger + '10',
+    borderRadius: theme.borderRadius.md,
     borderWidth: 1,
-    borderColor: COLORS.danger + '44',
-    marginBottom: 24,
+    borderColor: theme.colors.danger + '30',
+    marginBottom: 32,
   },
-  logoutText: { color: COLORS.danger, fontSize: 16, fontWeight: '600' },
-  version: { textAlign: 'center', color: COLORS.textSecondary, fontSize: 12 },
+  signOutText: { 
+    color: theme.colors.danger, 
+    fontSize: 16,
+    fontWeight: theme.fontWeight.semibold,
+  },
+  version: { 
+    textAlign: 'center', 
+    color: theme.colors.textTertiary, 
+    fontSize: 12,
+    fontWeight: theme.fontWeight.medium,
+  },
 });

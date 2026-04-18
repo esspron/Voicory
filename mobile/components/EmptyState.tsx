@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { theme } from '../lib/theme';
 
 interface EmptyStateProps {
   title?: string;
@@ -11,11 +12,13 @@ interface EmptyStateProps {
 export function EmptyState({
   title = 'No data yet',
   message = 'Nothing to show here.',
-  icon = 'folder-open-outline',
+  icon = 'folder-open',
 }: EmptyStateProps) {
   return (
     <View style={styles.container}>
-      <Ionicons name={icon} size={56} color="#374151" style={styles.icon} />
+      <View style={styles.iconContainer}>
+        <Ionicons name={icon} size={48} color={theme.colors.textTertiary} />
+      </View>
       <Text style={styles.title}>{title}</Text>
       <Text style={styles.message}>{message}</Text>
     </View>
@@ -27,21 +30,32 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 60,
+    paddingVertical: 80,
     paddingHorizontal: 32,
   },
-  icon: { marginBottom: 16 },
+  iconContainer: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: theme.colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
   title: {
-    color: '#ffffff',
-    fontSize: 18,
-    fontWeight: '600',
+    color: theme.colors.text,
+    fontSize: 20,
+    fontWeight: theme.fontWeight.bold,
     marginBottom: 8,
     textAlign: 'center',
   },
   message: {
-    color: '#9ca3af',
-    fontSize: 14,
+    color: theme.colors.textSecondary,
+    fontSize: 15,
     textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: 22,
+    maxWidth: 280,
   },
 });

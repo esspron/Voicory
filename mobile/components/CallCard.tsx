@@ -3,14 +3,7 @@ import { TouchableOpacity, View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { CallLog } from '../types';
 import { StatusBadge } from './StatusBadge';
-
-const COLORS = {
-  surface: '#111827',
-  text: '#ffffff',
-  textSecondary: '#9ca3af',
-  border: '#374151',
-  primary: '#00d4aa',
-};
+import { theme } from '../lib/theme';
 
 const USD_TO_INR = 84;
 
@@ -44,38 +37,60 @@ export function CallCard({ call, onPress }: CallCardProps) {
     ? call.from_number || call.phone_number
     : call.to_number || call.phone_number;
 
+  const directionIcon = call.direction === 'inbound' ? 'arrow-down' : 'arrow-up';
+  const directionColor = call.direction === 'inbound' ? theme.colors.success : theme.colors.secondary;
+
   return (
-    <TouchableOpacity style={styles.card} onPress={() => onPress(call)} activeOpacity={0.75}>
-      <View style={styles.iconWrap}>
+    <TouchableOpacity 
+      style={styles.card} 
+      onPress={() => onPress(call)} 
+      activeOpacity={0.7}
+    >
+      {/* Direction arrow icon */}
+      <View style={[styles.iconContainer, { backgroundColor: directionColor + '15' }]}>
         <Ionicons
-          name={call.direction === 'inbound' ? 'arrow-down-outline' : 'arrow-up-outline'}
-          size={18}
-          color={call.direction === 'inbound' ? '#00d4aa' : '#818cf8'}
+          name={directionIcon}
+          size={20}
+          color={directionColor}
         />
       </View>
-      <View style={styles.body}>
-        <View style={styles.row}>
-          <Text style={styles.phone} numberOfLines={1}>
+
+      {/* Main content */}
+      <View style={styles.content}>
+        <View style={styles.header}>
+          <Text style={styles.phoneNumber} numberOfLines={1}>
             {displayNumber}
           </Text>
           <StatusBadge status={call.status} />
         </View>
+        
         {call.assistant?.name ? (
-          <Text style={styles.assistant} numberOfLines={1}>
+          <Text style={styles.assistantName} numberOfLines={1}>
             {call.assistant.name}
           </Text>
         ) : null}
-        <View style={styles.meta}>
-          <Text style={styles.metaText}>
-            <Ionicons name="time-outline" size={12} /> {formatDuration(call.duration_seconds)}
-          </Text>
-          {cost > 0 && <Text style={styles.metaText}>₹{costInr}</Text>}
-          <Text style={styles.metaText}>
+        
+        <View style={styles.metaRow}>
+          <View style={styles.leftMeta}>
+            <Text style={styles.metaText}>
+              {formatDuration(call.duration_seconds)}
+            </Text>
+            {cost > 0 && (
+              <Text style={styles.costText}>₹{costInr}</Text>
+            )}
+          </View>
+          <Text style={styles.timeText}>
             {call.started_at ? timeAgo(call.started_at) : timeAgo(call.created_at)}
           </Text>
         </View>
       </View>
-      <Ionicons name="chevron-forward" size={16} color={COLORS.textSecondary} />
+
+      {/* Chevron */}
+      <Ionicons 
+        name="chevron-forward" 
+        size={18} 
+        color={theme.colors.textTertiary} 
+      />
     </TouchableOpacity>
   );
 }
@@ -84,50 +99,69 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.surface,
-    borderRadius: 10,
-    padding: 12,
-    marginHorizontal: 16,
-    marginVertical: 4,
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.lg,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    marginHorizontal: 20,
+    marginVertical: 6,
+    borderWidth: theme.card.borderWidth,
+    borderColor: theme.colors.border,
+    ...theme.shadow.card,
   },
-  iconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#1f2937',
+  iconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+    marginRight: 16,
   },
-  body: {
+  content: {
     flex: 1,
   },
-  row: {
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 2,
-  },
-  phone: {
-    color: COLORS.text,
-    fontSize: 15,
-    fontWeight: '600',
-    flex: 1,
-    marginRight: 8,
-  },
-  assistant: {
-    color: COLORS.textSecondary,
-    fontSize: 12,
     marginBottom: 4,
   },
-  meta: {
+  phoneNumber: {
+    color: theme.colors.text,
+    fontSize: 16,
+    fontWeight: theme.fontWeight.semibold,
+    flex: 1,
+    marginRight: 12,
+  },
+  assistantName: {
+    color: theme.colors.textSecondary,
+    fontSize: 13,
+    fontWeight: theme.fontWeight.medium,
+    marginBottom: 8,
+  },
+  metaRow: {
     flexDirection: 'row',
-    gap: 10,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  leftMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
   metaText: {
-    color: COLORS.textSecondary,
+    color: theme.colors.textSecondary,
+    fontSize: 13,
+    fontWeight: theme.fontWeight.medium,
+  },
+  costText: {
+    color: theme.colors.primary,
+    fontSize: 13,
+    fontWeight: theme.fontWeight.semibold,
+  },
+  timeText: {
+    color: theme.colors.textTertiary,
     fontSize: 12,
+    fontWeight: theme.fontWeight.medium,
   },
 });

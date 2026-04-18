@@ -2,7 +2,7 @@ import React from 'react';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../lib/theme';
-import { Platform, StyleSheet } from 'react-native';
+import { Platform } from 'react-native';
 
 type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -60,10 +60,10 @@ export default function TabsLayout() {
           paddingTop: 8,
         },
         tabBarActiveTintColor: theme.colors.primary,
-        tabBarInactiveTintColor: theme.colors.textSecondary,
+        tabBarInactiveTintColor: theme.colors.textTertiary,
         tabBarLabelStyle: {
           fontSize: 11,
-          fontWeight: '500',
+          fontWeight: theme.fontWeight.semibold,
         },
       }}
     >
@@ -76,7 +76,7 @@ export default function TabsLayout() {
             tabBarIcon: ({ focused, color, size }) => (
               <Ionicons
                 name={focused ? tab.iconFocused : tab.icon}
-                size={size}
+                size={26} // Slightly larger icons
                 color={color}
               />
             ),
