@@ -2,13 +2,12 @@ import { colors as C } from '../lib/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SkeletonListItem } from '../components/Skeleton';
 import * as haptics from '../lib/haptics';
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   View,
-  FlatList,
+  SectionList,
   StyleSheet,
   RefreshControl,
-  ActivityIndicator,
   Text,
   Platform,
 } from 'react-native';
@@ -21,7 +20,6 @@ import { getCalls } from '../services/callService';
 import { supabase } from '../lib/supabase';
 import { CallLog } from '../types';
 
-
 const FILTER_OPTIONS = [
   { label: 'All', value: 'all' },
   { label: 'Inbound', value: 'inbound' },
@@ -31,6 +29,43 @@ const FILTER_OPTIONS = [
 ];
 
 const PAGE_SIZE = 20;
+
+// ─── Date grouping helpers ──────────────────────────────────────────────────
+
+function getDateLabel(dateStr: string): string {
+  const d = new Date(dateStr);
+  const now = new Date();
+
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  const callDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+
+  if (callDay.getTime() === today.getTime()) return 'Today';
+  if (callDay.getTime() === yesterday.getTime()) return 'Yesterday';
+
+  return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+}
+
+function groupCallsByDate(calls: CallLog[]): { title: string; data: CallLog[] }[] {
+  const groups: Record<string, CallLog[]> = {};
+  const order: string[] = [];
+
+  for (const call of calls) {
+    const ts = call.started_at || call.created_at;
+    const label = getDateLabel(ts);
+    if (!groups[label]) {
+      groups[label] = [];
+      order.push(label);
+    }
+    groups[label].push(call);
+  }
+
+  return order.map((title) => ({ title, data: groups[title] }));
+}
+
+// ─── Screen ─────────────────────────────────────────────────────────────────
 
 export default function CallLogsScreen() {
   const insets = useSafeAreaInsets();
@@ -44,14 +79,12 @@ export default function CallLogsScreen() {
   const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const offsetRef = useRef(0);
-  const userIdRef = useRef<string | null>(null);
 
   const fetchCalls = useCallback(
     async (reset: boolean = false) => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error('Not authenticated');
-        userIdRef.current = user.id;
 
         const offset = reset ? 0 : offsetRef.current;
         const data = await getCalls(user.id, {
@@ -95,43 +128,25 @@ export default function CallLogsScreen() {
     setLoadingMore(false);
   }, [loadingMore, hasMore, fetchCalls]);
 
-  const ListHeader = () => (
-    <View>
-      <View style={styles.screenHeader}>
-        <View style={styles.titleRow}>
-          <Text style={styles.screenTitle}>Calls</Text>
-          {calls.length > 0 && (
-            <View style={styles.countBadge}>
-              <Text style={styles.countText}>{calls.length}</Text>
-            </View>
-          )}
-        </View>
-      </View>
-      
-      <SearchBar
-        value={search}
-        onChangeText={setSearch}
-        placeholder="Search by phone number..."
-      />
-      
-      <FilterChips 
-        options={FILTER_OPTIONS} 
-        selected={filter} 
-        onSelect={setFilter} 
-      />
-      
-      {error ? (
-        <View style={styles.errorBanner}>
-          <Text style={styles.errorText}>{error}</Text>
-        </View>
-      ) : null}
-    </View>
+  // Stats summary (completed / total)
+  const completedCount = useMemo(
+    () => calls.filter((c) => c.status === 'completed').length,
+    [calls]
   );
 
+  // Grouped sections for SectionList
+  const sections = useMemo(() => groupCallsByDate(calls), [calls]);
+
+  // ─── Loading state (skeleton) ──────────────────────────────────────────
   if (loading) {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
-        <View style={{ paddingHorizontal: 20, paddingTop: 24 }}>
+        <View style={styles.skeletonHeader}>
+          <View style={styles.titleRow}>
+            <Text style={styles.screenTitle}>Calls</Text>
+          </View>
+        </View>
+        <View style={{ paddingHorizontal: 16 }}>
           {Array.from({ length: 8 }).map((_, i) => (
             <SkeletonListItem key={i} />
           ))}
@@ -140,31 +155,81 @@ export default function CallLogsScreen() {
     );
   }
 
+  // ─── List header (title + search + filters + error) ───────────────────
+  const ListHeader = () => (
+    <View>
+      {/* Screen title + stats summary */}
+      <View style={styles.screenHeader}>
+        <View style={styles.titleRow}>
+          <Text style={styles.screenTitle}>Calls</Text>
+          {calls.length > 0 && (
+            <View style={styles.statsRow}>
+              <View style={styles.statPill}>
+                <View style={[styles.statDot, { backgroundColor: C.success }]} />
+                <Text style={styles.statText}>{completedCount} completed</Text>
+              </View>
+              <View style={[styles.statPill, styles.statPillTotal]}>
+                <Text style={styles.statTextMuted}>{calls.length} total</Text>
+              </View>
+            </View>
+          )}
+        </View>
+      </View>
+
+      <SearchBar
+        value={search}
+        onChangeText={setSearch}
+        placeholder="Search by phone number..."
+      />
+
+      <FilterChips
+        options={FILTER_OPTIONS}
+        selected={filter}
+        onSelect={setFilter}
+      />
+
+      {error ? (
+        <View style={styles.errorBanner}>
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
+      ) : null}
+    </View>
+  );
+
+  const ListEmpty = () => (
+    <EmptyState
+      icon="call"
+      title="No calls yet"
+      message="Calls from your voice agents will appear here"
+    />
+  );
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <FlatList
-        data={calls}
+      <SectionList
+        sections={sections}
         keyExtractor={(item) => item.id}
         ListHeaderComponent={ListHeader}
+        renderSectionHeader={({ section: { title } }) => (
+          <View style={styles.sectionHeaderContainer}>
+            <Text style={styles.sectionHeaderText}>{title}</Text>
+            <View style={styles.sectionHeaderLine} />
+          </View>
+        )}
         renderItem={({ item }) => (
           <CallCard
             call={item}
             onPress={(call) => router.push(`/calls/${call.id}` as any)}
           />
         )}
-        ListEmptyComponent={
-          <EmptyState
-            icon="call"
-            title="No calls yet"
-            message="Calls from your voice agents will appear here"
-          />
-        }
+        ListEmptyComponent={ListEmpty}
         ListFooterComponent={
           loadingMore ? (
-            <ActivityIndicator
-              color={C.primary}
-              style={styles.loadingMore}
-            />
+            <View style={styles.loadingMoreContainer}>
+              {Array.from({ length: 3 }).map((_, i) => (
+                <SkeletonListItem key={i} />
+              ))}
+            </View>
           ) : null
         }
         refreshControl={
@@ -179,53 +244,96 @@ export default function CallLogsScreen() {
         onEndReachedThreshold={0.3}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
+        stickySectionHeadersEnabled={false}
       />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
+  container: {
+    flex: 1,
     backgroundColor: C.bg,
   },
-  listContent: { 
-    paddingBottom: 32,
+  listContent: {
+    paddingBottom: 40,
   },
-  centered: { 
-    flex: 1, 
-    alignItems: 'center', 
-    justifyContent: 'center', 
-    backgroundColor: C.bg,
+  skeletonHeader: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 20,
   },
   screenHeader: {
     paddingHorizontal: 20,
     paddingTop: 16,
-    paddingBottom: 24,
+    paddingBottom: 20,
   },
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  screenTitle: { 
+  screenTitle: {
     fontSize: 32,
     fontWeight: '800',
     color: C.text,
-    letterSpacing: 0.5,
+    letterSpacing: -0.5,
   },
-  countBadge: {
-    backgroundColor: C.primaryMuted,
-    borderColor: C.primary,
+  statsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  statPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: C.successMuted,
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    borderColor: C.success + '30',
   },
-  countText: {
-    fontSize: 14,
+  statPillTotal: {
+    backgroundColor: C.surfaceRaised,
+    borderColor: C.border,
+  },
+  statDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+  },
+  statText: {
+    fontSize: 12,
     fontWeight: '600',
-    color: C.primary,
+    color: C.success,
+  },
+  statTextMuted: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: C.textMuted,
+  },
+  // Section date headers
+  sectionHeaderContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 10,
+    gap: 10,
+  },
+  sectionHeaderText: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+    color: C.textMuted,
+  },
+  sectionHeaderLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: C.border,
   },
   errorBanner: {
     backgroundColor: C.danger + '15',
@@ -236,12 +344,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: C.danger + '30',
   },
-  errorText: { 
-    color: C.danger, 
+  errorText: {
+    color: C.danger,
     fontSize: 14,
     fontWeight: '500',
   },
-  loadingMore: { 
-    paddingVertical: 20,
+  loadingMoreContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
   },
 });

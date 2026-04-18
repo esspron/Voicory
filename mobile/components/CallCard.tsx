@@ -1,26 +1,27 @@
-import React from 'react';
-import { TouchableOpacity, View, Text, StyleSheet } from 'react-native';
+import React, { useRef, useCallback } from 'react';
+import {
+  Animated,
+  TouchableOpacity,
+  View,
+  Text,
+  StyleSheet,
+  Alert,
+  Linking,
+  Platform,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { CallLog } from '../types';
 import { StatusBadge } from './StatusBadge';
-import { theme } from '../lib/theme';
+import { colors as C, radii, shadows, typography } from '../lib/theme';
 
 const USD_TO_INR = 84;
 
 function formatDuration(seconds: number | undefined): string {
-  if (!seconds) return '0:00';
+  if (!seconds) return '—';
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
   return `${m}:${s.toString().padStart(2, '0')}`;
-}
-
-function timeAgo(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
 }
 
 interface CallCardProps {
@@ -28,69 +29,149 @@ interface CallCardProps {
   onPress: (call: CallLog) => void;
 }
 
-export function CallCard({ call, onPress }: CallCardProps) {
-  const cost = call.cost || 0;
-  const costInr = (cost * USD_TO_INR).toFixed(2);
-  
-  // Use from_number/to_number based on direction, fallback to phone_number
-  const displayNumber = call.direction === 'inbound' 
-    ? call.from_number || call.phone_number
-    : call.to_number || call.phone_number;
+// Direction icon + gradient ring config
+const DIRECTION_CONFIG = {
+  inbound: {
+    icon: 'arrow-down-outline' as const,
+    gradientColors: ['#22c55e30', '#16a34a20'] as [string, string],
+    ringColor: '#22c55e40',
+    iconColor: '#4ade80',
+  },
+  outbound: {
+    icon: 'arrow-up-outline' as const,
+    gradientColors: ['#0099ff30', '#0070dd20'] as [string, string],
+    ringColor: '#0099ff40',
+    iconColor: '#60b8ff',
+  },
+};
 
-  const directionIcon = call.direction === 'inbound' ? 'arrow-down' : 'arrow-up';
-  const directionColor = call.direction === 'inbound' ? theme.colors.success : theme.colors.secondary;
+// Status dot color for right-side indicator
+const STATUS_DOT: Record<string, string> = {
+  completed: '#22c55e',
+  failed: '#ef4444',
+  'in-progress': '#f59e0b',
+  busy: '#f97316',
+  'no-answer': '#6b7280',
+  queued: '#0099ff',
+  ringing: '#00d4aa',
+};
+
+export function CallCard({ call, onPress }: CallCardProps) {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+
+  const handlePressIn = useCallback(() => {
+    Animated.spring(scaleAnim, {
+      toValue: 0.97,
+      useNativeDriver: true,
+      damping: 20,
+      stiffness: 300,
+    }).start();
+  }, [scaleAnim]);
+
+  const handlePressOut = useCallback(() => {
+    Animated.spring(scaleAnim, {
+      toValue: 1,
+      useNativeDriver: true,
+      damping: 15,
+      stiffness: 200,
+    }).start();
+  }, [scaleAnim]);
+
+  const handleLongPress = useCallback(() => {
+    const displayNum =
+      call.direction === 'inbound'
+        ? call.from_number || call.phone_number
+        : call.to_number || call.phone_number;
+
+    if (call.status === 'completed' || call.status === 'no-answer' || call.status === 'busy') {
+      Alert.alert('Call Back', `Call ${displayNum}?`, [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Call',
+          onPress: () => Linking.openURL(`tel:${displayNum}`),
+        },
+      ]);
+    }
+  }, [call]);
+
+  const dirConf = DIRECTION_CONFIG[call.direction] ?? DIRECTION_CONFIG.outbound;
+  const dotColor = STATUS_DOT[call.status] ?? C.textMuted;
+
+  const cost = call.cost ?? 0;
+  const costInr = (cost * USD_TO_INR).toFixed(2);
+
+  const displayNumber =
+    call.direction === 'inbound'
+      ? call.from_number || call.phone_number
+      : call.to_number || call.phone_number;
 
   return (
-    <TouchableOpacity 
-      style={styles.card} 
-      onPress={() => onPress(call)} 
-      activeOpacity={0.7}
+    <TouchableOpacity
+      activeOpacity={1}
+      onPress={() => onPress(call)}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      onLongPress={handleLongPress}
+      delayLongPress={400}
     >
-      {/* Direction arrow icon */}
-      <View style={[styles.iconContainer, { backgroundColor: directionColor + '15' }]}>
-        <Ionicons
-          name={directionIcon}
-          size={20}
-          color={directionColor}
-        />
-      </View>
-
-      {/* Main content */}
-      <View style={styles.content}>
-        <View style={styles.header}>
-          <Text style={styles.phoneNumber} numberOfLines={1}>
-            {displayNumber}
-          </Text>
-          <StatusBadge status={call.status} />
+      <Animated.View style={[styles.card, { transform: [{ scale: scaleAnim }] }]}>
+        {/* LEFT: Direction icon with gradient ring */}
+        <View style={styles.iconWrapper}>
+          {/* Outer glow ring */}
+          <View style={[styles.iconRing, { borderColor: dirConf.ringColor }]} />
+          <LinearGradient
+            colors={dirConf.gradientColors}
+            style={styles.iconContainer}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          >
+            <Ionicons name={dirConf.icon} size={18} color={dirConf.iconColor} />
+          </LinearGradient>
         </View>
-        
-        {call.assistant?.name ? (
-          <Text style={styles.assistantName} numberOfLines={1}>
-            {call.assistant.name}
-          </Text>
-        ) : null}
-        
-        <View style={styles.metaRow}>
-          <View style={styles.leftMeta}>
-            <Text style={styles.metaText}>
-              {formatDuration(call.duration_seconds)}
+
+        {/* CENTER: Caller info */}
+        <View style={styles.content}>
+          {/* Top row: number + status badge */}
+          <View style={styles.topRow}>
+            <Text style={styles.phoneNumber} numberOfLines={1}>
+              {displayNumber}
             </Text>
+            <StatusBadge status={call.status} />
+          </View>
+
+          {/* Assistant name */}
+          {call.assistant?.name ? (
+            <Text style={styles.assistantName} numberOfLines={1}>
+              via {call.assistant.name}
+            </Text>
+          ) : null}
+
+          {/* Bottom meta row */}
+          <View style={styles.metaRow}>
+            {call.duration_seconds ? (
+              <View style={styles.metaChip}>
+                <Ionicons name="time-outline" size={11} color={C.textMuted} />
+                <Text style={styles.metaText}>{formatDuration(call.duration_seconds)}</Text>
+              </View>
+            ) : null}
             {cost > 0 && (
-              <Text style={styles.costText}>₹{costInr}</Text>
+              <View style={styles.metaChip}>
+                <Text style={styles.costText}>₹{costInr}</Text>
+              </View>
             )}
           </View>
-          <Text style={styles.timeText}>
-            {call.started_at ? timeAgo(call.started_at) : timeAgo(call.created_at)}
-          </Text>
         </View>
-      </View>
 
-      {/* Chevron */}
-      <Ionicons 
-        name="chevron-forward" 
-        size={18} 
-        color={theme.colors.textTertiary} 
-      />
+        {/* RIGHT: Animated status dot + chevron */}
+        <View style={styles.rightSide}>
+          <View style={styles.statusDotContainer}>
+            <View style={[styles.statusDotOuter, { backgroundColor: dotColor + '25' }]}>
+              <View style={[styles.statusDotInner, { backgroundColor: dotColor }]} />
+            </View>
+          </View>
+          <Ionicons name="chevron-forward" size={14} color={C.textFaint} />
+        </View>
+      </Animated.View>
     </TouchableOpacity>
   );
 }
@@ -99,69 +180,101 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.borderRadius.lg,
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    marginHorizontal: 20,
-    marginVertical: 6,
-    borderWidth: theme.card.borderWidth,
-    borderColor: theme.colors.border,
-    ...theme.shadow.card,
+    backgroundColor: C.surface,
+    borderRadius: radii.xl,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    marginHorizontal: 16,
+    marginVertical: 5,
+    borderWidth: 1,
+    borderColor: C.border,
+    ...shadows.md,
   },
-  iconContainer: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+  iconWrapper: {
+    width: 48,
+    height: 48,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 16,
+    marginRight: 14,
+    position: 'relative',
+  },
+  iconRing: {
+    position: 'absolute',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 1.5,
+  },
+  iconContainer: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   content: {
     flex: 1,
   },
-  header: {
+  topRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 4,
+    marginBottom: 3,
   },
   phoneNumber: {
-    color: theme.colors.text,
-    fontSize: 16,
-    fontWeight: theme.fontWeight.semibold,
+    color: C.text,
+    fontSize: 15,
+    fontWeight: '600',
     flex: 1,
-    marginRight: 12,
+    marginRight: 8,
+    letterSpacing: 0.2,
   },
   assistantName: {
-    color: theme.colors.textSecondary,
-    fontSize: 13,
-    fontWeight: theme.fontWeight.medium,
-    marginBottom: 8,
+    color: C.textMuted,
+    fontSize: 12,
+    fontWeight: '500',
+    marginBottom: 6,
   },
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: 8,
   },
-  leftMeta: {
+  metaChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 4,
   },
   metaText: {
-    color: theme.colors.textSecondary,
-    fontSize: 13,
-    fontWeight: theme.fontWeight.medium,
+    color: C.textSecondary,
+    fontSize: 12,
+    fontWeight: '500',
   },
   costText: {
-    color: theme.colors.primary,
-    fontSize: 13,
-    fontWeight: theme.fontWeight.semibold,
-  },
-  timeText: {
-    color: theme.colors.textTertiary,
+    color: C.primary,
     fontSize: 12,
-    fontWeight: theme.fontWeight.medium,
+    fontWeight: '600',
+  },
+  rightSide: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 10,
+    gap: 4,
+  },
+  statusDotContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statusDotOuter: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statusDotInner: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
   },
 });

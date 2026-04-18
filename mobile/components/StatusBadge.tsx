@@ -1,42 +1,49 @@
 import React from 'react';
 import { View, Text, StyleSheet, ViewStyle } from 'react-native';
-import { theme } from '../lib/theme';
+import { LinearGradient } from 'expo-linear-gradient';
+import { colors as C } from '../lib/theme';
 
-const STATUS_CONFIG: Record<string, { dotColor: string; textColor: string; text: string }> = {
-  completed: { 
-    dotColor: theme.colors.success, 
-    textColor: theme.colors.success, 
-    text: 'Completed' 
+interface StatusConfig {
+  gradient: [string, string];
+  textColor: string;
+  text: string;
+}
+
+const STATUS_CONFIG: Record<string, StatusConfig> = {
+  completed: {
+    gradient: ['#22c55e20', '#16a34a20'],
+    textColor: '#4ade80',
+    text: 'Completed',
   },
-  failed: { 
-    dotColor: theme.colors.danger, 
-    textColor: theme.colors.danger, 
-    text: 'Failed' 
+  failed: {
+    gradient: ['#ef444420', '#dc262620'],
+    textColor: '#f87171',
+    text: 'Failed',
   },
-  'in-progress': { 
-    dotColor: theme.colors.warning, 
-    textColor: theme.colors.warning, 
-    text: 'In Progress' 
+  'in-progress': {
+    gradient: ['#f59e0b20', '#d9770620'],
+    textColor: '#fbbf24',
+    text: 'Live',
   },
-  busy: { 
-    dotColor: '#f97316', 
-    textColor: '#f97316', 
-    text: 'Busy' 
+  busy: {
+    gradient: ['#f9731620', '#ea580c20'],
+    textColor: '#fb923c',
+    text: 'Busy',
   },
-  'no-answer': { 
-    dotColor: theme.colors.textTertiary, 
-    textColor: theme.colors.textTertiary, 
-    text: 'No Answer' 
+  'no-answer': {
+    gradient: ['#3d4a5c20', '#2d3748 20'],
+    textColor: '#8b95a5',
+    text: 'No Answer',
   },
-  queued: { 
-    dotColor: theme.colors.secondary, 
-    textColor: theme.colors.secondary, 
-    text: 'Queued' 
+  queued: {
+    gradient: ['#0099ff20', '#0070dd20'],
+    textColor: '#38bdf8',
+    text: 'Queued',
   },
-  ringing: { 
-    dotColor: theme.colors.primary, 
-    textColor: theme.colors.primary, 
-    text: 'Ringing' 
+  ringing: {
+    gradient: ['#00d4aa20', '#00b89420'],
+    textColor: '#00d4aa',
+    text: 'Ringing',
   },
 };
 
@@ -46,17 +53,25 @@ interface StatusBadgeProps {
 }
 
 export function StatusBadge({ status, style }: StatusBadgeProps) {
-  const config = STATUS_CONFIG[status] || { 
-    dotColor: theme.colors.textTertiary, 
-    textColor: theme.colors.textTertiary,
-    text: status.replace('-', ' ') 
+  const config = STATUS_CONFIG[status] ?? {
+    gradient: ['#3d4a5c20', '#2d374820'] as [string, string],
+    textColor: C.textSecondary,
+    text: status.replace(/-/g, ' '),
   };
 
   return (
-    <View style={[styles.badge, style]}>
-      <View style={[styles.dot, { backgroundColor: config.dotColor }]} />
+    <LinearGradient
+      colors={config.gradient}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 0 }}
+      style={[styles.badge, style]}
+    >
+      {/* Animated dot for live statuses */}
+      {(status === 'in-progress' || status === 'ringing') && (
+        <View style={[styles.liveDot, { backgroundColor: config.textColor }]} />
+      )}
       <Text style={[styles.text, { color: config.textColor }]}>{config.text}</Text>
-    </View>
+    </LinearGradient>
   );
 }
 
@@ -64,15 +79,19 @@ const styles = StyleSheet.create({
   badge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
   },
-  dot: {
-    width: 6,
-    height: 6,
+  liveDot: {
+    width: 5,
+    height: 5,
     borderRadius: 3,
   },
   text: {
-    fontSize: 12,
-    fontWeight: theme.fontWeight.medium,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
 });
