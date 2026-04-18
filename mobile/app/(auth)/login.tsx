@@ -132,7 +132,7 @@ export default function LoginScreen() {
             <View style={s.logoWrapper}>
               <VoicoryLogo size={64} />
             </View>
-            <Text style={s.brandName}>Voicory</Text>
+            <Text style={s.brandName}>VOICORY</Text>
             <Text style={s.brandTagline}>Intelligent voice AI for your business</Text>
           </View>
 
@@ -279,10 +279,10 @@ const s = StyleSheet.create({
     elevation: 10,
   },
   brandName: {
-    fontSize: 32,
-    fontWeight: '800',
-    color: '#ffffff',
-    letterSpacing: 1,
+    fontSize: 36,
+    fontFamily: 'Ahsing',
+    color: '#2EC7B7',
+    letterSpacing: 2,
   },
   brandTagline: {
     marginTop: 6,

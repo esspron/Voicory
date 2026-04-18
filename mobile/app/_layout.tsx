@@ -5,9 +5,11 @@ import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { useFonts } from 'expo-font';
 import { AuthProvider, useAuth } from '../contexts/AuthContext';
 import { useAuthStore } from '../stores/authStore';
 import { theme } from '../lib/theme';
+
 
 // ─── Auth Guard ───────────────────────────────────────────────────────────────
 
@@ -62,6 +64,18 @@ function AuthGuard() {
 // ─── Root Layout ──────────────────────────────────────────────────────────────
 
 export default function RootLayout() {
+  const [fontsLoaded] = useFonts({
+    'Ahsing': require('../assets/fonts/ahsing.otf'),
+  });
+
+  if (!fontsLoaded) {
+    return (
+      <View style={{ flex: 1, backgroundColor: theme.colors.background, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+      </View>
+    );
+  }
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
