@@ -2,177 +2,287 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
-  FlatList,
+  ScrollView,
   StyleSheet,
   TouchableOpacity,
   RefreshControl,
   ActivityIndicator,
   Dimensions,
   Platform,
+  Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import Svg, { Circle, Path } from 'react-native-svg';
-import { CallCard } from '../components/CallCard';
-import { EmptyState } from '../components/EmptyState';
+import Svg, { Circle, Path, Rect, Defs, LinearGradient as SvgGrad, Stop, G } from 'react-native-svg';
 import { getDashboardData, DashboardData, CreditHealth, AgentPerformance } from '../services/analyticsService';
 import { getCalls } from '../services/callService';
 import { supabase } from '../lib/supabase';
-import { theme } from '../lib/theme';
 import { CallLog } from '../types';
 
-const { width: SCREEN_W } = Dimensions.get('window');
+const { width: SW } = Dimensions.get('window');
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+// DESIGN TOKENS — single source of truth
+// ═══════════════════════════════════════════════════════════════════════════════
 
-function formatDuration(seconds: number): string {
-  if (!seconds) return '0s';
-  const m = Math.floor(seconds / 60);
-  const s = Math.round(seconds % 60);
-  return m > 0 ? `${m}m ${s}s` : `${s}s`;
+const C = {
+  bg: '#050a12',
+  surface: '#0c1219',
+  surfaceRaised: '#111a24',
+  border: '#1a2332',
+  borderLight: '#1a233350',
+  primary: '#00d4aa',
+  primaryMuted: '#00d4aa18',
+  secondary: '#0099ff',
+  text: '#f0f2f5',
+  textMuted: '#7a8599',
+  textFaint: '#3d4a5c',
+  danger: '#ef4444',
+  warning: '#f59e0b',
+  success: '#22c55e',
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SVG ILLUSTRATIONS — hand-drawn quality, not clip art
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function RocketIllustration() {
+  return (
+    <Svg width={120} height={120} viewBox="0 0 120 120" fill="none">
+      <Defs>
+        <SvgGrad id="rk1" x1="40" y1="20" x2="80" y2="100" gradientUnits="userSpaceOnUse">
+          <Stop offset="0" stopColor="#00d4aa" stopOpacity="0.15" />
+          <Stop offset="1" stopColor="#0099ff" stopOpacity="0.05" />
+        </SvgGrad>
+        <SvgGrad id="rk2" x1="50" y1="30" x2="70" y2="85" gradientUnits="userSpaceOnUse">
+          <Stop offset="0" stopColor="#00d4aa" />
+          <Stop offset="1" stopColor="#0099ff" />
+        </SvgGrad>
+      </Defs>
+      <Circle cx="60" cy="60" r="50" fill="url(#rk1)" />
+      {/* Rocket body */}
+      <Path d="M60 25C55 40 50 55 50 70C50 78 54 85 60 88C66 85 70 78 70 70C70 55 65 40 60 25Z" fill="url(#rk2)" opacity="0.9" />
+      {/* Window */}
+      <Circle cx="60" cy="55" r="6" fill={C.bg} />
+      <Circle cx="60" cy="55" r="4" fill="#00d4aa" opacity="0.3" />
+      {/* Fins */}
+      <Path d="M50 72L40 85L50 80Z" fill="#00d4aa" opacity="0.5" />
+      <Path d="M70 72L80 85L70 80Z" fill="#00d4aa" opacity="0.5" />
+      {/* Exhaust */}
+      <Path d="M55 88Q60 100 65 88" stroke="#f59e0b" strokeWidth="2" fill="none" opacity="0.6" />
+      <Path d="M57 90Q60 97 63 90" stroke="#ef4444" strokeWidth="1.5" fill="none" opacity="0.4" />
+      {/* Stars */}
+      <Circle cx="25" cy="30" r="1.5" fill={C.textMuted} opacity="0.5" />
+      <Circle cx="90" cy="25" r="1" fill={C.textMuted} opacity="0.4" />
+      <Circle cx="95" cy="60" r="1.5" fill={C.textMuted} opacity="0.3" />
+      <Circle cx="20" cy="75" r="1" fill={C.textMuted} opacity="0.5" />
+      <Circle cx="85" cy="85" r="1" fill={C.textMuted} opacity="0.3" />
+    </Svg>
+  );
 }
 
-function formatCompact(n: number): string {
-  if (n >= 10000) return `₹${(n / 1000).toFixed(0)}k`;
-  if (n >= 1000) return `₹${(n / 1000).toFixed(1)}k`;
-  return `₹${n.toFixed(0)}`;
+function PhoneWaveIllustration() {
+  return (
+    <Svg width={48} height={48} viewBox="0 0 48 48" fill="none">
+      <Rect x="14" y="6" width="20" height="36" rx="4" stroke={C.primary} strokeWidth="1.5" fill="none" opacity="0.4" />
+      <Circle cx="24" cy="38" r="2" fill={C.primary} opacity="0.3" />
+      {/* Sound waves */}
+      <Path d="M36 18C38 20 38 28 36 30" stroke={C.primary} strokeWidth="1.5" strokeLinecap="round" opacity="0.6" />
+      <Path d="M40 15C43 19 43 29 40 33" stroke={C.primary} strokeWidth="1.5" strokeLinecap="round" opacity="0.3" />
+    </Svg>
+  );
 }
 
-// ── Credit Ring ──────────────────────────────────────────────────────────────
-// SVG donut ring that fills based on urgency
+// ═══════════════════════════════════════════════════════════════════════════════
+// CREDIT RING — SVG donut
+// ═══════════════════════════════════════════════════════════════════════════════
 
-const RING_SIZE = 88;
-const RING_STROKE = 6;
-const RING_RADIUS = (RING_SIZE - RING_STROKE) / 2;
-const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
+const RING_SZ = 80;
+const RING_SW = 5;
+const RING_R = (RING_SZ - RING_SW) / 2;
+const RING_C = 2 * Math.PI * RING_R;
 
-const URGENCY_COLORS = {
-  healthy: '#22c55e',
-  watch: '#f59e0b',
-  low: '#f97316',
-  critical: '#ef4444',
+const URGENCY = {
+  healthy: { color: '#22c55e', label: 'Healthy' },
+  watch: { color: '#f59e0b', label: 'Watch' },
+  low: { color: '#f97316', label: 'Low' },
+  critical: { color: '#ef4444', label: 'Critical' },
 };
 
 function CreditRing({ health }: { health: CreditHealth }) {
-  // Show percentage of "runway" — cap at 30 days as 100%
   const pct = Math.min(health.daysRemaining / 30, 1);
-  const strokeDashoffset = RING_CIRCUMFERENCE * (1 - pct);
-  const color = URGENCY_COLORS[health.urgency];
+  const offset = RING_C * (1 - pct);
+  const u = URGENCY[health.urgency];
 
   return (
-    <View style={{ width: RING_SIZE, height: RING_SIZE, alignItems: 'center', justifyContent: 'center' }}>
-      <Svg width={RING_SIZE} height={RING_SIZE} style={{ position: 'absolute' }}>
-        {/* Background track */}
+    <View style={{ width: RING_SZ, height: RING_SZ, alignItems: 'center', justifyContent: 'center' }}>
+      <Svg width={RING_SZ} height={RING_SZ} style={StyleSheet.absoluteFill}>
+        <Circle cx={RING_SZ/2} cy={RING_SZ/2} r={RING_R} stroke={C.border} strokeWidth={RING_SW} fill="none" />
         <Circle
-          cx={RING_SIZE / 2}
-          cy={RING_SIZE / 2}
-          r={RING_RADIUS}
-          stroke="#1a2332"
-          strokeWidth={RING_STROKE}
-          fill="none"
-        />
-        {/* Progress arc */}
-        <Circle
-          cx={RING_SIZE / 2}
-          cy={RING_SIZE / 2}
-          r={RING_RADIUS}
-          stroke={color}
-          strokeWidth={RING_STROKE}
-          fill="none"
+          cx={RING_SZ/2} cy={RING_SZ/2} r={RING_R}
+          stroke={u.color} strokeWidth={RING_SW} fill="none"
           strokeLinecap="round"
-          strokeDasharray={`${RING_CIRCUMFERENCE}`}
-          strokeDashoffset={strokeDashoffset}
-          transform={`rotate(-90 ${RING_SIZE / 2} ${RING_SIZE / 2})`}
+          strokeDasharray={`${RING_C}`}
+          strokeDashoffset={offset}
+          transform={`rotate(-90 ${RING_SZ/2} ${RING_SZ/2})`}
         />
       </Svg>
-      {/* Center text */}
-      <Text style={[s.ringDays, { color }]}>
+      <Text style={[s.ringNum, { color: u.color }]}>
         {health.daysRemaining >= 999 ? '∞' : Math.floor(health.daysRemaining)}
       </Text>
-      <Text style={s.ringLabel}>days</Text>
+      <Text style={s.ringUnit}>days</Text>
     </View>
   );
 }
 
-// ── Mini Sparkline ───────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+// SPARKLINE
+// ═══════════════════════════════════════════════════════════════════════════════
 
-function Sparkline({ data, color = '#00d4aa' }: { data: number[]; color?: string }) {
+function Sparkline({ data }: { data: number[] }) {
   const max = Math.max(...data, 1);
-  const barWidth = 4;
-  const gap = 3;
-  const totalW = data.length * (barWidth + gap) - gap;
-  const height = 32;
-
+  const h = 28;
   return (
-    <View style={{ width: totalW, height, flexDirection: 'row', alignItems: 'flex-end', gap }}>
-      {data.map((val, i) => {
-        const h = Math.max((val / max) * height, 2);
-        const isToday = i === data.length - 1;
-        return (
-          <View
-            key={i}
-            style={{
-              width: barWidth,
-              height: h,
-              borderRadius: 2,
-              backgroundColor: isToday ? color : color + '40',
-            }}
-          />
-        );
-      })}
+    <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 3, height: h }}>
+      {data.map((v, i) => (
+        <View key={i} style={{
+          width: 4, borderRadius: 2,
+          height: Math.max((v / max) * h, 2),
+          backgroundColor: i === data.length - 1 ? C.primary : C.primary + '35',
+        }} />
+      ))}
     </View>
   );
 }
 
-// ── Trend Arrow ──────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+// SETUP CHECKLIST — shown when user has no calls
+// ═══════════════════════════════════════════════════════════════════════════════
 
-function TrendBadge({ pct }: { pct: number | null }) {
-  if (pct === null) return null;
-  const up = pct > 0;
-  const color = up ? '#ef4444' : '#22c55e'; // Up spend = bad (red), down = good (green)
+interface SetupStep {
+  key: string;
+  title: string;
+  subtitle: string;
+  icon: string;
+  done: boolean;
+  action?: () => void;
+}
+
+function SetupChecklist({ steps }: { steps: SetupStep[] }) {
+  const doneCount = steps.filter(s => s.done).length;
+
   return (
-    <View style={[s.trendBadge, { backgroundColor: color + '15' }]}>
-      <Ionicons name={up ? 'trending-up' : 'trending-down'} size={12} color={color} />
-      <Text style={[s.trendText, { color }]}>{Math.abs(pct).toFixed(0)}%</Text>
+    <View style={s.setupCard}>
+      <View style={s.setupHeader}>
+        <View style={{ flex: 1 }}>
+          <Text style={s.setupTitle}>Get started</Text>
+          <Text style={s.setupProgress}>{doneCount} of {steps.length} complete</Text>
+        </View>
+        {/* Progress bar */}
+        <View style={s.setupBarTrack}>
+          <View style={[s.setupBarFill, { width: `${(doneCount / steps.length) * 100}%` }]} />
+        </View>
+      </View>
+
+      {steps.map((step, i) => (
+        <TouchableOpacity
+          key={step.key}
+          style={[s.setupStep, i === steps.length - 1 && { borderBottomWidth: 0 }]}
+          onPress={step.action}
+          activeOpacity={step.action ? 0.7 : 1}
+          disabled={step.done}
+        >
+          <View style={[s.setupCheck, step.done && s.setupCheckDone]}>
+            {step.done ? (
+              <Ionicons name="checkmark" size={14} color={C.bg} />
+            ) : (
+              <Text style={s.setupCheckNum}>{i + 1}</Text>
+            )}
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[s.setupStepTitle, step.done && s.setupStepDone]}>{step.title}</Text>
+            <Text style={s.setupStepSub}>{step.subtitle}</Text>
+          </View>
+          {!step.done && step.action && (
+            <Ionicons name="chevron-forward" size={16} color={C.textFaint} />
+          )}
+        </TouchableOpacity>
+      ))}
     </View>
   );
 }
 
-// ── Agent Row ────────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+// AGENT ROW
+// ═══════════════════════════════════════════════════════════════════════════════
 
 function AgentRow({ agent }: { agent: AgentPerformance }) {
-  const barPct = Math.min(agent.successRate, 100);
+  const rateColor = agent.successRate > 80 ? C.success : agent.successRate > 50 ? C.warning : C.danger;
   return (
     <View style={s.agentRow}>
-      <View style={s.agentLeft}>
-        <View style={s.agentDot}>
-          <Ionicons name="hardware-chip-outline" size={16} color="#00d4aa" />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={s.agentName} numberOfLines={1}>{agent.assistantName}</Text>
-          <View style={s.agentMeta}>
-            <Text style={s.agentMetaText}>{agent.totalCalls} calls</Text>
-            <View style={s.metaSep} />
-            <Text style={s.agentMetaText}>{formatDuration(agent.avgDurationSec)} avg</Text>
-          </View>
-        </View>
+      <View style={s.agentIcon}>
+        <Ionicons name="hardware-chip-outline" size={16} color={C.primary} />
       </View>
-      <View style={s.agentRight}>
-        <Text style={[s.agentRate, { color: agent.successRate > 80 ? '#22c55e' : agent.successRate > 50 ? '#f59e0b' : '#ef4444' }]}>
-          {agent.successRate.toFixed(0)}%
-        </Text>
+      <View style={{ flex: 1 }}>
+        <Text style={s.agentName} numberOfLines={1}>{agent.assistantName}</Text>
+        <Text style={s.agentSub}>{agent.totalCalls} calls · {Math.round(agent.avgDurationSec)}s avg</Text>
+      </View>
+      <View style={s.agentRateBox}>
+        <Text style={[s.agentRate, { color: rateColor }]}>{agent.successRate.toFixed(0)}%</Text>
         <View style={s.agentBarTrack}>
-          <View style={[s.agentBarFill, { width: `${barPct}%`, backgroundColor: agent.successRate > 80 ? '#22c55e' : agent.successRate > 50 ? '#f59e0b' : '#ef4444' }]} />
+          <View style={[s.agentBarFill, { width: `${Math.min(agent.successRate, 100)}%`, backgroundColor: rateColor }]} />
         </View>
       </View>
     </View>
   );
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// ── DASHBOARD ────────────────────────────────────────────────────────────────
-// ══════════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════
+// CALL ROW — inline, not a separate component. Tighter.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function CallRow({ call, onPress }: { call: CallLog; onPress: () => void }) {
+  const isIn = call.direction === 'inbound';
+  const dur = call.duration_seconds ?? 0;
+  const m = Math.floor(dur / 60);
+  const sec = dur % 60;
+  const timeStr = m > 0 ? `${m}:${String(sec).padStart(2, '0')}` : `${sec}s`;
+  const phone = call.phone_number || (isIn ? call.from_number : call.to_number) || 'Unknown';
+  const statusColor = call.status === 'completed' ? C.success
+    : call.status === 'failed' ? C.danger
+    : call.status === 'in-progress' ? C.warning
+    : C.textFaint;
+
+  const ago = (() => {
+    const diff = Date.now() - new Date(call.created_at).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    return `${Math.floor(hrs / 24)}d ago`;
+  })();
+
+  return (
+    <TouchableOpacity style={s.callRow} onPress={onPress} activeOpacity={0.7}>
+      <View style={[s.callDir, { backgroundColor: isIn ? C.secondary + '15' : C.primary + '15' }]}>
+        <Ionicons name={isIn ? 'arrow-down-outline' : 'arrow-up-outline'} size={14} color={isIn ? C.secondary : C.primary} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={s.callPhone} numberOfLines={1}>{phone}</Text>
+        <Text style={s.callMeta}>{call.assistant?.name ?? 'Agent'} · {ago}</Text>
+      </View>
+      <View style={s.callRight}>
+        <Text style={s.callDur}>{timeStr}</Text>
+        <View style={[s.callDot, { backgroundColor: statusColor }]} />
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MAIN DASHBOARD
+// ═══════════════════════════════════════════════════════════════════════════════
 
 export default function DashboardScreen() {
   const router = useRouter();
@@ -187,12 +297,10 @@ export default function DashboardScreen() {
       setError(null);
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
-
       const [dashData, callsData] = await Promise.all([
         getDashboardData(user.id),
         getCalls(user.id, { limit: 5 }),
       ]);
-
       setData(dashData);
       setRecentCalls(callsData);
     } catch (err: any) {
@@ -212,319 +320,329 @@ export default function DashboardScreen() {
   }, [loadData]);
 
   if (loading) {
-    return (
-      <View style={s.centered}>
-        <ActivityIndicator size="large" color="#00d4aa" />
-      </View>
-    );
+    return <View style={s.centered}><ActivityIndicator size="large" color={C.primary} /></View>;
   }
 
   const ch = data?.creditHealth;
   const stats = data?.stats;
   const agents = data?.agentPerformance ?? [];
   const activity = data?.dailyActivity?.map(d => d.count) ?? [];
+  const hasCalls = (stats?.totalCalls ?? 0) > 0;
+  const hasAgents = agents.length > 0;
 
-  const ListHeader = () => (
-    <View>
+  // Setup steps — derived from actual state
+  const setupSteps: SetupStep[] = [
+    {
+      key: 'credits',
+      title: 'Add credits',
+      subtitle: ch && ch.balanceInr > 0 ? `₹${ch.balanceInr.toFixed(0)} loaded` : 'Fund your account to start making calls',
+      icon: 'wallet',
+      done: (ch?.balanceInr ?? 0) > 0,
+      action: () => router.push('/billing' as any),
+    },
+    {
+      key: 'agent',
+      title: 'Create a voice agent',
+      subtitle: hasAgents ? `${agents.length} agent${agents.length > 1 ? 's' : ''} active` : 'Set up your AI assistant',
+      icon: 'hardware-chip',
+      done: hasAgents,
+      action: () => Linking.openURL('https://app.voicory.com/assistants'),
+    },
+    {
+      key: 'call',
+      title: 'Make your first call',
+      subtitle: hasCalls ? `${stats!.totalCalls} calls this week` : 'Test your agent with a live call',
+      icon: 'call',
+      done: hasCalls,
+      action: () => Linking.openURL('https://app.voicory.com'),
+    },
+  ];
+
+  const allSetupDone = setupSteps.every(st => st.done);
+
+  return (
+    <ScrollView
+      style={s.container}
+      contentContainerStyle={s.content}
+      showsVerticalScrollIndicator={false}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.primary} colors={[C.primary]} />}
+    >
       {/* ── Header ── */}
       <View style={s.header}>
         <View>
           <Text style={s.greeting}>{data?.greeting ?? 'Hello'}</Text>
-          <Text style={s.headerTitle}>Dashboard</Text>
+          <Text style={s.title}>Dashboard</Text>
         </View>
-        <TouchableOpacity onPress={onRefresh} style={s.refreshBtn}>
-          <Ionicons name="refresh" size={20} color="#00d4aa" />
+        <TouchableOpacity onPress={onRefresh} style={s.iconBtn}>
+          <Ionicons name="refresh" size={18} color={C.textMuted} />
         </TouchableOpacity>
       </View>
 
       {error && (
-        <View style={s.errorBanner}>
-          <Ionicons name="alert-circle" size={16} color="#ef4444" />
+        <View style={s.errorBox}>
+          <Ionicons name="alert-circle" size={16} color={C.danger} />
           <Text style={s.errorText}>{error}</Text>
         </View>
       )}
 
-      {/* ═══════════════════════════════════════════════════════════════════ */}
-      {/* ── SECTION 1: CREDIT HEALTH ── */}
-      {/* The #1 thing: "Am I running out of money?" */}
-      {/* ═══════════════════════════════════════════════════════════════════ */}
+      {/* ════════════════════════════════════════════════════════════════ */}
+      {/* CREDIT HEALTH — always visible, adapts to urgency */}
+      {/* ════════════════════════════════════════════════════════════════ */}
       {ch && (
-        <View style={s.section}>
-          {/* Critical/Low urgency banner */}
+        <>
+          {/* Urgency banner — only when it matters */}
           {(ch.urgency === 'critical' || ch.urgency === 'low') && (
-            <View style={[s.urgencyBanner, { backgroundColor: URGENCY_COLORS[ch.urgency] + '12', borderColor: URGENCY_COLORS[ch.urgency] + '30' }]}>
-              <Ionicons
-                name={ch.urgency === 'critical' ? 'warning' : 'alert-circle-outline'}
-                size={18}
-                color={URGENCY_COLORS[ch.urgency]}
-              />
-              <Text style={[s.urgencyText, { color: URGENCY_COLORS[ch.urgency] }]}>
+            <View style={[s.urgencyBanner, { borderColor: URGENCY[ch.urgency].color + '30' }]}>
+              <Ionicons name={ch.urgency === 'critical' ? 'warning' : 'alert-circle-outline'} size={16} color={URGENCY[ch.urgency].color} />
+              <Text style={[s.urgencyText, { color: URGENCY[ch.urgency].color }]}>
                 {ch.urgency === 'critical'
-                  ? `Calls will stop in ~${Math.max(Math.floor(ch.daysRemaining), 0)} days. Top up now.`
-                  : `Credits running low — ~${Math.floor(ch.daysRemaining)} days remaining.`}
+                  ? `Calls stop in ${Math.max(Math.floor(ch.daysRemaining), 0)} days`
+                  : `~${Math.floor(ch.daysRemaining)} days of credits left`}
               </Text>
+              <TouchableOpacity onPress={() => router.push('/billing' as any)}>
+                <Text style={[s.urgencyAction, { color: URGENCY[ch.urgency].color }]}>Top up</Text>
+              </TouchableOpacity>
             </View>
           )}
 
           <View style={s.creditCard}>
-            {/* Left: ring + runway */}
-            <CreditRing health={ch} />
-
-            {/* Right: numbers */}
-            <View style={s.creditRight}>
-              <Text style={s.creditBalance}>₹{ch.balanceInr.toFixed(0)}</Text>
-              <Text style={s.creditUsd}>${ch.balanceUsd.toFixed(2)} USD</Text>
-
-              <View style={s.creditBurnRow}>
-                <Text style={s.creditBurnLabel}>
-                  ₹{ch.dailyBurnInr.toFixed(0)}/day
-                </Text>
-                <TrendBadge pct={ch.weekOverWeekPct} />
-              </View>
+            <View style={s.creditMain}>
+              {/* The hero number */}
+              <Text style={s.creditAmount}>₹{ch.balanceInr >= 1000 ? `${(ch.balanceInr / 1000).toFixed(1)}k` : ch.balanceInr.toFixed(0)}</Text>
+              <Text style={s.creditSub}>${ch.balanceUsd.toFixed(2)} · {ch.dailyBurnInr > 0 ? `₹${ch.dailyBurnInr.toFixed(0)}/day` : 'No spend yet'}</Text>
             </View>
+            <CreditRing health={ch} />
           </View>
 
-          {/* Add Credits — prominence based on urgency */}
-          <TouchableOpacity
-            onPress={() => router.push('/billing' as any)}
-            activeOpacity={0.8}
-          >
-            {ch.urgency === 'critical' || ch.urgency === 'low' ? (
+          {/* Healthy state: subtle add credits */}
+          {(ch.urgency === 'critical' || ch.urgency === 'low') ? (
+            <TouchableOpacity onPress={() => router.push('/billing' as any)} activeOpacity={0.8}>
               <LinearGradient
-                colors={ch.urgency === 'critical' ? ['#ef4444', '#dc2626'] as [string, string] : ['#00d4aa', '#00b894'] as [string, string]}
-                style={s.addCreditsBtnFull}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
+                colors={ch.urgency === 'critical' ? ['#ef4444', '#dc2626'] as [string, string] : [C.primary, '#00b894'] as [string, string]}
+                style={s.addCreditsFull}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
               >
-                <Ionicons name="add-circle" size={18} color="#000" />
-                <Text style={s.addCreditsTextBold}>Add Credits Now</Text>
+                <Text style={s.addCreditsFullText}>Add Credits</Text>
               </LinearGradient>
-            ) : (
-              <View style={s.addCreditsSubtle}>
-                <Ionicons name="add-circle-outline" size={16} color="#6b7280" />
-                <Text style={s.addCreditsTextSubtle}>Add Credits</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-        </View>
+            </TouchableOpacity>
+          ) : null}
+        </>
       )}
 
-      {/* ═══════════════════════════════════════════════════════════════════ */}
-      {/* ── SECTION 2: THIS WEEK'S PULSE ── */}
-      {/* Quick read: what happened, is my AI performing? */}
-      {/* ═══════════════════════════════════════════════════════════════════ */}
-      {stats && (
-        <View style={s.section}>
-          <View style={s.sectionHeaderRow}>
-            <Text style={s.sectionTitle}>This Week</Text>
+      {/* ════════════════════════════════════════════════════════════════ */}
+      {/* SETUP CHECKLIST — when not fully onboarded */}
+      {/* ════════════════════════════════════════════════════════════════ */}
+      {!allSetupDone && (
+        <SetupChecklist steps={setupSteps} />
+      )}
+
+      {/* ════════════════════════════════════════════════════════════════ */}
+      {/* THIS WEEK — only when there's data */}
+      {/* ════════════════════════════════════════════════════════════════ */}
+      {hasCalls && stats && (
+        <View style={s.weekSection}>
+          <View style={s.weekHeader}>
+            <Text style={s.sectionLabel}>This week</Text>
             {activity.length > 0 && <Sparkline data={activity} />}
           </View>
 
-          <View style={s.metricsGrid}>
-            <MetricTile
-              label="Calls"
-              value={String(stats.totalCalls)}
-              icon="call"
-              color="#00d4aa"
-            />
-            <MetricTile
-              label="Avg Duration"
-              value={formatDuration(stats.avgDuration)}
-              icon="time"
-              color="#f59e0b"
-            />
-            <MetricTile
-              label="Spent"
-              value={formatCompact(stats.totalCost)}
-              icon="wallet"
-              color="#0099ff"
-            />
-            <MetricTile
-              label="Success"
-              value={`${stats.successRate.toFixed(0)}%`}
-              icon="checkmark-circle"
-              color={stats.successRate > 80 ? '#22c55e' : stats.successRate > 50 ? '#f59e0b' : '#ef4444'}
-            />
+          <View style={s.metricRow}>
+            <View style={s.metric}>
+              <Text style={s.metricNum}>{stats.totalCalls}</Text>
+              <Text style={s.metricLabel}>Calls</Text>
+            </View>
+            <View style={s.metricSep} />
+            <View style={s.metric}>
+              <Text style={s.metricNum}>{stats.successRate.toFixed(0)}%</Text>
+              <Text style={s.metricLabel}>Success</Text>
+            </View>
+            <View style={s.metricSep} />
+            <View style={s.metric}>
+              <Text style={s.metricNum}>{Math.round(stats.avgDuration)}s</Text>
+              <Text style={s.metricLabel}>Avg call</Text>
+            </View>
+            <View style={s.metricSep} />
+            <View style={s.metric}>
+              <Text style={s.metricNum}>₹{stats.totalCost >= 1000 ? `${(stats.totalCost / 1000).toFixed(1)}k` : stats.totalCost.toFixed(0)}</Text>
+              <Text style={s.metricLabel}>Spent</Text>
+            </View>
           </View>
         </View>
       )}
 
-      {/* ═══════════════════════════════════════════════════════════════════ */}
-      {/* ── SECTION 3: AGENT PERFORMANCE ── */}
-      {/* "Which of my AI agents is actually working?" */}
-      {/* ═══════════════════════════════════════════════════════════════════ */}
-      {agents.length > 0 && (
-        <View style={s.section}>
-          <Text style={s.sectionTitle}>Agent Performance</Text>
+      {/* ════════════════════════════════════════════════════════════════ */}
+      {/* AGENT PERFORMANCE — only when agents exist */}
+      {/* ════════════════════════════════════════════════════════════════ */}
+      {hasAgents && (
+        <View style={s.agentSection}>
+          <Text style={s.sectionLabel}>Agents</Text>
           <View style={s.agentList}>
-            {agents.slice(0, 4).map(a => (
-              <AgentRow key={a.assistantId} agent={a} />
-            ))}
+            {agents.slice(0, 4).map(a => <AgentRow key={a.assistantId} agent={a} />)}
           </View>
         </View>
       )}
 
-      {/* ── Recent Calls Header ── */}
-      <View style={[s.sectionHeaderRow, { paddingHorizontal: 20, paddingBottom: 12, paddingTop: 4 }]}>
-        <Text style={s.sectionTitle}>Recent Calls</Text>
-        <TouchableOpacity onPress={() => router.push('/calls' as any)}>
-          <Text style={s.seeAll}>See all</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
+      {/* ════════════════════════════════════════════════════════════════ */}
+      {/* RECENT CALLS */}
+      {/* ════════════════════════════════════════════════════════════════ */}
+      {hasCalls ? (
+        <View style={s.callsSection}>
+          <View style={s.callsSectionHeader}>
+            <Text style={s.sectionLabel}>Recent calls</Text>
+            <TouchableOpacity onPress={() => router.push('/calls' as any)}>
+              <Text style={s.seeAll}>See all</Text>
+            </TouchableOpacity>
+          </View>
+          {recentCalls.map(call => (
+            <CallRow key={call.id} call={call} onPress={() => router.push(`/calls/${call.id}` as any)} />
+          ))}
+        </View>
+      ) : allSetupDone ? (
+        /* All setup done but no calls yet — waiting state */
+        <View style={s.waitingCard}>
+          <PhoneWaveIllustration />
+          <Text style={s.waitingTitle}>Waiting for calls</Text>
+          <Text style={s.waitingSub}>Your agents are live. Incoming calls will appear here.</Text>
+        </View>
+      ) : null}
 
-  return (
-    <View style={s.container}>
-      <FlatList
-        data={recentCalls}
-        keyExtractor={(item) => item.id}
-        ListHeaderComponent={ListHeader}
-        renderItem={({ item }) => (
-          <CallCard
-            call={item}
-            onPress={(call) => router.push(`/calls/${call.id}` as any)}
-          />
-        )}
-        ListEmptyComponent={
-          !loading ? (
-            <EmptyState
-              icon="call"
-              title="No calls yet"
-              message="Your AI agents haven't received any calls this week."
-            />
-          ) : null
-        }
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#00d4aa" colors={['#00d4aa']} />
-        }
-        contentContainerStyle={s.listContent}
-        showsVerticalScrollIndicator={false}
-      />
-    </View>
+      <View style={{ height: 40 }} />
+    </ScrollView>
   );
 }
 
-// ── Metric Tile (compact stat in 2×2 grid) ──────────────────────────────────
-
-function MetricTile({ label, value, icon, color }: { label: string; value: string; icon: string; color: string }) {
-  return (
-    <View style={s.metricTile}>
-      <View style={[s.metricIconBg, { backgroundColor: color + '12' }]}>
-        <Ionicons name={icon as any} size={16} color={color} />
-      </View>
-      <Text style={s.metricValue}>{value}</Text>
-      <Text style={s.metricLabel}>{label}</Text>
-    </View>
-  );
-}
-
-// ══════════════════════════════════════════════════════════════════════════════
-// ── STYLES ───────────────────────────────────────────────────────────────────
-// ══════════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════
+// STYLES
+// ═══════════════════════════════════════════════════════════════════════════════
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#060b14' },
-  listContent: { paddingBottom: 32 },
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#060b14' },
+  container: { flex: 1, backgroundColor: C.bg },
+  content: { paddingBottom: 32 },
+  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: C.bg },
 
   // Header
   header: {
     flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between',
-    paddingHorizontal: 20, paddingTop: Platform.OS === 'ios' ? 60 : 20, paddingBottom: 20,
+    paddingHorizontal: 20, paddingTop: Platform.OS === 'ios' ? 60 : 44, paddingBottom: 24,
   },
-  greeting: { fontSize: 13, fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 },
-  headerTitle: { fontSize: 32, fontWeight: '800', color: '#fff', letterSpacing: 0.5 },
-  refreshBtn: {
-    width: 44, height: 44, borderRadius: 22, backgroundColor: '#0d1420',
-    alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#1a2332',
+  greeting: { fontSize: 13, fontWeight: '500', color: C.textFaint, letterSpacing: 0.3, marginBottom: 4 },
+  title: { fontSize: 28, fontWeight: '800', color: C.text, letterSpacing: -0.5 },
+  iconBtn: {
+    width: 40, height: 40, borderRadius: 12, backgroundColor: C.surface,
+    alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.border,
   },
 
   // Error
-  errorBanner: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    backgroundColor: '#ef444415', marginHorizontal: 20, marginBottom: 16,
-    borderRadius: 14, padding: 16, borderWidth: 1, borderColor: '#ef444430',
+  errorBox: {
+    flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 20, marginBottom: 16,
+    padding: 14, borderRadius: 12, backgroundColor: C.danger + '10', borderWidth: 1, borderColor: C.danger + '25',
   },
-  errorText: { color: '#ef4444', fontSize: 14, flex: 1 },
+  errorText: { color: C.danger, fontSize: 13, flex: 1, fontWeight: '500' },
 
-  // Sections
-  section: { marginHorizontal: 20, marginBottom: 24 },
-  sectionHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
-  sectionTitle: { fontSize: 18, fontWeight: '700', color: '#fff' },
-  seeAll: { color: '#00d4aa', fontSize: 14, fontWeight: '600' },
-
-  // ── Credit Health ──
+  // Urgency
   urgencyBanner: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    padding: 14, borderRadius: 14, borderWidth: 1, marginBottom: 14,
+    flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 20, marginBottom: 12,
+    paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, borderWidth: 1, backgroundColor: C.surface,
   },
-  urgencyText: { fontSize: 13, fontWeight: '600', flex: 1, lineHeight: 18 },
+  urgencyText: { fontSize: 13, fontWeight: '600', flex: 1 },
+  urgencyAction: { fontSize: 13, fontWeight: '700' },
 
+  // Credit card
   creditCard: {
-    flexDirection: 'row', alignItems: 'center', gap: 20,
-    backgroundColor: '#0d1420', borderRadius: 20, padding: 20,
-    borderWidth: 1, borderColor: '#1a2332',
-  },
-  creditRight: { flex: 1 },
-  creditBalance: { fontSize: 32, fontWeight: '800', color: '#fff', marginBottom: 2 },
-  creditUsd: { fontSize: 13, color: '#4b5563', marginBottom: 12 },
-  creditBurnRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  creditBurnLabel: { fontSize: 14, color: '#9ca3af', fontWeight: '500' },
-
-  // Ring
-  ringDays: { fontSize: 22, fontWeight: '800' },
-  ringLabel: { fontSize: 10, color: '#6b7280', fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: -2 },
-
-  // Trend badge
-  trendBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 99 },
-  trendText: { fontSize: 11, fontWeight: '700' },
-
-  // Add credits variations
-  addCreditsBtnFull: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    height: 48, borderRadius: 14, marginTop: 14,
-  },
-  addCreditsTextBold: { fontSize: 15, fontWeight: '700', color: '#000' },
-  addCreditsSubtle: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 12,
-  },
-  addCreditsTextSubtle: { fontSize: 13, color: '#6b7280', fontWeight: '500' },
-
-  // ── Metrics Grid ──
-  metricsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  metricTile: {
-    width: (SCREEN_W - 40 - 12) / 2 - 1, // 2 columns with gap
-    backgroundColor: '#0d1420', borderRadius: 16, padding: 16,
-    borderWidth: 1, borderColor: '#1a2332',
-  },
-  metricIconBg: {
-    width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginBottom: 10,
-  },
-  metricValue: { fontSize: 22, fontWeight: '800', color: '#fff', marginBottom: 2 },
-  metricLabel: { fontSize: 12, fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.3 },
-
-  // ── Agent Performance ──
-  agentList: {
-    backgroundColor: '#0d1420', borderRadius: 20, borderWidth: 1, borderColor: '#1a2332',
-    overflow: 'hidden', marginTop: 12,
-  },
-  agentRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingVertical: 14,
-    borderBottomWidth: 1, borderBottomColor: '#1a233250',
+    marginHorizontal: 20, marginBottom: 8, padding: 20,
+    backgroundColor: C.surface, borderRadius: 20, borderWidth: 1, borderColor: C.border,
   },
-  agentLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
-  agentDot: {
-    width: 36, height: 36, borderRadius: 12, backgroundColor: '#00d4aa12',
+  creditMain: { flex: 1 },
+  creditAmount: { fontSize: 40, fontWeight: '800', color: C.text, letterSpacing: -1, lineHeight: 44 },
+  creditSub: { fontSize: 13, color: C.textMuted, marginTop: 4, fontWeight: '500' },
+
+  ringNum: { fontSize: 20, fontWeight: '800', lineHeight: 22 },
+  ringUnit: { fontSize: 9, color: C.textMuted, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: -1 },
+
+  // Add credits
+  addCreditsFull: {
+    marginHorizontal: 20, marginBottom: 24, height: 44, borderRadius: 12,
     alignItems: 'center', justifyContent: 'center',
   },
-  agentName: { fontSize: 15, fontWeight: '600', color: '#fff', marginBottom: 2 },
-  agentMeta: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  agentMetaText: { fontSize: 12, color: '#6b7280' },
-  metaSep: { width: 3, height: 3, borderRadius: 2, backgroundColor: '#374151' },
-  agentRight: { alignItems: 'flex-end', marginLeft: 12, width: 56 },
-  agentRate: { fontSize: 15, fontWeight: '800', marginBottom: 4 },
-  agentBarTrack: { width: 48, height: 3, borderRadius: 2, backgroundColor: '#1a2332' },
+  addCreditsFullText: { fontSize: 15, fontWeight: '700', color: '#000' },
+
+  // Setup
+  setupCard: { marginHorizontal: 20, marginBottom: 24, backgroundColor: C.surface, borderRadius: 20, borderWidth: 1, borderColor: C.border, overflow: 'hidden' },
+  setupHeader: { padding: 20, paddingBottom: 16 },
+  setupTitle: { fontSize: 17, fontWeight: '700', color: C.text, marginBottom: 4 },
+  setupProgress: { fontSize: 12, color: C.textMuted, fontWeight: '500' },
+  setupBarTrack: { height: 3, backgroundColor: C.border, borderRadius: 2, marginTop: 12 },
+  setupBarFill: { height: 3, backgroundColor: C.primary, borderRadius: 2 },
+  setupStep: {
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+    paddingHorizontal: 20, paddingVertical: 14,
+    borderBottomWidth: 1, borderBottomColor: C.borderLight,
+  },
+  setupCheck: {
+    width: 28, height: 28, borderRadius: 14, borderWidth: 1.5, borderColor: C.border,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  setupCheckDone: { backgroundColor: C.primary, borderColor: C.primary },
+  setupCheckNum: { fontSize: 12, fontWeight: '700', color: C.textFaint },
+  setupStepTitle: { fontSize: 15, fontWeight: '600', color: C.text, marginBottom: 1 },
+  setupStepDone: { color: C.textMuted, textDecorationLine: 'line-through' },
+  setupStepSub: { fontSize: 12, color: C.textMuted },
+
+  // Week metrics
+  weekSection: { marginHorizontal: 20, marginBottom: 24 },
+  weekHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
+  sectionLabel: { fontSize: 15, fontWeight: '700', color: C.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
+
+  metricRow: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: C.surface, borderRadius: 16, borderWidth: 1, borderColor: C.border,
+    paddingVertical: 18,
+  },
+  metric: { flex: 1, alignItems: 'center' },
+  metricNum: { fontSize: 20, fontWeight: '800', color: C.text, marginBottom: 3 },
+  metricLabel: { fontSize: 11, fontWeight: '600', color: C.textMuted },
+  metricSep: { width: 1, height: 28, backgroundColor: C.border },
+
+  // Agents
+  agentSection: { marginHorizontal: 20, marginBottom: 24 },
+  agentList: { backgroundColor: C.surface, borderRadius: 16, borderWidth: 1, borderColor: C.border, marginTop: 12, overflow: 'hidden' },
+  agentRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingHorizontal: 16, paddingVertical: 14,
+    borderBottomWidth: 1, borderBottomColor: C.borderLight,
+  },
+  agentIcon: {
+    width: 32, height: 32, borderRadius: 10, backgroundColor: C.primaryMuted,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  agentName: { fontSize: 14, fontWeight: '600', color: C.text },
+  agentSub: { fontSize: 12, color: C.textMuted, marginTop: 1 },
+  agentRateBox: { alignItems: 'flex-end', width: 52 },
+  agentRate: { fontSize: 14, fontWeight: '800', marginBottom: 4 },
+  agentBarTrack: { width: 44, height: 3, borderRadius: 2, backgroundColor: C.border },
   agentBarFill: { height: 3, borderRadius: 2 },
+
+  // Calls
+  callsSection: { marginHorizontal: 20, marginBottom: 8 },
+  callsSectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  seeAll: { fontSize: 13, fontWeight: '600', color: C.primary },
+  callRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: C.borderLight,
+  },
+  callDir: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  callPhone: { fontSize: 15, fontWeight: '600', color: C.text },
+  callMeta: { fontSize: 12, color: C.textMuted, marginTop: 1 },
+  callRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  callDur: { fontSize: 13, fontWeight: '600', color: C.textMuted },
+  callDot: { width: 7, height: 7, borderRadius: 4 },
+
+  // Waiting
+  waitingCard: {
+    marginHorizontal: 20, padding: 32, alignItems: 'center',
+    backgroundColor: C.surface, borderRadius: 20, borderWidth: 1, borderColor: C.border,
+  },
+  waitingTitle: { fontSize: 16, fontWeight: '700', color: C.text, marginTop: 16 },
+  waitingSub: { fontSize: 13, color: C.textMuted, textAlign: 'center', marginTop: 6, lineHeight: 19 },
 });
