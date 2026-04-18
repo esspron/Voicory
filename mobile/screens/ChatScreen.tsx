@@ -243,7 +243,7 @@ export default function ChatScreen() {
       setMessages((prev) => [tempMsg, ...prev]);
 
       try {
-        const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/whatsapp/send`, {
+        const response = await fetch(`${process.env.EXPO_PUBLIC_BACKEND_URL}/api/whatsapp/send`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ config_id: config.id, to: phone, message: text }),
