@@ -1,4 +1,4 @@
-import supabase from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import { Customer } from '../types';
 
 export async function getCustomers(

@@ -62,7 +62,7 @@ export default function CustomerDetailScreen() {
       // Load calls for this customer
       // We need to filter by customer_id from call_logs
       const { data: callsRaw } = await (async () => {
-        const supabase = (await import('../lib/supabase')).default;
+        const supabase = (await import('../lib/supabase')).supabase;
         return supabase
           .from('call_logs')
           .select('*, assistant:assistant_id(name)')

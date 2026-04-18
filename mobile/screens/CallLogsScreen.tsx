@@ -13,7 +13,7 @@ import { FilterChips } from '../components/FilterChips';
 import { CallCard } from '../components/CallCard';
 import { EmptyState } from '../components/EmptyState';
 import { getCalls } from '../services/callService';
-import supabase from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import { CallLog } from '../types';
 
 const COLORS = {

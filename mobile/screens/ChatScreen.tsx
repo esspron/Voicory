@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { router } from 'expo-router';
 import {
   View,
   FlatList,
@@ -83,14 +84,13 @@ function buildListItems(messages: WhatsAppMessage[]): ListItem[] {
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 interface Props {
-  route: { params: { contact: WhatsAppContact } };
-  navigation: any;
+  phone?: string;
 }
 
-export default function ChatScreen({ route, navigation }: Props) {
-  const { contact } = route.params;
+export default function ChatScreen({ phone: phoneProp }: Props) {
   const { user } = useAuth();
 
+  const [contact, setContact] = useState<WhatsAppContact | null>(null);
   const [messages, setMessages] = useState<WhatsAppMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -98,18 +98,38 @@ export default function ChatScreen({ route, navigation }: Props) {
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const flatListRef = useRef<FlatList>(null);
 
+  // ── Load contact from phone ────────────────────────────────────────────────
+  useEffect(() => {
+    if (!user || !phoneProp) return;
+    supabase
+      .from('whatsapp_contacts')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('phone', phoneProp)
+      .single()
+      .then(({ data }) => {
+        if (data) {
+          setContact(data as WhatsAppContact);
+        } else {
+          setContact({ id: '', user_id: user.id, phone: phoneProp, name: phoneProp, last_message_at: '', unread_count: 0, is_active: true, created_at: '', updated_at: '' });
+        }
+      });
+  }, [user, phoneProp]);
+
   // ── Load messages ──────────────────────────────────────────────────────────
+  const phone: string = contact?.phone ?? phoneProp ?? "";
+
   const loadMessages = useCallback(async () => {
     if (!user) return;
     try {
       setError(null);
-      const data = await getMessages(user.id, contact.phone);
+      const data = await getMessages(user.id, phone);
       setMessages(data);
-      await markAsRead(user.id, contact.phone);
+      await markAsRead(user.id, phone);
     } catch (e: any) {
       setError(e.message || 'Failed to load messages');
     }
-  }, [user, contact.phone]);
+  }, [user, phone]);
 
   useEffect(() => {
     loadMessages().finally(() => setLoading(false));
@@ -120,7 +140,7 @@ export default function ChatScreen({ route, navigation }: Props) {
     if (!user) return;
 
     const channel = supabase
-      .channel(`whatsapp-chat-${contact.phone}`)
+      .channel(`whatsapp-chat-${phone}`)
       .on(
         'postgres_changes',
         {
@@ -131,7 +151,7 @@ export default function ChatScreen({ route, navigation }: Props) {
         },
         (payload) => {
           const newMsg = payload.new as WhatsAppMessage;
-          if (newMsg.contact_phone === contact.phone) {
+          if (newMsg.contact_phone === phone) {
             setMessages((prev) => [newMsg, ...prev]);
           }
         },
@@ -141,7 +161,7 @@ export default function ChatScreen({ route, navigation }: Props) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user, contact.phone]);
+  }, [user, phone]);
 
   // ── Send message ────────────────────────────────────────────────────────────
   const handleSend = useCallback(
@@ -154,8 +174,8 @@ export default function ChatScreen({ route, navigation }: Props) {
         id: `temp-${Date.now()}`,
         user_id: user.id,
         wa_message_id: `temp-${Date.now()}`,
-        contact_phone: contact.phone,
-        contact_name: contact.name,
+        contact_phone: phone,
+        contact_name: contact?.name ?? phone,
         direction: 'outbound',
         message_type: 'text',
         body: text,
@@ -166,7 +186,7 @@ export default function ChatScreen({ route, navigation }: Props) {
       setMessages((prev) => [tempMsg, ...prev]);
 
       try {
-        await sendMessage(contact.phone, text);
+        await sendMessage(phone, text);
       } catch (e: any) {
         // Mark temp message as failed
         setMessages((prev) =>
@@ -207,14 +227,14 @@ export default function ChatScreen({ route, navigation }: Props) {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
-          onPress={() => navigation.goBack()}
+          onPress={() => router.back()}
           style={styles.backBtn}
         >
           <Text style={styles.backIcon}>←</Text>
         </TouchableOpacity>
-        <ContactAvatar name={contact.name} profilePictureUrl={contact.profile_picture_url} size={38} />
+        <ContactAvatar name={contact?.name ?? phone} profilePictureUrl={contact?.profile_picture_url} size={38} />
         <View style={styles.headerInfo}>
-          <Text style={styles.headerName} numberOfLines={1}>{contact.name}</Text>
+          <Text style={styles.headerName} numberOfLines={1}>{contact?.name ?? phone}</Text>
           <Text style={styles.headerStatus}>online</Text>
         </View>
         <TouchableOpacity style={styles.headerAction}>

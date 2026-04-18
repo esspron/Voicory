@@ -15,7 +15,7 @@ import { FilterChips } from '../components/FilterChips';
 import { CustomerCard } from '../components/CustomerCard';
 import { EmptyState } from '../components/EmptyState';
 import { getCustomers } from '../services/customerService';
-import supabase from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import { Customer } from '../types';
 
 const COLORS = {

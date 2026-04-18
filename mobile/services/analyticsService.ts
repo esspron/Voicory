@@ -1,4 +1,4 @@
-import supabase from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import { DashboardStats } from '../types';
 
 const USD_TO_INR = 84;

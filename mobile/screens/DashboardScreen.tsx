@@ -16,7 +16,7 @@ import { CallCard } from '../components/CallCard';
 import { EmptyState } from '../components/EmptyState';
 import { getDashboardStats } from '../services/analyticsService';
 import { getCalls } from '../services/callService';
-import supabase from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import { DashboardStats, CallLog } from '../types';
 
 const COLORS = {

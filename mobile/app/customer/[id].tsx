@@ -1,0 +1,4 @@
+import CustomerDetailScreen from '../../screens/CustomerDetailScreen';
+export default function CustomerDetail() {
+  return <CustomerDetailScreen />;
+}
