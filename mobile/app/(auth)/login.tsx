@@ -19,7 +19,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../contexts/AuthContext';
 import { theme } from '../../lib/theme';
-import Svg, { Path, Defs, LinearGradient as SvgGrad, Stop, Circle, G } from 'react-native-svg';
+import Svg, { Path, Defs, LinearGradient as SvgGrad, Stop, Circle, G, Rect } from 'react-native-svg';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 
