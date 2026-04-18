@@ -370,6 +370,7 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    alignSelf: 'stretch',
     gap: 10,
     backgroundColor: '#111827',
     borderRadius: 14,
