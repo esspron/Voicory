@@ -190,21 +190,21 @@ export default function SettingsScreen() {
           icon="help-circle"
           label="Help Center"
           chevron
-          onPress={() => openLink('https://help.voicory.com')}
+          onPress={() => openLink('https://www.voicory.com/help')}
         />
         <Separator />
         <SettingsRow
           icon="mail"
           label="Contact Support"
           chevron
-          onPress={() => openLink('mailto:support@voicory.com')}
+          onPress={() => openLink('mailto:hello@voicory.com')}
         />
         <Separator />
         <SettingsRow
           icon="bug"
           label="Report Issue"
           chevron
-          onPress={() => openLink('mailto:bugs@voicory.com')}
+          onPress={() => openLink('mailto:hello@voicory.com?subject=Bug%20Report')}
         />
       </View>
 
