@@ -1,3 +1,7 @@
+import { colors as C } from '../lib/theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SkeletonListItem } from '../components/Skeleton';
+import * as haptics from '../lib/haptics';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
@@ -20,23 +24,6 @@ import { getCustomers } from '../services/customerService';
 import { supabase } from '../lib/supabase';
 import { Customer } from '../types';
 
-// Design tokens
-const C = {
-  bg: '#050a12',
-  surface: '#0c1219',
-  surfaceRaised: '#111a24',
-  border: '#1a2332',
-  borderLight: '#1a233350',
-  primary: '#00d4aa',
-  primaryMuted: '#00d4aa18',
-  secondary: '#0099ff',
-  text: '#f0f2f5',
-  textMuted: '#7a8599',
-  textFaint: '#3d4a5c',
-  danger: '#ef4444',
-  warning: '#f59e0b',
-  success: '#22c55e',
-};
 
 const FILTER_OPTIONS = [
   { label: 'All', value: 'all' },
@@ -47,6 +34,7 @@ const FILTER_OPTIONS = [
 const PAGE_SIZE = 20;
 
 export default function CustomersScreen() {
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [search, setSearch] = useState('');
@@ -142,14 +130,18 @@ export default function CustomersScreen() {
 
   if (loading) {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color={C.primary} />
+      <View style={[styles.container, { paddingTop: insets.top }]}>
+        <View style={{ paddingHorizontal: 20, paddingTop: 24 }}>
+          {Array.from({ length: 8 }).map((_, i) => (
+            <SkeletonListItem key={i} />
+          ))}
+        </View>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       <FlatList
         data={customers}
         keyExtractor={(item) => item.id}
@@ -222,7 +214,7 @@ const styles = StyleSheet.create({
   },
   screenHeader: { 
     paddingHorizontal: 20, 
-    paddingTop: Platform.OS === 'ios' ? 60 : 44, 
+    paddingTop: 16, 
     paddingBottom: 24,
   },
   titleRow: {

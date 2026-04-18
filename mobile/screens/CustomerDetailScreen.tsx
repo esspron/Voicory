@@ -1,3 +1,6 @@
+import { colors as C } from '../lib/theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as haptics from '../lib/haptics';
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
@@ -20,23 +23,6 @@ import { getCustomerById, updateCustomer } from '../services/customerService';
 import { getCalls } from '../services/callService';
 import { Customer, CallLog } from '../types';
 
-// Design tokens
-const C = {
-  bg: '#050a12',
-  surface: '#0c1219',
-  surfaceRaised: '#111a24',
-  border: '#1a2332',
-  borderLight: '#1a233350',
-  primary: '#00d4aa',
-  primaryMuted: '#00d4aa18',
-  secondary: '#0099ff',
-  text: '#f0f2f5',
-  textMuted: '#7a8599',
-  textFaint: '#3d4a5c',
-  danger: '#ef4444',
-  warning: '#f59e0b',
-  success: '#22c55e',
-};
 
 const TAGS = ['hot_lead', 'follow_up', 'closed', 'vip', 'new'];
 

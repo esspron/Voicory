@@ -1,25 +1,9 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Platform } from 'react-native';
-
-// Design tokens
-const C = {
-  bg: '#050a12',
-  surface: '#0c1219',
-  surfaceRaised: '#111a24',
-  border: '#1a2332',
-  borderLight: '#1a233350',
-  primary: '#00d4aa',
-  primaryMuted: '#00d4aa18',
-  secondary: '#0099ff',
-  text: '#f0f2f5',
-  textMuted: '#7a8599',
-  textFaint: '#3d4a5c',
-  danger: '#ef4444',
-  warning: '#f59e0b',
-  success: '#22c55e',
-};
+import { Platform, StyleSheet, View } from 'react-native';
+import { colors } from '../../lib/theme';
+import * as haptics from '../../lib/haptics';
 
 type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -31,36 +15,11 @@ interface TabConfig {
 }
 
 const TABS: TabConfig[] = [
-  {
-    name: 'index',
-    title: 'Dashboard',
-    icon: 'home-outline',
-    iconFocused: 'home',
-  },
-  {
-    name: 'calls',
-    title: 'Calls',
-    icon: 'call-outline',
-    iconFocused: 'call',
-  },
-  {
-    name: 'customers',
-    title: 'Customers',
-    icon: 'people-outline',
-    iconFocused: 'people',
-  },
-  {
-    name: 'whatsapp',
-    title: 'WhatsApp',
-    icon: 'chatbubble-ellipses-outline',
-    iconFocused: 'chatbubble-ellipses',
-  },
-  {
-    name: 'settings',
-    title: 'Settings',
-    icon: 'settings-outline',
-    iconFocused: 'settings',
-  },
+  { name: 'index', title: 'Home', icon: 'grid-outline', iconFocused: 'grid' },
+  { name: 'calls', title: 'Calls', icon: 'call-outline', iconFocused: 'call' },
+  { name: 'customers', title: 'Contacts', icon: 'people-outline', iconFocused: 'people' },
+  { name: 'whatsapp', title: 'Chat', icon: 'chatbubble-outline', iconFocused: 'chatbubble' },
+  { name: 'settings', title: 'Settings', icon: 'cog-outline', iconFocused: 'cog' },
 ];
 
 export default function TabsLayout() {
@@ -69,19 +28,28 @@ export default function TabsLayout() {
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: C.surface,
-          borderTopColor: C.border,
-          borderTopWidth: 1,
-          height: Platform.OS === 'ios' ? 84 : 60,
-          paddingBottom: Platform.OS === 'ios' ? 24 : 8,
+          backgroundColor: colors.surface + 'F5', // near-opaque for pseudo-blur
+          borderTopColor: colors.border,
+          borderTopWidth: StyleSheet.hairlineWidth,
+          height: Platform.OS === 'ios' ? 88 : 64,
+          paddingBottom: Platform.OS === 'ios' ? 28 : 8,
           paddingTop: 8,
+          elevation: 0,
         },
-        tabBarActiveTintColor: C.primary,
-        tabBarInactiveTintColor: C.textFaint,
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.textFaint,
         tabBarLabelStyle: {
           fontSize: 10,
           fontWeight: '600',
+          letterSpacing: 0.2,
+          marginTop: 2,
         },
+        tabBarItemStyle: {
+          paddingTop: 2,
+        },
+      }}
+      screenListeners={{
+        tabPress: () => haptics.selectionTap(),
       }}
     >
       {TABS.map((tab) => (
@@ -90,12 +58,14 @@ export default function TabsLayout() {
           name={tab.name}
           options={{
             title: tab.title,
-            tabBarIcon: ({ focused, color, size }) => (
-              <Ionicons
-                name={focused ? tab.iconFocused : tab.icon}
-                size={24}
-                color={color}
-              />
+            tabBarIcon: ({ focused, color }) => (
+              <View style={focused ? styles.activeIconWrap : undefined}>
+                <Ionicons
+                  name={focused ? tab.iconFocused : tab.icon}
+                  size={22}
+                  color={color}
+                />
+              </View>
             ),
           }}
         />
@@ -103,3 +73,12 @@ export default function TabsLayout() {
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  activeIconWrap: {
+    backgroundColor: colors.primaryMuted,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+  },
+});

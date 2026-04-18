@@ -1,24 +1,7 @@
-import React from 'react';
-import { View, TextInput, StyleSheet, ViewStyle } from 'react-native';
+import { colors as C } from '../lib/theme';
+import React, { useState } from 'react';
+import { View, TextInput, StyleSheet, ViewStyle, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-
-// Design tokens
-const C = {
-  bg: '#050a12',
-  surface: '#0c1219',
-  surfaceRaised: '#111a24',
-  border: '#1a2332',
-  borderLight: '#1a233350',
-  primary: '#00d4aa',
-  primaryMuted: '#00d4aa18',
-  secondary: '#0099ff',
-  text: '#f0f2f5',
-  textMuted: '#7a8599',
-  textFaint: '#3d4a5c',
-  danger: '#ef4444',
-  warning: '#f59e0b',
-  success: '#22c55e',
-};
 
 interface SearchBarProps {
   value: string;
@@ -27,20 +10,12 @@ interface SearchBarProps {
   style?: ViewStyle;
 }
 
-export function SearchBar({ 
-  value, 
-  onChangeText, 
-  placeholder = 'Search...', 
-  style 
-}: SearchBarProps) {
+export function SearchBar({ value, onChangeText, placeholder = 'Search...', style }: SearchBarProps) {
+  const [focused, setFocused] = useState(false);
+
   return (
-    <View style={[styles.container, style]}>
-      <Ionicons 
-        name="search" 
-        size={20} 
-        color={C.textFaint} 
-        style={styles.icon} 
-      />
+    <View style={[styles.container, focused && styles.containerFocused, style]}>
+      <Ionicons name="search" size={18} color={focused ? C.primary : C.textFaint} style={styles.icon} />
       <TextInput
         style={styles.input}
         value={value}
@@ -49,8 +24,14 @@ export function SearchBar({
         placeholderTextColor={C.textFaint}
         autoCapitalize="none"
         autoCorrect={false}
-        clearButtonMode="while-editing"
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
       />
+      {value.length > 0 && (
+        <TouchableOpacity onPress={() => onChangeText('')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <Ionicons name="close-circle" size={18} color={C.textFaint} />
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
@@ -59,22 +40,25 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: C.surface,
-    borderRadius: 12,
-    borderWidth: 1,
+    backgroundColor: C.surfaceRaised,
+    borderRadius: 14,
+    borderWidth: 1.5,
     borderColor: C.border,
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     marginHorizontal: 20,
-    marginVertical: 12,
-    height: 44,
+    marginVertical: 10,
+    height: 48,
+    gap: 10,
   },
-  icon: { 
-    marginRight: 12,
+  containerFocused: {
+    borderColor: C.primary + '50',
+    backgroundColor: C.surface,
   },
+  icon: {},
   input: {
     flex: 1,
     color: C.text,
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '500',
   },
 });

@@ -6,7 +6,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   RefreshControl,
-  ActivityIndicator,
   Dimensions,
   Platform,
   Linking,
@@ -14,34 +13,17 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Path, Rect, Defs, LinearGradient as SvgGrad, Stop, G } from 'react-native-svg';
 import { getDashboardData, DashboardData, CreditHealth, AgentPerformance } from '../services/analyticsService';
 import { getCalls } from '../services/callService';
 import { supabase } from '../lib/supabase';
 import { CallLog } from '../types';
+import { colors as C } from '../lib/theme';
+import { SkeletonDashboard } from '../components/Skeleton';
+import * as haptics from '../lib/haptics';
 
 const { width: SW } = Dimensions.get('window');
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// DESIGN TOKENS — single source of truth
-// ═══════════════════════════════════════════════════════════════════════════════
-
-const C = {
-  bg: '#050a12',
-  surface: '#0c1219',
-  surfaceRaised: '#111a24',
-  border: '#1a2332',
-  borderLight: '#1a233350',
-  primary: '#00d4aa',
-  primaryMuted: '#00d4aa18',
-  secondary: '#0099ff',
-  text: '#f0f2f5',
-  textMuted: '#7a8599',
-  textFaint: '#3d4a5c',
-  danger: '#ef4444',
-  warning: '#f59e0b',
-  success: '#22c55e',
-};
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SVG ILLUSTRATIONS — hand-drawn quality, not clip art
@@ -319,8 +301,14 @@ export default function DashboardScreen() {
     setRefreshing(false);
   }, [loadData]);
 
+  const insets = useSafeAreaInsets();
+
   if (loading) {
-    return <View style={s.centered}><ActivityIndicator size="large" color={C.primary} /></View>;
+    return (
+      <View style={[s.container, { paddingTop: insets.top }]}>
+        <SkeletonDashboard />
+      </View>
+    );
   }
 
   const ch = data?.creditHealth;
@@ -368,7 +356,7 @@ export default function DashboardScreen() {
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.primary} colors={[C.primary]} />}
     >
       {/* ── Header ── */}
-      <View style={s.header}>
+      <View style={[s.header, { paddingTop: insets.top + 12 }]}>
         <View>
           <Text style={s.greeting}>{data?.greeting ?? 'Hello'}</Text>
           <Text style={s.title}>Dashboard</Text>
@@ -523,7 +511,7 @@ const s = StyleSheet.create({
   // Header
   header: {
     flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between',
-    paddingHorizontal: 20, paddingTop: Platform.OS === 'ios' ? 60 : 44, paddingBottom: 24,
+    paddingHorizontal: 20, paddingBottom: 24,
   },
   greeting: { fontSize: 13, fontWeight: '500', color: C.textFaint, letterSpacing: 0.3, marginBottom: 4 },
   title: { fontSize: 28, fontWeight: '800', color: C.text, letterSpacing: -0.5 },

@@ -1,3 +1,6 @@
+import { colors as C } from '../lib/theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as haptics from '../lib/haptics';
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -16,23 +19,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { supabase } from '../lib/supabase';
 
-// Design tokens
-const C = {
-  bg: '#050a12',
-  surface: '#0c1219',
-  surfaceRaised: '#111a24',
-  border: '#1a2332',
-  borderLight: '#1a233350',
-  primary: '#00d4aa',
-  primaryMuted: '#00d4aa18',
-  secondary: '#0099ff',
-  text: '#f0f2f5',
-  textMuted: '#7a8599',
-  textFaint: '#3d4a5c',
-  danger: '#ef4444',
-  warning: '#f59e0b',
-  success: '#22c55e',
-};
 
 const APP_VERSION = '1.0.0';
 
@@ -46,6 +32,7 @@ interface UserProfile {
 }
 
 export default function SettingsScreen() {
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -72,7 +59,7 @@ export default function SettingsScreen() {
 
       setProfile(data || {});
     } catch (err) {
-      console.error('Error loading profile:', err);
+      if (__DEV__) console.error('Error loading profile:', err);
     } finally {
       setLoading(false);
     }
@@ -103,7 +90,7 @@ export default function SettingsScreen() {
 
   if (loading) {
     return (
-      <View style={styles.centered}>
+      <View style={[styles.centered, { paddingTop: insets.top }]}>
         <ActivityIndicator size="large" color={C.primary} />
       </View>
     );
@@ -319,7 +306,7 @@ const styles = StyleSheet.create({
   },
   pageHeader: { 
     paddingHorizontal: 20, 
-    paddingTop: Platform.OS === 'ios' ? 60 : 44, 
+    paddingTop: 16, 
     paddingBottom: 32,
   },
   pageTitle: { 

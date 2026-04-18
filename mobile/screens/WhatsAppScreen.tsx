@@ -1,3 +1,6 @@
+import { colors as C } from '../lib/theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as haptics from '../lib/haptics';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
@@ -10,23 +13,6 @@ import { supabase } from '../lib/supabase';
 import ContactAvatar from '../components/whatsapp/ContactAvatar';
 import { EmptyState } from '../components/EmptyState';
 
-// Design tokens
-const C = {
-  bg: '#050a12',
-  surface: '#0c1219',
-  surfaceRaised: '#111a24',
-  border: '#1a2332',
-  borderLight: '#1a233350',
-  primary: '#00d4aa',
-  primaryMuted: '#00d4aa18',
-  secondary: '#0099ff',
-  text: '#f0f2f5',
-  textMuted: '#7a8599',
-  textFaint: '#3d4a5c',
-  danger: '#ef4444',
-  warning: '#f59e0b',
-  success: '#22c55e',
-};
 
 interface WAContact {
   id: string;
@@ -50,6 +36,7 @@ function formatTime(iso: string): string {
 }
 
 export default function WhatsAppScreen() {
+  const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const [contacts, setContacts] = useState<WAContact[]>([]);
   const [loading, setLoading] = useState(true);
@@ -226,7 +213,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end', 
     justifyContent: 'space-between', 
     backgroundColor: C.surface, 
-    paddingTop: Platform.OS === 'ios' ? 60 : 44, 
+    paddingTop: 16, 
     paddingBottom: 20, 
     paddingHorizontal: 20,
     borderBottomWidth: 1,

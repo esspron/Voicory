@@ -1,23 +1,7 @@
+import { colors as C } from '../lib/theme';
 import React from 'react';
 import { ScrollView, TouchableOpacity, Text, StyleSheet, ViewStyle } from 'react-native';
-
-// Design tokens
-const C = {
-  bg: '#050a12',
-  surface: '#0c1219',
-  surfaceRaised: '#111a24',
-  border: '#1a2332',
-  borderLight: '#1a233350',
-  primary: '#00d4aa',
-  primaryMuted: '#00d4aa18',
-  secondary: '#0099ff',
-  text: '#f0f2f5',
-  textMuted: '#7a8599',
-  textFaint: '#3d4a5c',
-  danger: '#ef4444',
-  warning: '#f59e0b',
-  success: '#22c55e',
-};
+import * as haptics from '../lib/haptics';
 
 interface FilterChipsProps {
   options: { label: string; value: string }[];
@@ -39,7 +23,7 @@ export function FilterChips({ options, selected, onSelect, style }: FilterChipsP
           <TouchableOpacity
             key={opt.value}
             style={[styles.chip, isSelected && styles.chipSelected]}
-            onPress={() => onSelect(opt.value)}
+            onPress={() => { haptics.selectionTap(); onSelect(opt.value); }}
             activeOpacity={0.7}
           >
             <Text style={[styles.label, isSelected && styles.labelSelected]}>
@@ -55,17 +39,17 @@ export function FilterChips({ options, selected, onSelect, style }: FilterChipsP
 const styles = StyleSheet.create({
   container: {
     paddingHorizontal: 20,
-    paddingVertical: 8,
-    gap: 12,
+    paddingVertical: 6,
+    gap: 10,
     flexDirection: 'row',
-    paddingBottom: 16,
+    paddingBottom: 14,
   },
   chip: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 20,
-    backgroundColor: C.surface,
-    borderWidth: 1,
+    paddingHorizontal: 18,
+    paddingVertical: 9,
+    borderRadius: 24,
+    backgroundColor: C.surfaceRaised,
+    borderWidth: 1.5,
     borderColor: C.border,
   },
   chipSelected: {
@@ -74,8 +58,9 @@ const styles = StyleSheet.create({
   },
   label: {
     color: C.textMuted,
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
+    letterSpacing: 0.2,
   },
   labelSelected: {
     color: C.primary,
