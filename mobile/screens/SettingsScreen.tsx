@@ -28,10 +28,12 @@ const COLORS = {
 const APP_VERSION = '1.0.0';
 
 interface UserProfile {
-  name?: string;
-  email?: string;
-  organization?: string;
-  avatar_url?: string;
+  organization_name?: string;
+  organization_email?: string;
+  plan_type?: string;
+  credits_balance?: number;
+  voice_minutes_used?: number;
+  voice_minutes_limit?: number;
 }
 
 export default function SettingsScreen() {
@@ -40,6 +42,7 @@ export default function SettingsScreen() {
   const [loading, setLoading] = useState(true);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
     loadProfile();
@@ -50,20 +53,17 @@ export default function SettingsScreen() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
+      setUser(user);
+
       const { data } = await supabase
         .from('user_profiles')
-        .select('full_name, email, organization, avatar_url')
+        .select('organization_name, organization_email, plan_type, credits_balance, voice_minutes_used, voice_minutes_limit')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
-      setProfile({
-        name: data?.full_name || user.email?.split('@')[0] || 'User',
-        email: user.email || '',
-        organization: data?.organization,
-        avatar_url: data?.avatar_url,
-      });
-    } catch {
-      // ignore — show partial data
+      setProfile(data || {});
+    } catch (err) {
+      console.error('Error loading profile:', err);
     } finally {
       setLoading(false);
     }
@@ -105,15 +105,21 @@ export default function SettingsScreen() {
       <View style={styles.profileCard}>
         <View style={styles.avatar}>
           <Text style={styles.avatarText}>
-            {(profile?.name || 'U')[0].toUpperCase()}
+            {(user?.email || 'U')[0].toUpperCase()}
           </Text>
         </View>
         <View style={styles.profileInfo}>
-          <Text style={styles.profileName}>{profile?.name || 'User'}</Text>
-          <Text style={styles.profileEmail}>{profile?.email || ''}</Text>
-          {profile?.organization ? (
-            <Text style={styles.profileOrg}>{profile.organization}</Text>
+          <Text style={styles.profileName}>{user?.email?.split('@')[0] || 'User'}</Text>
+          <Text style={styles.profileEmail}>{user?.email || ''}</Text>
+          {profile?.organization_name ? (
+            <Text style={styles.profileOrg}>{profile.organization_name}</Text>
           ) : null}
+          {profile?.plan_type && (
+            <Text style={styles.profilePlan}>Plan: {profile.plan_type}</Text>
+          )}
+          {profile?.credits_balance !== undefined && (
+            <Text style={styles.profileCredits}>₹{(profile.credits_balance * 84).toFixed(2)} credits</Text>
+          )}
         </View>
       </View>
 
@@ -147,7 +153,7 @@ export default function SettingsScreen() {
           icon="information-circle-outline"
           label="About Voicory"
           chevron
-          onPress={() => router.push('/about' as any)}
+          onPress={() => require('react-native').Linking.openURL('https://www.voicory.com')}
         />
         <Separator />
         <SettingsRow
@@ -255,6 +261,8 @@ const styles = StyleSheet.create({
   profileName: { color: COLORS.text, fontSize: 17, fontWeight: '700' },
   profileEmail: { color: COLORS.textSecondary, fontSize: 13, marginTop: 2 },
   profileOrg: { color: COLORS.primary, fontSize: 12, marginTop: 2 },
+  profilePlan: { color: COLORS.textSecondary, fontSize: 12, marginTop: 1 },
+  profileCredits: { color: COLORS.primary, fontSize: 11, marginTop: 1 },
   sectionLabel: { color: COLORS.textSecondary, fontSize: 12, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.8, marginHorizontal: 20, marginBottom: 6 },
   menuCard: {
     backgroundColor: COLORS.surface,

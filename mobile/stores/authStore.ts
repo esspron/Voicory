@@ -5,19 +5,24 @@ import { supabase } from '../lib/supabase';
 
 export interface UserProfile {
   id: string;
-  email: string;
-  full_name: string | null;
-  avatar_url: string | null;
-  org_id: string | null;
-  role: string | null;
+  user_id: string;
+  organization_name: string | null;
+  organization_email: string | null;
+  credits_balance: number;
+  plan_type: string | null;
+  country: string | null;
+  currency: string | null;
+  currency_symbol: string | null;
+  voice_minutes_used: number;
+  voice_minutes_limit: number;
   created_at: string;
+  updated_at: string;
 }
 
 export interface OrgInfo {
-  id: string;
-  name: string;
-  plan: string | null;
-  credits: number;
+  organization_name: string | null;
+  plan_type: string | null;
+  credits_balance: number;
 }
 
 interface AuthStore {
@@ -45,12 +50,12 @@ export const useAuthStore = create<AuthStore>((set, _get) => ({
     set({ isLoadingProfile: true });
 
     try {
-      // Fetch user profile
+      // Fetch user profile using user_id column
       const { data: profileData, error: profileError } = await supabase
         .from('user_profiles')
         .select('*')
-        .eq('id', userId)
-        .single();
+        .eq('user_id', userId)
+        .maybeSingle();
 
       if (profileError) {
         console.error('[AuthStore] Failed to fetch user profile:', profileError.message);
@@ -58,23 +63,19 @@ export const useAuthStore = create<AuthStore>((set, _get) => ({
         return;
       }
 
-      const profile = profileData as UserProfile;
-      set({ profile });
-
-      // Fetch org info if user belongs to an org
-      if (profile.org_id) {
-        const { data: orgData, error: orgError } = await supabase
-          .from('organizations')
-          .select('id, name, plan, credits')
-          .eq('id', profile.org_id)
-          .single();
-
-        if (orgError) {
-          console.warn('[AuthStore] Failed to fetch org info:', orgError.message);
-        } else if (orgData) {
-          const orgInfo = orgData as OrgInfo;
-          set({ orgInfo, creditsBalance: orgInfo.credits ?? 0 });
-        }
+      if (profileData) {
+        const profile = profileData as UserProfile;
+        set({ 
+          profile,
+          creditsBalance: profile.credits_balance || 0,
+          orgInfo: {
+            organization_name: profile.organization_name,
+            plan_type: profile.plan_type,
+            credits_balance: profile.credits_balance || 0,
+          }
+        });
+      } else {
+        set({ profile: null, orgInfo: null, creditsBalance: 0 });
       }
     } catch (err) {
       console.error('[AuthStore] Unexpected error fetching profile:', err);
@@ -88,7 +89,7 @@ export const useAuthStore = create<AuthStore>((set, _get) => ({
   setCreditsBalance: (credits) => {
     set((state) => ({
       creditsBalance: credits,
-      orgInfo: state.orgInfo ? { ...state.orgInfo, credits } : null,
+      orgInfo: state.orgInfo ? { ...state.orgInfo, credits_balance: credits } : null,
     }));
   },
 

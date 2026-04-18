@@ -59,14 +59,14 @@ export default function CustomerDetailScreen() {
       setCustomer(customerData);
       setNotes(customerData?.variables?.notes || '');
 
-      // Load calls for this customer
-      // We need to filter by customer_id from call_logs
+      // Load calls for this customer by matching phone_number
+      // Since there's no customer_id in call_logs, we match by phone number
       const { data: callsRaw } = await (async () => {
         const supabase = (await import('../lib/supabase')).supabase;
         return supabase
           .from('call_logs')
           .select('*, assistant:assistant_id(name)')
-          .eq('customer_id', id)
+          .eq('phone_number', customerData?.phone_number)
           .order('created_at', { ascending: false })
           .limit(50);
       })();

@@ -2,11 +2,11 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 
 interface UnreadBadgeProps {
-  count: number;
+  count?: number; // Made optional since count may not exist in schema
 }
 
 export default function UnreadBadge({ count }: UnreadBadgeProps) {
-  if (count <= 0) return null;
+  if (!count || count <= 0) return null;
   const label = count > 99 ? '99+' : String(count);
   return (
     <View style={styles.badge}>

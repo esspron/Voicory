@@ -51,6 +51,9 @@ export function CustomerCard({ customer, onPress }: CustomerCardProps) {
             </View>
           ) : null}
         </View>
+        {customer.email ? (
+          <Text style={styles.email} numberOfLines={1}>{customer.email}</Text>
+        ) : null}
         <Text style={styles.phone}>{customer.phone_number}</Text>
         <View style={styles.meta}>
           <Text style={styles.metaText}>
@@ -105,6 +108,11 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     flex: 1,
     marginRight: 8,
+  },
+  email: {
+    color: COLORS.textSecondary,
+    fontSize: 12,
+    marginBottom: 2,
   },
   phone: {
     color: COLORS.textSecondary,

@@ -13,21 +13,21 @@ const COLORS = {
 };
 
 interface StatCardProps {
-  label: string;
+  title: string; // Changed from 'label' to 'title'
   value: string;
   icon: keyof typeof Ionicons.glyphMap;
-  iconColor: string;
+  iconColor?: string; // Make optional with default
   subtitle?: string;
 }
 
-export function StatCard({ label, value, icon, iconColor, subtitle }: StatCardProps) {
+export function StatCard({ title, value, icon, iconColor = '#00d4aa', subtitle }: StatCardProps) {
   return (
     <View style={styles.card}>
       <View style={[styles.iconWrap, { backgroundColor: iconColor + '22' }]}>
         <Ionicons name={icon} size={20} color={iconColor} />
       </View>
       <Text style={styles.value}>{value}</Text>
-      <Text style={styles.label}>{label}</Text>
+      <Text style={styles.title}>{title}</Text>
       {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
     </View>
   );
@@ -57,7 +57,7 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     marginBottom: 2,
   },
-  label: {
+  title: { // Changed from 'label' to 'title'
     fontSize: 12,
     color: COLORS.textSecondary,
   },

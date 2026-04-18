@@ -8,6 +8,8 @@ import React, {
 } from 'react';
 import { Session, User, AuthError } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+import * as WebBrowser from 'expo-web-browser';
+import { makeRedirectUri } from 'expo-auth-session';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -33,14 +35,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Load initial session
     supabase.auth.getSession().then(({ data: { session: s } }) => {
       setSession(s);
       setUser(s?.user ?? null);
       setLoading(false);
     });
 
-    // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, s) => {
         setSession(s);
@@ -74,13 +74,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signInWithGoogle = useCallback(async () => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: 'voicory://auth/callback',
-      },
-    });
-    return { error };
+    try {
+      const redirectUrl = makeRedirectUri({ scheme: 'voicory', path: 'auth/callback' });
+
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: redirectUrl,
+          skipBrowserRedirect: true,
+        },
+      });
+
+      if (error) return { error };
+      if (data?.url) {
+        const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
+        if (result.type === 'success' && result.url) {
+          // Extract tokens from the redirect URL
+          const url = new URL(result.url);
+          const params = new URLSearchParams(url.hash.substring(1)); // after #
+          const accessToken = params.get('access_token');
+          const refreshToken = params.get('refresh_token');
+
+          if (accessToken && refreshToken) {
+            const { error: sessionError } = await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken,
+            });
+            return { error: sessionError };
+          }
+        }
+      }
+      return { error: null };
+    } catch (e: any) {
+      return { error: { message: e.message } as AuthError };
+    }
   }, []);
 
   const value = useMemo<AuthContextValue>(

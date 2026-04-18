@@ -88,25 +88,25 @@ export default function DashboardScreen() {
   const statsCards = stats
     ? [
         {
-          label: 'Total Calls',
+          title: 'Total Calls',
           value: String(stats.totalCalls),
           icon: 'call-outline' as const,
           iconColor: '#60a5fa',
         },
         {
-          label: 'Avg Duration',
+          title: 'Avg Duration',
           value: formatDuration(stats.avgDuration),
           icon: 'timer-outline' as const,
           iconColor: '#fb923c',
         },
         {
-          label: 'Total Cost',
+          title: 'Total Cost',
           value: `₹${stats.totalCost.toFixed(2)}`,
           icon: 'wallet-outline' as const,
           iconColor: '#4ade80',
         },
         {
-          label: 'Success Rate',
+          title: 'Success Rate',
           value: `${stats.successRate.toFixed(1)}%`,
           icon: 'trending-up-outline' as const,
           iconColor: '#c084fc',
@@ -134,12 +134,12 @@ export default function DashboardScreen() {
       <View style={styles.statsGrid}>
         <View style={styles.statsRow}>
           {statsCards.slice(0, 2).map((card) => (
-            <StatCard key={card.label} {...card} />
+            <StatCard key={card.title} {...card} />
           ))}
         </View>
         <View style={styles.statsRow}>
           {statsCards.slice(2, 4).map((card) => (
-            <StatCard key={card.label} {...card} />
+            <StatCard key={card.title} {...card} />
           ))}
         </View>
       </View>

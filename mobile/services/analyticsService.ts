@@ -30,7 +30,7 @@ export async function getDashboardStats(
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
   const { data: calls } = await supabase
     .from('call_logs')
-    .select('duration_seconds, cost_usd, status')
+    .select('duration_seconds, cost, status')
     .eq('user_id', userId)
     .gte('created_at', since);
 
@@ -46,7 +46,7 @@ export async function getDashboardStats(
     totalCalls > 0
       ? callList.reduce((s: number, c: any) => s + (c.duration_seconds || 0), 0) / totalCalls
       : 0;
-  const totalCostUsd = callList.reduce((s: number, c: any) => s + (c.cost_usd || 0), 0);
+  const totalCostUsd = callList.reduce((s: number, c: any) => s + (c.cost || 0), 0);
   const completed = callList.filter((c: any) => c.status === 'completed').length;
   const successRate = totalCalls > 0 ? (completed / totalCalls) * 100 : 0;
   const creditsBalance = (profile?.credits_balance || 0) * USD_TO_INR;
@@ -64,7 +64,7 @@ export async function getUsageSummary(userId: string, days: number = 30) {
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
   const { data, error } = await supabase
     .from('call_logs')
-    .select('created_at, cost_usd, duration_seconds, status')
+    .select('created_at, cost, duration_seconds, status')
     .eq('user_id', userId)
     .gte('created_at', since)
     .order('created_at', { ascending: true });

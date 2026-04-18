@@ -1,49 +1,68 @@
 import { supabase } from '../lib/supabase';
 import { authFetch } from '../lib/api';
-import { WhatsAppContact, WhatsAppMessage } from '../types/whatsapp';
 
-export const getConversations = async (userId: string): Promise<WhatsAppContact[]> => {
+export interface WAContact {
+  id: string;
+  config_id: string;
+  wa_id: string;
+  profile_name: string;
+  phone_number: string;
+  customer_id?: string;
+  is_opted_in: boolean;
+  last_message_at: string;
+  total_messages: number;
+  total_calls: number;
+  created_at: string;
+  updated_at: string;
+  lastMessage?: WAMessage;
+}
+
+export interface WAMessage {
+  id: string;
+  wa_message_id: string;
+  config_id: string;
+  from_number: string;
+  to_number: string;
+  direction: 'inbound' | 'outbound';
+  message_type: string;
+  content: string;
+  status: string;
+  is_from_bot: boolean;
+  assistant_id?: string;
+  message_timestamp: string;
+  delivered_at?: string;
+  read_at?: string;
+  created_at: string;
+  customer_id?: string;
+}
+
+export const getConversations = async (configId: string): Promise<WAContact[]> => {
   const { data, error } = await supabase
     .from('whatsapp_contacts')
     .select('*')
-    .eq('user_id', userId)
+    .eq('config_id', configId)
     .order('last_message_at', { ascending: false });
 
   if (error) throw error;
-
-  // For each contact, fetch last message
-  const contacts = data as WhatsAppContact[];
-  const withLastMessage = await Promise.all(
-    contacts.map(async (contact) => {
-      const { data: msgs } = await supabase
-        .from('whatsapp_messages')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('contact_phone', contact.phone)
-        .order('timestamp', { ascending: false })
-        .limit(1);
-      return { ...contact, lastMessage: msgs?.[0] as WhatsAppMessage | undefined };
-    }),
-  );
-
-  return withLastMessage;
+  return (data ?? []) as WAContact[];
 };
 
 export const getMessages = async (
-  userId: string,
-  contactPhone: string,
+  configId: string,
+  phoneNumber: string,
   limit = 50,
-): Promise<WhatsAppMessage[]> => {
+): Promise<WAMessage[]> => {
+  // Messages where this phone is either sender or recipient
   const { data, error } = await supabase
     .from('whatsapp_messages')
     .select('*')
-    .eq('user_id', userId)
-    .eq('contact_phone', contactPhone)
-    .order('timestamp', { ascending: false })
+    .eq('config_id', configId)
+    .or(`from_number.eq.${phoneNumber},to_number.eq.${phoneNumber}`)
+    .order('message_timestamp', { ascending: false })
     .limit(limit);
 
   if (error) throw error;
-  return data as WhatsAppMessage[];
+  return (data ?? []) as WAMessage[];
 };
 
 export const sendMessage = async (
@@ -61,12 +80,13 @@ export const sendMessage = async (
 };
 
 export const markAsRead = async (
-  userId: string,
-  contactPhone: string,
+  configId: string,
+  contactId: string,
 ): Promise<void> => {
+  // No unread_count column — just update last read timestamp
   await supabase
     .from('whatsapp_contacts')
-    .update({ unread_count: 0 })
-    .eq('user_id', userId)
-    .eq('phone', contactPhone);
+    .update({ updated_at: new Date().toISOString() })
+    .eq('config_id', configId)
+    .eq('id', contactId);
 };

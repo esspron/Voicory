@@ -16,6 +16,7 @@ function getColorForName(name: string): string {
 }
 
 function getInitials(name: string): string {
+  if (!name) return '?';
   const parts = name.trim().split(/\s+/);
   if (parts.length >= 2) {
     return (parts[0][0] + parts[1][0]).toUpperCase();
@@ -50,7 +51,8 @@ export default function ContactAvatar({ name, profilePictureUrl, size = 48 }: Co
     letterSpacing: 0.5,
   };
 
-  // For now use initials since expo-image requires additional setup
+  // Show initials fallback when no profile picture URL is provided
+  // Profile picture display can be implemented later when needed
   return (
     <View style={containerStyle}>
       <Text style={textStyle}>{initials}</Text>

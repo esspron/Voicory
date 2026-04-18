@@ -14,11 +14,11 @@ const COLORS = {
 
 const USD_TO_INR = 84;
 
-function formatDuration(seconds: number): string {
-  if (!seconds) return '0s';
+function formatDuration(seconds: number | undefined): string {
+  if (!seconds) return '0:00';
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
-  return m > 0 ? `${m}m ${s}s` : `${s}s`;
+  return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
 function timeAgo(dateStr: string): string {
@@ -36,8 +36,13 @@ interface CallCardProps {
 }
 
 export function CallCard({ call, onPress }: CallCardProps) {
-  const costInr = (call.cost_usd * USD_TO_INR).toFixed(2);
-  const directionIcon = call.direction === 'inbound' ? 'call-received' : 'call-made';
+  const cost = call.cost || 0;
+  const costInr = (cost * USD_TO_INR).toFixed(2);
+  
+  // Use from_number/to_number based on direction, fallback to phone_number
+  const displayNumber = call.direction === 'inbound' 
+    ? call.from_number || call.phone_number
+    : call.to_number || call.phone_number;
 
   return (
     <TouchableOpacity style={styles.card} onPress={() => onPress(call)} activeOpacity={0.75}>
@@ -51,7 +56,7 @@ export function CallCard({ call, onPress }: CallCardProps) {
       <View style={styles.body}>
         <View style={styles.row}>
           <Text style={styles.phone} numberOfLines={1}>
-            {call.customer?.name || call.phone_number}
+            {displayNumber}
           </Text>
           <StatusBadge status={call.status} />
         </View>
@@ -64,8 +69,10 @@ export function CallCard({ call, onPress }: CallCardProps) {
           <Text style={styles.metaText}>
             <Ionicons name="time-outline" size={12} /> {formatDuration(call.duration_seconds)}
           </Text>
-          <Text style={styles.metaText}>₹{costInr}</Text>
-          <Text style={styles.metaText}>{timeAgo(call.created_at)}</Text>
+          {cost > 0 && <Text style={styles.metaText}>₹{costInr}</Text>}
+          <Text style={styles.metaText}>
+            {call.started_at ? timeAgo(call.started_at) : timeAgo(call.created_at)}
+          </Text>
         </View>
       </View>
       <Ionicons name="chevron-forward" size={16} color={COLORS.textSecondary} />

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import {
   View,
   FlatList,
@@ -14,13 +14,50 @@ import {
   Image,
 } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
-import { getMessages, sendMessage, markAsRead } from '../services/whatsappService';
-import { WhatsAppContact, WhatsAppMessage } from '../types/whatsapp';
 import { supabase } from '../lib/supabase';
 import ChatBubble from '../components/whatsapp/ChatBubble';
 import ChatInput from '../components/whatsapp/ChatInput';
 import ContactAvatar from '../components/whatsapp/ContactAvatar';
 import DateDivider from '../components/whatsapp/DateDivider';
+
+// ─── Types ──────────────────────────────────────────────────────────────────
+
+interface WhatsAppConfig {
+  id: string;
+  user_id: string;
+  waba_id: string;
+  phone_number_id: string;
+  display_phone_number: string;
+  display_name: string;
+  access_token: string;
+  assistant_id: string;
+  status: string;
+}
+
+interface WhatsAppContact {
+  id: string;
+  config_id: string;
+  wa_id: string;
+  profile_name: string;
+  phone_number: string;
+  customer_id?: string;
+  last_message_at: string;
+  total_messages: number;
+}
+
+interface WhatsAppMessage {
+  id: string;
+  wa_message_id: string;
+  config_id: string;
+  from_number: string;
+  to_number: string;
+  direction: 'inbound' | 'outbound';
+  message_type: string;
+  content: any; // JSONB field
+  status: string;
+  is_from_bot: boolean;
+  message_timestamp: string;
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -37,6 +74,15 @@ function getDateLabel(isoString: string): string {
   return d.toLocaleDateString([], { month: 'long', day: 'numeric', year: 'numeric' });
 }
 
+// Extract text from content JSONB field - handle both {text: {body: "..."}} and {body: "..."} formats
+function getMessageText(content: any): string {
+  if (!content) return '';
+  if (typeof content === 'string') return content;
+  if (content.text?.body) return content.text.body;
+  if (content.body) return content.body;
+  return '';
+}
+
 // Build flat list items: messages with injected date dividers
 type ListItem =
   | { type: 'message'; message: WhatsAppMessage; showTail: boolean }
@@ -45,7 +91,7 @@ type ListItem =
 function buildListItems(messages: WhatsAppMessage[]): ListItem[] {
   // messages sorted newest-first (FlatList inverted); process in reading order
   const sorted = [...messages].sort(
-    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
+    (a, b) => new Date(a.message_timestamp).getTime() - new Date(b.message_timestamp).getTime(),
   );
 
   const items: ListItem[] = [];
@@ -55,7 +101,7 @@ function buildListItems(messages: WhatsAppMessage[]): ListItem[] {
 
   for (let i = 0; i < sorted.length; i++) {
     const msg = sorted[i];
-    const dateLabel = getDateLabel(msg.timestamp);
+    const dateLabel = getDateLabel(msg.message_timestamp);
 
     if (dateLabel !== lastDateLabel) {
       items.push({ type: 'divider', label: dateLabel, key: `divider-${msg.id}` });
@@ -65,7 +111,7 @@ function buildListItems(messages: WhatsAppMessage[]): ListItem[] {
     }
 
     // Show tail if: different sender OR same sender but >1 min gap
-    const msgTime = new Date(msg.timestamp);
+    const msgTime = new Date(msg.message_timestamp);
     const isGrouped =
       lastSender === msg.direction &&
       lastSenderTime !== null &&
@@ -83,13 +129,11 @@ function buildListItems(messages: WhatsAppMessage[]): ListItem[] {
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
-interface Props {
-  phone?: string;
-}
-
-export default function ChatScreen({ phone: phoneProp }: Props) {
+export default function ChatScreen() {
   const { user } = useAuth();
+  const { phone } = useLocalSearchParams<{ phone: string }>();
 
+  const [config, setConfig] = useState<WhatsAppConfig | null>(null);
   const [contact, setContact] = useState<WhatsAppContact | null>(null);
   const [messages, setMessages] = useState<WhatsAppMessage[]>([]);
   const [loading, setLoading] = useState(true);
@@ -98,38 +142,67 @@ export default function ChatScreen({ phone: phoneProp }: Props) {
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const flatListRef = useRef<FlatList>(null);
 
+  // ── Load user's WhatsApp config ───────────────────────────────────────────
+  useEffect(() => {
+    if (!user) return;
+    supabase
+      .from('whatsapp_configs')
+      .select('*')
+      .eq('user_id', user.id)
+      .single()
+      .then(({ data, error }) => {
+        if (data && !error) {
+          setConfig(data as WhatsAppConfig);
+        }
+      });
+  }, [user]);
+
   // ── Load contact from phone ────────────────────────────────────────────────
   useEffect(() => {
-    if (!user || !phoneProp) return;
+    if (!user || !phone || !config) return;
     supabase
       .from('whatsapp_contacts')
       .select('*')
-      .eq('user_id', user.id)
-      .eq('phone', phoneProp)
+      .eq('config_id', config.id)
+      .eq('phone_number', phone)
       .single()
       .then(({ data }) => {
         if (data) {
           setContact(data as WhatsAppContact);
         } else {
-          setContact({ id: '', user_id: user.id, phone: phoneProp, name: phoneProp, last_message_at: '', unread_count: 0, is_active: true, created_at: '', updated_at: '' });
+          // Create a fallback contact object if not found in DB
+          setContact({
+            id: '',
+            config_id: config.id,
+            wa_id: phone,
+            profile_name: phone,
+            phone_number: phone,
+            last_message_at: '',
+            total_messages: 0,
+          });
         }
       });
-  }, [user, phoneProp]);
+  }, [user, phone, config]);
 
   // ── Load messages ──────────────────────────────────────────────────────────
-  const phone: string = contact?.phone ?? phoneProp ?? "";
-
   const loadMessages = useCallback(async () => {
-    if (!user) return;
+    if (!user || !phone || !config) return;
     try {
       setError(null);
-      const data = await getMessages(user.id, phone);
-      setMessages(data);
-      await markAsRead(user.id, phone);
+      const { data, error } = await supabase
+        .from('whatsapp_messages')
+        .select('*')
+        .eq('config_id', config.id)
+        .or(`from_number.eq.${phone},to_number.eq.${phone}`)
+        .order('message_timestamp', { ascending: false })
+        .limit(100);
+        
+      if (error) throw error;
+      setMessages(data || []);
     } catch (e: any) {
       setError(e.message || 'Failed to load messages');
     }
-  }, [user, phone]);
+  }, [user, phone, config]);
 
   useEffect(() => {
     loadMessages().finally(() => setLoading(false));
@@ -137,7 +210,7 @@ export default function ChatScreen({ phone: phoneProp }: Props) {
 
   // ── Realtime subscription ──────────────────────────────────────────────────
   useEffect(() => {
-    if (!user) return;
+    if (!user || !phone || !config) return;
 
     const channel = supabase
       .channel(`whatsapp-chat-${phone}`)
@@ -147,11 +220,11 @@ export default function ChatScreen({ phone: phoneProp }: Props) {
           event: 'INSERT',
           schema: 'public',
           table: 'whatsapp_messages',
-          filter: `user_id=eq.${user.id}`,
+          filter: `config_id=eq.${config.id}`,
         },
         (payload) => {
           const newMsg = payload.new as WhatsAppMessage;
-          if (newMsg.contact_phone === phone) {
+          if (newMsg.from_number === phone || newMsg.to_number === phone) {
             setMessages((prev) => [newMsg, ...prev]);
           }
         },
@@ -161,32 +234,47 @@ export default function ChatScreen({ phone: phoneProp }: Props) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user, phone]);
+  }, [user, phone, config]);
 
   // ── Send message ────────────────────────────────────────────────────────────
   const handleSend = useCallback(
     async (text: string) => {
-      if (!user) return;
+      if (!user || !phone || !config) return;
       setSending(true);
 
       // Optimistic update
       const tempMsg: WhatsAppMessage = {
         id: `temp-${Date.now()}`,
-        user_id: user.id,
         wa_message_id: `temp-${Date.now()}`,
-        contact_phone: phone,
-        contact_name: contact?.name ?? phone,
+        config_id: config.id,
+        from_number: config.display_phone_number,
+        to_number: phone,
         direction: 'outbound',
         message_type: 'text',
-        body: text,
-        timestamp: new Date().toISOString(),
+        content: { text: { body: text } },
         status: 'sent',
-        created_at: new Date().toISOString(),
+        is_from_bot: false,
+        message_timestamp: new Date().toISOString(),
       };
       setMessages((prev) => [tempMsg, ...prev]);
 
       try {
-        await sendMessage(phone, text);
+        // Call backend API to send message
+        const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/whatsapp/send`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            config_id: config.id,
+            to: phone,
+            message: text,
+          }),
+        });
+        
+        if (!response.ok) {
+          throw new Error('Failed to send message');
+        }
       } catch (e: any) {
         // Mark temp message as failed
         setMessages((prev) =>
@@ -196,7 +284,7 @@ export default function ChatScreen({ phone: phoneProp }: Props) {
         setSending(false);
       }
     },
-    [user, contact],
+    [user, phone, config],
   );
 
   // ── List data ────────────────────────────────────────────────────────────────
@@ -206,9 +294,18 @@ export default function ChatScreen({ phone: phoneProp }: Props) {
     if (item.type === 'divider') {
       return <DateDivider label={item.label} />;
     }
+    
+    // Adapt message format for ChatBubble component
+    const adaptedMessage = {
+      ...item.message,
+      body: getMessageText(item.message.content),
+      timestamp: item.message.message_timestamp,
+      media_url: undefined, // TODO: Extract from content if media message
+    } as any; // Type override since ChatBubble expects old format
+    
     return (
       <ChatBubble
-        message={item.message}
+        message={adaptedMessage}
         showTail={item.showTail}
         onImagePress={setLightboxUrl}
       />
@@ -232,9 +329,9 @@ export default function ChatScreen({ phone: phoneProp }: Props) {
         >
           <Text style={styles.backIcon}>←</Text>
         </TouchableOpacity>
-        <ContactAvatar name={contact?.name ?? phone} profilePictureUrl={contact?.profile_picture_url} size={38} />
+        <ContactAvatar name={contact?.profile_name ?? phone ?? 'Unknown'} profilePictureUrl={undefined} size={38} />
         <View style={styles.headerInfo}>
-          <Text style={styles.headerName} numberOfLines={1}>{contact?.name ?? phone}</Text>
+          <Text style={styles.headerName} numberOfLines={1}>{contact?.profile_name ?? phone ?? 'Unknown'}</Text>
           <Text style={styles.headerStatus}>online</Text>
         </View>
         <TouchableOpacity style={styles.headerAction}>

@@ -1,31 +1,35 @@
+// WhatsApp types matching exact DB schema
+
 export interface WhatsAppContact {
   id: string;
-  user_id: string;
-  phone: string;
-  name: string;
-  profile_picture_url?: string;
-  last_message_at: string;
-  unread_count: number;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-  lastMessage?: WhatsAppMessage;
+  config_id: string;
+  wa_id: string;
+  profile_name?: string;
+  phone_number: string;
+  customer_id?: string;
+  is_opted_in?: boolean;
+  last_message_at?: string;
+  total_messages?: number;
+  total_calls?: number;
 }
 
 export interface WhatsAppMessage {
   id: string;
-  user_id: string;
   wa_message_id: string;
-  contact_phone: string;
-  contact_name?: string;
+  config_id: string;
+  from_number: string;
+  to_number: string;
   direction: 'inbound' | 'outbound';
   message_type: 'text' | 'image' | 'audio' | 'document' | 'template';
-  body: string;
-  media_url?: string;
-  timestamp: string;
+  content?: any; // jsonb field from DB
   status: 'sent' | 'delivered' | 'read' | 'failed';
-  metadata?: Record<string, any>;
-  created_at: string;
+  is_from_bot?: boolean;
+  message_timestamp?: string;
+}
+
+export interface WhatsAppConfig {
+  id: string;
+  // Add config fields as needed based on actual usage
 }
 
 export type MessageGroup = {

@@ -105,7 +105,7 @@ export default function CallDetailScreen() {
     );
   }
 
-  const costInr = call.cost_usd * USD_TO_INR;
+  const costInr = (call.cost || 0) * USD_TO_INR;
   const breakdown = call.metadata?.cost_breakdown;
 
   return (
@@ -130,7 +130,7 @@ export default function CallDetailScreen() {
           </Text>
         </View>
         <View style={styles.infoGrid}>
-          <InfoRow icon="time-outline" label="Duration" value={formatDuration(call.duration_seconds)} />
+          <InfoRow icon="time-outline" label="Duration" value={formatDuration(call.duration_seconds ?? 0)} />
           <InfoRow icon="wallet-outline" label="Cost" value={`₹${costInr.toFixed(2)}`} />
           <InfoRow icon="calendar-outline" label="Time" value={formatDate(call.created_at)} />
           {call.assistant?.name && (

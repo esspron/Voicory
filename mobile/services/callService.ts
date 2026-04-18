@@ -12,7 +12,7 @@ export async function getCalls(
 ): Promise<CallLog[]> {
   let query = supabase
     .from('call_logs')
-    .select('*, assistant:assistant_id(name), customer:customer_id(name)')
+    .select('*, assistant:assistant_id(name)')
     .eq('user_id', userId)
     .order('created_at', { ascending: false });
 
@@ -35,7 +35,7 @@ export async function getCalls(
 export async function getCallById(callId: string): Promise<CallLog | null> {
   const { data, error } = await supabase
     .from('call_logs')
-    .select('*, assistant:assistant_id(name), customer:customer_id(name)')
+    .select('*, assistant:assistant_id(name)')
     .eq('id', callId)
     .single();
   if (error) throw error;
