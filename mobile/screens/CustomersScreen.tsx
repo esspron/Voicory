@@ -157,7 +157,7 @@ export default function CustomersScreen() {
         renderItem={({ item }) => (
           <CustomerCard
             customer={item}
-            onPress={(c) => router.push(`/customers/${c.id}` as any)}
+            onPress={(c) => router.push(`/customer/${c.id}` as any)}
           />
         )}
         ListEmptyComponent={

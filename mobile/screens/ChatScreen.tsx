@@ -18,6 +18,7 @@ import { supabase } from '../lib/supabase';
 import ChatBubble from '../components/whatsapp/ChatBubble';
 import ChatInput from '../components/whatsapp/ChatInput';
 import ContactAvatar from '../components/whatsapp/ContactAvatar';
+import { Ionicons } from '@expo/vector-icons';
 import DateDivider from '../components/whatsapp/DateDivider';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -327,7 +328,7 @@ export default function ChatScreen() {
           onPress={() => router.back()}
           style={styles.backBtn}
         >
-          <Text style={styles.backIcon}>←</Text>
+          <Ionicons name="arrow-back" size={22} color="#fff" />
         </TouchableOpacity>
         <ContactAvatar name={contact?.profile_name ?? phone ?? 'Unknown'} profilePictureUrl={undefined} size={38} />
         <View style={styles.headerInfo}>
@@ -335,10 +336,7 @@ export default function ChatScreen() {
           <Text style={styles.headerStatus}>online</Text>
         </View>
         <TouchableOpacity style={styles.headerAction}>
-          <Text style={styles.headerActionIcon}>📞</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.headerAction}>
-          <Text style={styles.headerActionIcon}>📹</Text>
+          <Ionicons name="call-outline" size={20} color="#fff" />
         </TouchableOpacity>
       </View>
 
@@ -371,7 +369,7 @@ export default function ChatScreen() {
               showsVerticalScrollIndicator={false}
               ListEmptyComponent={
                 <View style={styles.emptyChat}>
-                  <Text style={styles.emptyChatText}>No messages yet. Say hello! 👋</Text>
+                  <Text style={styles.emptyChatText}>No messages yet. Say hello!</Text>
                 </View>
               }
             />

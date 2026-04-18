@@ -3,10 +3,10 @@ import {
   View,
   TextInput,
   TouchableOpacity,
-  Text,
   StyleSheet,
   Platform,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 interface ChatInputProps {
   onSend: (text: string) => void;
@@ -28,11 +28,6 @@ export default function ChatInput({ onSend, disabled }: ChatInputProps) {
 
   return (
     <View style={styles.container}>
-      {/* Emoji button */}
-      <TouchableOpacity style={styles.iconBtn}>
-        <Text style={styles.iconText}>😊</Text>
-      </TouchableOpacity>
-
       {/* Text input */}
       <TextInput
         ref={inputRef}
@@ -47,20 +42,20 @@ export default function ChatInput({ onSend, disabled }: ChatInputProps) {
         editable={!disabled}
       />
 
-      {/* Attachment */}
+      {/* Attachment (only when no text) */}
       {!hasText && (
         <TouchableOpacity style={styles.iconBtn}>
-          <Text style={styles.iconText}>📎</Text>
+          <Ionicons name="attach-outline" size={22} color="#8696a0" />
         </TouchableOpacity>
       )}
 
-      {/* Send / Mic */}
+      {/* Send button */}
       <TouchableOpacity
         style={[styles.sendBtn, hasText && styles.sendBtnActive]}
         onPress={hasText ? handleSend : undefined}
         disabled={disabled}
       >
-        <Text style={styles.sendIcon}>{hasText ? '➤' : '🎤'}</Text>
+        <Ionicons name="send" size={18} color={hasText ? '#fff' : '#8696a0'} />
       </TouchableOpacity>
     </View>
   );
@@ -83,9 +78,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 2,
-  },
-  iconText: {
-    fontSize: 22,
   },
   input: {
     flex: 1,
@@ -111,9 +103,5 @@ const styles = StyleSheet.create({
   },
   sendBtnActive: {
     backgroundColor: '#00d4aa',
-  },
-  sendIcon: {
-    fontSize: 18,
-    color: '#ffffff',
   },
 });
