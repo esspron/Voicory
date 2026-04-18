@@ -107,6 +107,46 @@ export default function RootLayout() {
             >
               <Stack.Screen name="(auth)" options={{ headerShown: false, animation: 'fade' }} />
               <Stack.Screen name="(tabs)" options={{ headerShown: false, animation: 'fade' }} />
+              {/* Detail screens — slide from right */}
+              <Stack.Screen
+                name="call/[id]"
+                options={{ headerShown: false, animation: 'slide_from_right', animationDuration: 250 }}
+              />
+              <Stack.Screen
+                name="customer/[id]"
+                options={{ headerShown: false, animation: 'slide_from_right', animationDuration: 250 }}
+              />
+              <Stack.Screen
+                name="chat/[phone]"
+                options={{ headerShown: false, animation: 'slide_from_right', animationDuration: 250 }}
+              />
+              <Stack.Screen
+                name="contact/[phone]"
+                options={{ headerShown: false, animation: 'slide_from_right', animationDuration: 250 }}
+              />
+              <Stack.Screen
+                name="customers/new"
+                options={{ headerShown: false, animation: 'slide_from_right', animationDuration: 250 }}
+              />
+              {/* Modal screens — slide from bottom */}
+              <Stack.Screen
+                name="billing"
+                options={{
+                  headerShown: false,
+                  presentation: 'modal',
+                  animation: 'slide_from_bottom',
+                  animationDuration: 300,
+                }}
+              />
+              <Stack.Screen
+                name="profile"
+                options={{
+                  headerShown: false,
+                  presentation: 'modal',
+                  animation: 'slide_from_bottom',
+                  animationDuration: 300,
+                }}
+              />
             </Stack>
           </AuthProvider>
         </ErrorBoundary>

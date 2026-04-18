@@ -12,7 +12,7 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
-    "description": "Voicory — AI-powered voice agents for your business. Deploy intelligent voice assistants that handle calls, qualify leads, and support customers 24/7.",
+    "description": "Voicory \u2014 AI-powered voice agents for your business. Deploy intelligent voice assistants that handle calls, qualify leads, and support customers 24/7.",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
@@ -27,12 +27,17 @@
         "NSSpeechRecognitionUsageDescription": "Voicory uses speech recognition to process voice input for your AI agents.",
         "NSCameraUsageDescription": "Voicory may use the camera for profile photo uploads.",
         "NSPhotoLibraryUsageDescription": "Voicory may access your photo library for profile photo uploads.",
-        "UIBackgroundModes": ["audio"],
+        "UIBackgroundModes": [
+          "audio"
+        ],
         "ITSAppUsesNonExemptEncryption": false
       },
       "config": {
         "usesNonExemptEncryption": false
-      }
+      },
+      "associatedDomains": [
+        "applinks:app.voicory.com"
+      ]
     },
     "android": {
       "adaptiveIcon": {
@@ -47,6 +52,51 @@
         "android.permission.INTERNET",
         "android.permission.VIBRATE",
         "android.permission.RECEIVE_BOOT_COMPLETED"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "voicory"
+            },
+            {
+              "scheme": "https",
+              "host": "app.voicory.com",
+              "pathPrefix": "/call"
+            },
+            {
+              "scheme": "https",
+              "host": "app.voicory.com",
+              "pathPrefix": "/customer"
+            },
+            {
+              "scheme": "https",
+              "host": "app.voicory.com",
+              "pathPrefix": "/chat"
+            },
+            {
+              "scheme": "https",
+              "host": "app.voicory.com",
+              "pathPrefix": "/contact"
+            },
+            {
+              "scheme": "https",
+              "host": "app.voicory.com",
+              "pathPrefix": "/billing"
+            },
+            {
+              "scheme": "https",
+              "host": "app.voicory.com",
+              "pathPrefix": "/profile"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
       ]
     },
     "web": {
