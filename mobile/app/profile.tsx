@@ -1,25 +1,152 @@
 import React, { useState, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity,
-  ActivityIndicator, Alert, Platform,
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TextInput,
+  TouchableOpacity,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
+import { colors as C } from '../lib/theme';
 import { supabase } from '../lib/supabase';
 
-const C = {
-  bg: '#050a12',
-  surface: '#0c1219',
-  surfaceRaised: '#111a24',
-  border: '#1a2332',
-  primary: '#00d4aa',
-  text: '#f0f2f5',
-  textMuted: '#7a8599',
-  textFaint: '#3d4a5c',
-  danger: '#ef4444',
-};
+// ─── Field Component ──────────────────────────────────────────────────────────
+function FormField({
+  label,
+  value,
+  onChangeText,
+  placeholder,
+  keyboardType,
+  autoCapitalize,
+  editable = true,
+  iconName,
+}: {
+  label: string;
+  value: string;
+  onChangeText?: (t: string) => void;
+  placeholder?: string;
+  keyboardType?: any;
+  autoCapitalize?: any;
+  editable?: boolean;
+  iconName: string;
+}) {
+  const [focused, setFocused] = useState(false);
 
+  return (
+    <View style={ff.container}>
+      <Text style={ff.label}>{label}</Text>
+      <View
+        style={[
+          ff.inputWrap,
+          focused && ff.focused,
+          !editable && ff.disabled,
+        ]}
+      >
+        <Ionicons name={iconName as any} size={18} color={editable ? C.textMuted : C.textFaint} style={ff.icon} />
+        <TextInput
+          style={[ff.input, !editable && ff.inputDisabled]}
+          value={value}
+          onChangeText={onChangeText}
+          placeholder={placeholder}
+          placeholderTextColor={C.textFaint}
+          keyboardType={keyboardType}
+          autoCapitalize={autoCapitalize}
+          editable={editable}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+        />
+        {!editable && (
+          <Ionicons name="lock-closed" size={14} color={C.textFaint} style={ff.lockIcon} />
+        )}
+      </View>
+    </View>
+  );
+}
+
+const ff = StyleSheet.create({
+  container: { marginBottom: 16 },
+  label: { fontSize: 13, fontWeight: '600', color: C.textMuted, marginBottom: 8, letterSpacing: 0.2 },
+  inputWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: C.surfaceRaised,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: C.border,
+    height: 52,
+    paddingHorizontal: 14,
+  },
+  focused: {
+    borderColor: C.primary + '60',
+    backgroundColor: C.primaryMuted,
+  },
+  disabled: {
+    backgroundColor: C.surface,
+    borderColor: C.border + '80',
+  },
+  icon: { marginRight: 10 },
+  lockIcon: { marginLeft: 8 },
+  input: { flex: 1, color: C.text, fontSize: 15, fontWeight: '500' },
+  inputDisabled: { color: C.textFaint },
+});
+
+// ─── Avatar Placeholder ────────────────────────────────────────────────────────
+function AvatarUpload({ initials }: { initials: string }) {
+  return (
+    <TouchableOpacity style={av.container} activeOpacity={0.8}>
+      <LinearGradient
+        colors={[C.primary, C.secondary]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={av.gradient}
+      >
+        <Text style={av.initials}>{initials}</Text>
+      </LinearGradient>
+      <View style={av.badge}>
+        <Ionicons name="camera" size={14} color="#fff" />
+      </View>
+      <Text style={av.hint}>Tap to upload photo</Text>
+    </TouchableOpacity>
+  );
+}
+
+const av = StyleSheet.create({
+  container: { alignItems: 'center', paddingVertical: 28, gap: 10 },
+  gradient: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 3,
+    borderColor: C.primary + '40',
+  },
+  initials: { fontSize: 32, fontWeight: '800', color: '#fff' },
+  badge: {
+    position: 'absolute',
+    bottom: 38,
+    right: '35%',
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: C.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: C.bg,
+  },
+  hint: { fontSize: 12, color: C.textFaint, fontWeight: '500' },
+});
+
+// ─── Main Screen ───────────────────────────────────────────────────────────────
 export default function ProfileScreen() {
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -27,6 +154,7 @@ export default function ProfileScreen() {
   const [orgName, setOrgName] = useState('');
   const [orgEmail, setOrgEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     loadProfile();
@@ -34,23 +162,21 @@ export default function ProfileScreen() {
 
   const loadProfile = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      setUser(user);
-
+      const { data: { user: u } } = await supabase.auth.getUser();
+      if (!u) return;
+      setUser(u);
       const { data } = await supabase
         .from('user_profiles')
         .select('organization_name, organization_email, phone_number')
-        .eq('user_id', user.id)
+        .eq('user_id', u.id)
         .maybeSingle();
-
       if (data) {
         setOrgName(data.organization_name || '');
         setOrgEmail(data.organization_email || '');
         setPhone(data.phone_number || '');
       }
     } catch (err) {
-      console.error(err);
+      if (__DEV__) console.error(err);
     } finally {
       setLoading(false);
     }
@@ -59,6 +185,7 @@ export default function ProfileScreen() {
   const handleSave = async () => {
     if (!user) return;
     setSaving(true);
+    setSaved(false);
     try {
       const { error } = await supabase
         .from('user_profiles')
@@ -68,9 +195,9 @@ export default function ProfileScreen() {
           phone_number: phone,
         })
         .eq('user_id', user.id);
-
       if (error) throw error;
-      Alert.alert('Saved', 'Profile updated successfully.');
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
     } catch (err: any) {
       Alert.alert('Error', err.message || 'Failed to save profile.');
     } finally {
@@ -78,98 +205,197 @@ export default function ProfileScreen() {
     }
   };
 
+  const getInitials = (email?: string) => {
+    if (!email) return 'U';
+    return email.slice(0, 2).toUpperCase();
+  };
+
   if (loading) {
-    return <View style={s.centered}><ActivityIndicator size="large" color={C.primary} /></View>;
+    return (
+      <View style={[s.centered, { paddingTop: insets.top }]}>
+        <ActivityIndicator size="large" color={C.primary} />
+      </View>
+    );
   }
 
   return (
-    <ScrollView style={s.container} contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
-      <View style={s.header}>
-        <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
-          <Ionicons name="arrow-back" size={22} color={C.text} />
+    <View style={s.container}>
+      {/* ── Header ── */}
+      <View style={[s.header, { paddingTop: insets.top + 8 }]}>
+        <TouchableOpacity onPress={() => router.back()} style={s.backBtn} activeOpacity={0.7}>
+          <Ionicons name="chevron-back" size={22} color={C.text} />
         </TouchableOpacity>
-        <Text style={s.title}>Profile</Text>
-        <View style={{ width: 38 }} />
+        <Text style={s.headerTitle}>Profile</Text>
+        <View style={{ width: 44 }} />
       </View>
 
-      <View style={s.section}>
-        <Text style={s.sectionLabel}>ACCOUNT</Text>
-        <View style={s.card}>
-          <Text style={s.fieldLabel}>Email</Text>
-          <Text style={s.fieldReadonly}>{user?.email || ''}</Text>
+      <ScrollView
+        contentContainerStyle={[s.content, { paddingBottom: insets.bottom + 40 }]}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* ── Avatar ── */}
+        <AvatarUpload initials={getInitials(user?.email)} />
 
-          <Text style={[s.fieldLabel, { marginTop: 20 }]}>Organization Name</Text>
-          <TextInput
-            style={s.input}
+        {/* ── Account Info Card ── */}
+        <View style={s.card}>
+          <View style={s.cardHeader}>
+            <Ionicons name="shield-checkmark" size={16} color={C.primary} />
+            <Text style={s.cardTitle}>Account Details</Text>
+          </View>
+
+          <FormField
+            label="Email Address"
+            value={user?.email || ''}
+            placeholder="you@example.com"
+            iconName="mail"
+            editable={false}
+          />
+        </View>
+
+        {/* ── Organization Card ── */}
+        <View style={s.card}>
+          <View style={s.cardHeader}>
+            <Ionicons name="business" size={16} color={C.secondary} />
+            <Text style={s.cardTitle}>Organization</Text>
+          </View>
+
+          <FormField
+            label="Organization Name"
             value={orgName}
             onChangeText={setOrgName}
-            placeholder="Your company name"
-            placeholderTextColor={C.textFaint}
+            placeholder="Acme Corp"
+            iconName="business"
+            autoCapitalize="words"
           />
 
-          <Text style={[s.fieldLabel, { marginTop: 20 }]}>Organization Email</Text>
-          <TextInput
-            style={s.input}
+          <FormField
+            label="Organization Email"
             value={orgEmail}
             onChangeText={setOrgEmail}
             placeholder="contact@company.com"
-            placeholderTextColor={C.textFaint}
+            iconName="mail-open"
             keyboardType="email-address"
             autoCapitalize="none"
           />
 
-          <Text style={[s.fieldLabel, { marginTop: 20 }]}>Phone Number</Text>
-          <TextInput
-            style={s.input}
+          <FormField
+            label="Phone Number"
             value={phone}
             onChangeText={setPhone}
             placeholder="+91 9876543210"
-            placeholderTextColor={C.textFaint}
+            iconName="call"
             keyboardType="phone-pad"
           />
         </View>
-      </View>
 
-      <TouchableOpacity
-        style={[s.saveBtn, saving && { opacity: 0.6 }]}
-        onPress={handleSave}
-        disabled={saving}
-        activeOpacity={0.8}
-      >
-        <Text style={s.saveBtnText}>{saving ? 'Saving...' : 'Save Changes'}</Text>
-      </TouchableOpacity>
-    </ScrollView>
+        {/* ── Save Button ── */}
+        <TouchableOpacity
+          style={[s.saveBtn, saving && { opacity: 0.7 }, saved && s.savedBtn]}
+          onPress={handleSave}
+          disabled={saving}
+          activeOpacity={0.85}
+        >
+          {saving ? (
+            <ActivityIndicator size="small" color="#000" />
+          ) : saved ? (
+            <>
+              <Ionicons name="checkmark-circle" size={20} color="#000" />
+              <Text style={s.saveBtnText}>Saved!</Text>
+            </>
+          ) : (
+            <>
+              <Ionicons name="save" size={18} color="#000" />
+              <Text style={s.saveBtnText}>Save Changes</Text>
+            </>
+          )}
+        </TouchableOpacity>
+
+        <Text style={s.footerNote}>
+          Changes apply to your Voicory account immediately.
+        </Text>
+      </ScrollView>
+    </View>
   );
 }
 
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: C.bg },
-  content: { paddingBottom: 40 },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: C.bg },
+
+  // Header
   header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingTop: Platform.OS === 'ios' ? 60 : 44, paddingHorizontal: 16, paddingBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    backgroundColor: C.bg,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: C.border,
   },
   backBtn: {
-    width: 38, height: 38, borderRadius: 12, backgroundColor: C.surface,
-    alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.border,
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: C.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: C.border,
   },
-  title: { fontSize: 18, fontWeight: '700', color: C.text },
-  section: { marginTop: 12 },
-  sectionLabel: { fontSize: 12, fontWeight: '600', color: C.textMuted, letterSpacing: 0.5, marginHorizontal: 20, marginBottom: 10 },
+  headerTitle: { fontSize: 18, fontWeight: '700', color: C.text },
+
+  content: { paddingHorizontal: 16 },
+
+  // Card
   card: {
-    backgroundColor: C.surface, marginHorizontal: 16, borderRadius: 16,
-    borderWidth: 1, borderColor: C.border, padding: 20,
+    backgroundColor: C.surface,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: C.border,
+    padding: 20,
+    marginBottom: 16,
   },
-  fieldLabel: { fontSize: 13, fontWeight: '600', color: C.textMuted, marginBottom: 8 },
-  fieldReadonly: { fontSize: 15, color: C.textFaint, fontWeight: '500' },
-  input: {
-    backgroundColor: C.surfaceRaised, borderRadius: 12, borderWidth: 1, borderColor: C.border,
-    paddingHorizontal: 14, height: 48, color: C.text, fontSize: 15,
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 20,
+    paddingBottom: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: C.border,
   },
+  cardTitle: { fontSize: 14, fontWeight: '700', color: C.text, letterSpacing: 0.2 },
+
+  // Save button
   saveBtn: {
-    marginHorizontal: 16, marginTop: 24, height: 50, borderRadius: 14,
-    backgroundColor: C.primary, alignItems: 'center', justifyContent: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    height: 54,
+    borderRadius: 16,
+    backgroundColor: C.primary,
+    marginTop: 8,
+    marginBottom: 16,
+    shadowColor: C.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 6,
+  },
+  savedBtn: {
+    backgroundColor: C.success,
+    shadowColor: C.success,
   },
   saveBtnText: { fontSize: 16, fontWeight: '700', color: '#000' },
+
+  footerNote: {
+    textAlign: 'center',
+    fontSize: 12,
+    color: C.textFaint,
+    lineHeight: 18,
+    marginBottom: 8,
+  },
 });

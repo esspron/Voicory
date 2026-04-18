@@ -1,7 +1,6 @@
 import { colors as C } from '../lib/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as haptics from '../lib/haptics';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,15 +9,16 @@ import {
   Switch,
   TouchableOpacity,
   Linking,
-  Alert,
   ActivityIndicator,
   Platform,
+  Modal,
+  Animated,
+  Pressable,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { supabase } from '../lib/supabase';
-
 
 const APP_VERSION = '1.0.0';
 
@@ -31,13 +31,190 @@ interface UserProfile {
   voice_minutes_limit?: number;
 }
 
+// ─── Icon circle colors per category ─────────────────────────────────────────
+const ICON_COLORS: Record<string, [string, string]> = {
+  person: ['#5B8DEF', '#3366CC'],
+  card: ['#00C48C', '#00A878'],
+  notifications: ['#F5A623', '#E8941A'],
+  moon: ['#7B68EE', '#6A5ACD'],
+  'help-circle': ['#4CAF50', '#388E3C'],
+  mail: ['#2196F3', '#1976D2'],
+  bug: ['#FF7043', '#E64A19'],
+  'shield-checkmark': ['#9C27B0', '#7B1FA2'],
+  'document-text': ['#607D8B', '#455A64'],
+  'information-circle': ['#00BCD4', '#0097A7'],
+  'log-out': ['#EF4444', '#DC2626'],
+};
+
+function IconCircle({ name, size = 20 }: { name: string; size?: number }) {
+  const colors = ICON_COLORS[name] ?? ['#6B7280', '#4B5563'];
+  return (
+    <LinearGradient
+      colors={colors as [string, string]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={iconCircleStyles.circle}
+    >
+      <Ionicons name={name as any} size={size} color="#fff" />
+    </LinearGradient>
+  );
+}
+
+const iconCircleStyles = StyleSheet.create({
+  circle: {
+    width: 34,
+    height: 34,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
+  },
+});
+
+// ─── Sign Out Modal ────────────────────────────────────────────────────────────
+function SignOutModal({
+  visible,
+  onCancel,
+  onConfirm,
+  loading,
+}: {
+  visible: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+  loading: boolean;
+}) {
+  const slideAnim = useRef(new Animated.Value(300)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (visible) {
+      Animated.parallel([
+        Animated.timing(fadeAnim, { toValue: 1, duration: 250, useNativeDriver: true }),
+        Animated.spring(slideAnim, { toValue: 0, damping: 20, stiffness: 200, useNativeDriver: true }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(fadeAnim, { toValue: 0, duration: 200, useNativeDriver: true }),
+        Animated.timing(slideAnim, { toValue: 300, duration: 200, useNativeDriver: true }),
+      ]).start();
+    }
+  }, [visible]);
+
+  return (
+    <Modal transparent visible={visible} animationType="none" onRequestClose={onCancel}>
+      <Animated.View style={[modalStyles.backdrop, { opacity: fadeAnim }]}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={onCancel} />
+        <Animated.View
+          style={[
+            modalStyles.sheet,
+            { transform: [{ translateY: slideAnim }] },
+          ]}
+        >
+          <View style={modalStyles.handle} />
+
+          <View style={modalStyles.iconWrap}>
+            <LinearGradient
+              colors={['#EF4444', '#DC2626']}
+              style={modalStyles.iconCircle}
+            >
+              <Ionicons name="log-out" size={28} color="#fff" />
+            </LinearGradient>
+          </View>
+
+          <Text style={modalStyles.title}>Sign Out?</Text>
+          <Text style={modalStyles.desc}>
+            You'll be signed out of your Voicory account on this device.
+          </Text>
+
+          <TouchableOpacity
+            style={[modalStyles.confirmBtn, loading && { opacity: 0.6 }]}
+            onPress={onConfirm}
+            disabled={loading}
+            activeOpacity={0.8}
+          >
+            {loading ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Text style={modalStyles.confirmText}>Sign Out</Text>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity style={modalStyles.cancelBtn} onPress={onCancel} activeOpacity={0.7}>
+            <Text style={modalStyles.cancelText}>Cancel</Text>
+          </TouchableOpacity>
+        </Animated.View>
+      </Animated.View>
+    </Modal>
+  );
+}
+
+const modalStyles = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'flex-end',
+  },
+  sheet: {
+    backgroundColor: '#0d1420',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: 24,
+    paddingBottom: 40,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderColor: '#1a2332',
+    alignItems: 'center',
+  },
+  handle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#2a3545',
+    marginBottom: 28,
+  },
+  iconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconWrap: { marginBottom: 20 },
+  title: { fontSize: 22, fontWeight: '800', color: '#f0f2f5', marginBottom: 10, textAlign: 'center' },
+  desc: { fontSize: 15, color: '#7a8599', textAlign: 'center', lineHeight: 22, marginBottom: 32 },
+  confirmBtn: {
+    width: '100%',
+    height: 52,
+    backgroundColor: '#EF4444',
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  confirmText: { fontSize: 16, fontWeight: '700', color: '#fff' },
+  cancelBtn: {
+    width: '100%',
+    height: 52,
+    backgroundColor: '#111a24',
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#1a2332',
+  },
+  cancelText: { fontSize: 16, fontWeight: '600', color: '#8b95a5' },
+});
+
+// ─── Main Screen ───────────────────────────────────────────────────────────────
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [darkModeEnabled, setDarkModeEnabled] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [showSignOutModal, setShowSignOutModal] = useState(false);
   const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
@@ -46,17 +223,14 @@ export default function SettingsScreen() {
 
   const loadProfile = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      setUser(user);
-
+      const { data: { user: u } } = await supabase.auth.getUser();
+      if (!u) return;
+      setUser(u);
       const { data } = await supabase
         .from('user_profiles')
         .select('organization_name, organization_email, plan_type, credits_balance, voice_minutes_used, voice_minutes_limit')
-        .eq('user_id', user.id)
+        .eq('user_id', u.id)
         .maybeSingle();
-
       setProfile(data || {});
     } catch (err) {
       if (__DEV__) console.error('Error loading profile:', err);
@@ -65,217 +239,244 @@ export default function SettingsScreen() {
     }
   };
 
-  const handleLogout = () => {
-    Alert.alert('Logout', 'Are you sure you want to logout?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Logout',
-        style: 'destructive',
-        onPress: async () => {
-          setLoggingOut(true);
-          await supabase.auth.signOut();
-          router.replace('/login' as any);
-        },
-      },
-    ]);
+  const handleSignOut = async () => {
+    setLoggingOut(true);
+    await supabase.auth.signOut();
+    setShowSignOutModal(false);
+    router.replace('/login' as any);
   };
 
   const openLink = (url: string) => Linking.openURL(url).catch(() => {});
 
   const getInitials = (email?: string): string => {
     if (!email) return 'U';
-    const name = email.split('@')[0];
-    return name.slice(0, 2).toUpperCase();
+    return email.slice(0, 2).toUpperCase();
   };
 
   if (loading) {
     return (
-      <View style={[styles.centered, { paddingTop: insets.top }]}>
+      <View style={[s.centered, { paddingTop: insets.top }]}>
         <ActivityIndicator size="large" color={C.primary} />
       </View>
     );
   }
 
   return (
-    <ScrollView 
-      style={styles.container} 
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-    >
-      {/* Header */}
-      <View style={styles.pageHeader}>
-        <Text style={styles.pageTitle}>Settings</Text>
-      </View>
-
-      {/* Profile Section */}
-      <View style={styles.profileCard}>
+    <>
+      <ScrollView
+        style={s.container}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* ── Hero Profile Section ── */}
         <LinearGradient
-          colors={[C.primary, C.primary + 'dd']}
-          style={styles.avatar}
+          colors={['#0d1e30', '#061524', C.bg]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[s.heroSection, { paddingTop: insets.top + 24 }]}
         >
-          <Text style={styles.avatarText}>
-            {getInitials(user?.email)}
-          </Text>
-        </LinearGradient>
-        
-        <View style={styles.profileInfo}>
-          <Text style={styles.profileName}>
+          {/* Avatar with edit overlay */}
+          <View style={s.avatarContainer}>
+            <LinearGradient
+              colors={[C.primary, C.secondary]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={s.avatarGradient}
+            >
+              <Text style={s.avatarText}>{getInitials(user?.email)}</Text>
+            </LinearGradient>
+            <TouchableOpacity
+              style={s.editAvatarBtn}
+              onPress={() => router.push('/profile' as any)}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="pencil" size={14} color="#fff" />
+            </TouchableOpacity>
+          </View>
+
+          <Text style={s.heroName}>
             {profile?.organization_name || user?.email?.split('@')[0] || 'User'}
           </Text>
-          <Text style={styles.profileEmail}>{user?.email || ''}</Text>
-          
-          <View style={styles.badgeRow}>
+          <Text style={s.heroEmail}>{user?.email || ''}</Text>
+
+          <View style={s.heroBadgeRow}>
             {profile?.plan_type && (
-              <View style={styles.planBadge}>
-                <Text style={styles.planText}>{profile.plan_type.toUpperCase()}</Text>
+              <View style={s.planBadge}>
+                <Text style={s.planText}>{profile.plan_type.toUpperCase()}</Text>
               </View>
             )}
             {profile?.credits_balance !== undefined && (
-              <Text style={styles.creditsBalance}>
-                ₹{(profile.credits_balance * 84).toFixed(0)} credits
-              </Text>
+              <View style={s.creditsBadge}>
+                <Ionicons name="flash" size={12} color={C.primary} />
+                <Text style={s.creditsText}>
+                  ₹{(profile.credits_balance * 84).toFixed(0)} credits
+                </Text>
+              </View>
             )}
           </View>
+        </LinearGradient>
+
+        {/* ── Account Group ── */}
+        <SectionHeader label="Account" />
+        <View style={s.menuCard}>
+          <SettingsRow
+            icon="person"
+            label="Profile"
+            subtitle="Edit your name and contact"
+            chevron
+            onPress={() => router.push('/profile' as any)}
+          />
+          <Sep />
+          <SettingsRow
+            icon="card"
+            label="Billing & Credits"
+            subtitle={profile?.plan_type ? `${profile.plan_type} plan` : 'Manage payments'}
+            chevron
+            onPress={() => router.push('/billing' as any)}
+          />
+          <Sep />
+          <SettingsRow
+            icon="notifications"
+            label="Notifications"
+            right={
+              <Switch
+                value={notificationsEnabled}
+                onValueChange={setNotificationsEnabled}
+                trackColor={{ false: C.border, true: C.primaryGlow }}
+                thumbColor={notificationsEnabled ? C.primary : '#6b7280'}
+                ios_backgroundColor={C.border}
+              />
+            }
+          />
+          <Sep />
+          <SettingsRow
+            icon="moon"
+            label="Dark Mode"
+            subtitle="Always on for best experience"
+            right={
+              <Switch
+                value={darkModeEnabled}
+                onValueChange={setDarkModeEnabled}
+                trackColor={{ false: C.border, true: '#7B68EE40' }}
+                thumbColor={darkModeEnabled ? '#7B68EE' : '#6b7280'}
+                ios_backgroundColor={C.border}
+              />
+            }
+          />
         </View>
-      </View>
 
-      {/* Account Section */}
-      <Text style={styles.sectionHeader}>ACCOUNT</Text>
-      <View style={styles.menuCard}>
-        <SettingsRow
-          icon="person"
-          label="Profile"
-          chevron
-          onPress={() => router.push('/profile' as any)}
-        />
-        <Separator />
-        <SettingsRow
-          icon="card"
-          label="Billing"
-          chevron
-          onPress={() => router.push('/billing' as any)}
-        />
-        <Separator />
-        <SettingsRow
-          icon="notifications"
-          label="Notifications"
-          right={
-            <Switch
-              value={notificationsEnabled}
-              onValueChange={setNotificationsEnabled}
-              trackColor={{ false: C.border, true: C.primaryMuted }}
-              thumbColor={notificationsEnabled ? C.primary : C.textFaint}
-            />
-          }
-        />
-      </View>
+        {/* ── Support Group ── */}
+        <SectionHeader label="Support" />
+        <View style={s.menuCard}>
+          <SettingsRow
+            icon="help-circle"
+            label="Help Center"
+            chevron
+            onPress={() => openLink('https://www.voicory.com/help')}
+          />
+          <Sep />
+          <SettingsRow
+            icon="mail"
+            label="Contact Support"
+            chevron
+            onPress={() => openLink('mailto:hello@voicory.com')}
+          />
+          <Sep />
+          <SettingsRow
+            icon="bug"
+            label="Report an Issue"
+            chevron
+            onPress={() => openLink('mailto:hello@voicory.com?subject=Bug%20Report')}
+          />
+        </View>
 
-      {/* Support Section */}
-      <Text style={styles.sectionHeader}>SUPPORT</Text>
-      <View style={styles.menuCard}>
-        <SettingsRow
-          icon="help-circle"
-          label="Help Center"
-          chevron
-          onPress={() => openLink('https://www.voicory.com/help')}
-        />
-        <Separator />
-        <SettingsRow
-          icon="mail"
-          label="Contact Support"
-          chevron
-          onPress={() => openLink('mailto:hello@voicory.com')}
-        />
-        <Separator />
-        <SettingsRow
-          icon="bug"
-          label="Report Issue"
-          chevron
-          onPress={() => openLink('mailto:hello@voicory.com?subject=Bug%20Report')}
-        />
-      </View>
+        {/* ── Legal Group ── */}
+        <SectionHeader label="Legal" />
+        <View style={s.menuCard}>
+          <SettingsRow
+            icon="shield-checkmark"
+            label="Privacy Policy"
+            chevron
+            onPress={() => openLink('https://voicory.com/privacy')}
+          />
+          <Sep />
+          <SettingsRow
+            icon="document-text"
+            label="Terms of Service"
+            chevron
+            onPress={() => openLink('https://voicory.com/terms')}
+          />
+          <Sep />
+          <SettingsRow
+            icon="information-circle"
+            label="About Voicory"
+            chevron
+            onPress={() => openLink('https://www.voicory.com')}
+          />
+        </View>
 
-      {/* Legal Section */}
-      <Text style={styles.sectionHeader}>LEGAL</Text>
-      <View style={styles.menuCard}>
-        <SettingsRow
-          icon="shield-checkmark"
-          label="Privacy Policy"
-          chevron
-          onPress={() => openLink('https://voicory.com/privacy')}
-        />
-        <Separator />
-        <SettingsRow
-          icon="document-text"
-          label="Terms of Service"
-          chevron
-          onPress={() => openLink('https://voicory.com/terms')}
-        />
-        <Separator />
-        <SettingsRow
-          icon="information-circle"
-          label="About Voicory"
-          chevron
-          onPress={() => openLink('https://www.voicory.com')}
-        />
-      </View>
+        {/* ── Sign Out ── */}
+        <TouchableOpacity
+          style={s.signOutBtn}
+          onPress={() => setShowSignOutModal(true)}
+          activeOpacity={0.7}
+        >
+          <IconCircle name="log-out" />
+          <Text style={s.signOutText}>Sign Out</Text>
+          <Ionicons name="chevron-forward" size={18} color={C.danger + '80'} style={{ marginLeft: 'auto' }} />
+        </TouchableOpacity>
 
-      {/* Sign Out Button */}
-      <TouchableOpacity
-        style={[styles.signOutBtn, loggingOut && { opacity: 0.6 }]}
-        onPress={handleLogout}
-        disabled={loggingOut}
-        activeOpacity={0.7}
-      >
-        <Ionicons name="log-out" size={20} color={C.danger} />
-        <Text style={styles.signOutText}>
-          {loggingOut ? 'Signing out...' : 'Sign Out'}
-        </Text>
-      </TouchableOpacity>
+        {/* ── Version ── */}
+        <View style={s.versionContainer}>
+          <Text style={s.versionText}>Made with ❤️ by Voicory</Text>
+          <Text style={s.versionNum}>Version {APP_VERSION}</Text>
+        </View>
+      </ScrollView>
 
-      {/* Version */}
-      <Text style={styles.version}>Voicory v{APP_VERSION}</Text>
-    </ScrollView>
+      <SignOutModal
+        visible={showSignOutModal}
+        onCancel={() => setShowSignOutModal(false)}
+        onConfirm={handleSignOut}
+        loading={loggingOut}
+      />
+    </>
+  );
+}
+
+function SectionHeader({ label }: { label: string }) {
+  return (
+    <Text style={s.sectionHeader}>{label.toUpperCase()}</Text>
   );
 }
 
 function SettingsRow({
   icon,
   label,
+  subtitle,
   right,
   chevron,
   onPress,
 }: {
-  icon: any;
+  icon: string;
   label: string;
+  subtitle?: string;
   right?: React.ReactNode;
   chevron?: boolean;
   onPress?: () => void;
 }) {
   const inner = (
-    <View style={styles.settingsRow}>
-      <View style={styles.rowLeft}>
-        <Ionicons 
-          name={icon} 
-          size={22} 
-          color={C.textMuted} 
-          style={styles.rowIcon} 
-        />
-        <Text style={styles.rowLabel}>{label}</Text>
+    <View style={s.rowWrap}>
+      <IconCircle name={icon} />
+      <View style={s.rowContent}>
+        <Text style={s.rowLabel}>{label}</Text>
+        {subtitle ? <Text style={s.rowSubtitle}>{subtitle}</Text> : null}
       </View>
-      <View style={styles.rowRight}>
+      <View style={s.rowRight}>
         {right}
-        {chevron && (
-          <Ionicons 
-            name="chevron-forward" 
-            size={18} 
-            color={C.textFaint} 
-          />
-        )}
+        {chevron && <Ionicons name="chevron-forward" size={18} color={C.textFaint} />}
       </View>
     </View>
   );
-
   if (onPress) {
     return (
       <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
@@ -286,181 +487,125 @@ function SettingsRow({
   return inner;
 }
 
-function Separator() {
-  return <View style={styles.separator} />;
+function Sep() {
+  return <View style={s.sep} />;
 }
 
-const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    backgroundColor: C.bg,
-  },
-  content: { 
-    paddingBottom: 40,
-  },
-  centered: { 
-    flex: 1, 
-    alignItems: 'center', 
-    justifyContent: 'center', 
-    backgroundColor: C.bg,
-  },
-  pageHeader: { 
-    paddingHorizontal: 20, 
-    paddingTop: 16, 
-    paddingBottom: 32,
-  },
-  pageTitle: { 
-    fontSize: 32,
-    fontWeight: '800',
-    color: C.text,
-    letterSpacing: 0.5,
-  },
-  profileCard: {
-    flexDirection: 'row',
+const s = StyleSheet.create({
+  container: { flex: 1, backgroundColor: C.bg },
+  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: C.bg },
+
+  // Hero
+  heroSection: {
     alignItems: 'center',
-    backgroundColor: C.surface,
-    marginHorizontal: 20,
-    borderRadius: 16,
-    padding: 24,
-    marginBottom: 32,
-    borderWidth: 1,
-    borderColor: C.border,
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    paddingBottom: 32,
+    paddingHorizontal: 24,
   },
-  avatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+  avatarContainer: {
+    position: 'relative',
+    marginBottom: 16,
+  },
+  avatarGradient: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 16,
+    borderWidth: 3,
+    borderColor: C.primary + '40',
   },
-  avatarText: { 
-    color: C.text, 
-    fontSize: 20,
-    fontWeight: '800',
-    textShadowColor: 'rgba(0,0,0,0.3)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
-  },
-  profileInfo: { 
-    flex: 1,
-  },
-  profileName: { 
-    color: C.text, 
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: 4,
-  },
-  profileEmail: { 
-    color: C.textMuted, 
-    fontSize: 14,
-    fontWeight: '500',
-    marginBottom: 12,
-  },
-  badgeRow: {
-    flexDirection: 'row',
+  avatarText: { fontSize: 28, fontWeight: '800', color: '#fff' },
+  editAvatarBtn: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: C.primary,
     alignItems: 'center',
-    gap: 12,
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: C.bg,
   },
+  heroName: { fontSize: 22, fontWeight: '800', color: C.text, marginBottom: 4, textAlign: 'center' },
+  heroEmail: { fontSize: 14, color: C.textMuted, marginBottom: 16, textAlign: 'center' },
+  heroBadgeRow: { flexDirection: 'row', gap: 10, alignItems: 'center' },
   planBadge: {
     backgroundColor: C.primaryMuted,
     borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
     borderWidth: 1,
     borderColor: C.primary + '40',
   },
-  planText: {
-    color: C.primary,
+  planText: { color: C.primary, fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
+  creditsBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: C.success + '15',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderWidth: 1,
+    borderColor: C.success + '30',
+  },
+  creditsText: { color: C.success, fontSize: 12, fontWeight: '600' },
+
+  // Menu
+  sectionHeader: {
+    color: C.textFaint,
     fontSize: 11,
     fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  creditsBalance: {
-    color: C.success,
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  sectionHeader: { 
-    color: C.textMuted, 
-    fontSize: 12,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 1,
     marginHorizontal: 20,
-    marginBottom: 12,
+    marginBottom: 8,
+    marginTop: 24,
   },
   menuCard: {
     backgroundColor: C.surface,
-    marginHorizontal: 20,
+    marginHorizontal: 16,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: C.border,
-    marginBottom: 24,
     overflow: 'hidden',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
   },
-  settingsRow: {
+  rowWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 16,
-    paddingHorizontal: 20,
+    paddingVertical: 13,
+    paddingHorizontal: 16,
+    minHeight: 58,
   },
-  rowLeft: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    flex: 1,
+  rowContent: { flex: 1 },
+  rowLabel: { color: C.text, fontSize: 16, fontWeight: '500' },
+  rowSubtitle: { color: C.textFaint, fontSize: 12, fontWeight: '400', marginTop: 2 },
+  rowRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  sep: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: C.border,
+    marginLeft: 64,
   },
-  rowIcon: {
-    marginRight: 16,
-  },
-  rowLabel: { 
-    color: C.text, 
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  rowRight: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    gap: 12,
-  },
-  separator: { 
-    height: 1, 
-    backgroundColor: C.border, 
-    marginLeft: 58,
-  },
+
+  // Sign out
   signOutBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-    marginHorizontal: 20,
-    paddingVertical: 16,
+    marginHorizontal: 16,
+    marginTop: 24,
     backgroundColor: C.danger + '10',
-    borderRadius: 12,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: C.danger + '30',
-    marginBottom: 32,
+    borderColor: C.danger + '25',
+    paddingVertical: 13,
+    paddingHorizontal: 16,
+    minHeight: 58,
   },
-  signOutText: { 
-    color: C.danger, 
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  version: { 
-    textAlign: 'center', 
-    color: C.textFaint, 
-    fontSize: 12,
-    fontWeight: '500',
-  },
+  signOutText: { color: C.danger, fontSize: 16, fontWeight: '600', flex: 1 },
+
+  // Version
+  versionContainer: { alignItems: 'center', marginTop: 36, gap: 4 },
+  versionText: { color: C.textFaint, fontSize: 13, fontWeight: '500' },
+  versionNum: { color: C.textFaint + '80', fontSize: 11, fontWeight: '500' },
 });
