@@ -1,21 +1,47 @@
-import React from 'react';
-import { TouchableOpacity, View, Text, StyleSheet } from 'react-native';
+import React, { useRef } from 'react';
+import {
+  TouchableOpacity,
+  View,
+  Text,
+  StyleSheet,
+  Animated,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { theme } from '../lib/theme';
+import { colors as C } from '../lib/theme';
 import { Customer } from '../types';
 
-const SOURCE_COLORS: Record<string, [string, string]> = {
-  inbound: [theme.colors.secondary, '#0077cc'],
-  outbound: [theme.colors.primary, theme.colors.primaryDark],
-  whatsapp: [theme.colors.success, '#16a34a'],
+const SOURCE_GRADIENTS: Record<string, [string, string]> = {
+  inbound:  ['#00d4aa', '#0099ff'],
+  outbound: ['#00d4aa', '#00b894'],
+  whatsapp: ['#22c55e', '#16a34a'],
+  vapi:     ['#a855f7', '#7c3aed'],
+  twilio:   ['#ef4444', '#dc2626'],
 };
+
+// Deterministic gradient per name initial
+const FALLBACK_GRADIENTS: [string, string][] = [
+  ['#00d4aa', '#0099ff'],
+  ['#a855f7', '#ec4899'],
+  ['#f59e0b', '#ef4444'],
+  ['#0099ff', '#6366f1'],
+  ['#22c55e', '#00d4aa'],
+];
+
+function getGradient(name?: string, source?: string): [string, string] {
+  if (source && SOURCE_GRADIENTS[source]) return SOURCE_GRADIENTS[source];
+  const idx = name ? name.charCodeAt(0) % FALLBACK_GRADIENTS.length : 0;
+  return FALLBACK_GRADIENTS[idx];
+}
 
 function timeAgo(dateStr?: string): string {
   if (!dateStr) return 'Never';
   const diff = Date.now() - new Date(dateStr).getTime();
-  const days = Math.floor(diff / 86400000);
-  if (days === 0) return 'Today';
+  const mins = Math.floor(diff / 60000);
+  if (mins < 60) return mins <= 1 ? 'Just now' : `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
   if (days === 1) return 'Yesterday';
   if (days < 30) return `${days}d ago`;
   return `${Math.floor(days / 30)}mo ago`;
@@ -23,7 +49,12 @@ function timeAgo(dateStr?: string): string {
 
 function getInitials(name?: string): string {
   if (!name) return '?';
-  return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+  return name
+    .split(' ')
+    .map((n) => n[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
 }
 
 interface CustomerCardProps {
@@ -32,156 +63,173 @@ interface CustomerCardProps {
 }
 
 export function CustomerCard({ customer, onPress }: CustomerCardProps) {
-  const gradientColors: [string, string] = (SOURCE_COLORS[customer.source || ''] || [theme.colors.textTertiary, theme.colors.textSecondary]) as [string, string];
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+
+  const gradColors = getGradient(customer.name, customer.source);
+
+  const onPressIn = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 0.97,
+      useNativeDriver: true,
+      speed: 50,
+      bounciness: 4,
+    }).start();
+  };
+
+  const onPressOut = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 1,
+      useNativeDriver: true,
+      speed: 30,
+      bounciness: 6,
+    }).start();
+  };
 
   return (
-    <TouchableOpacity 
-      style={styles.card} 
-      onPress={() => onPress(customer)} 
-      activeOpacity={0.7}
-    >
-      {/* Avatar with gradient background + initials */}
-      <View style={styles.avatar}>
-        <LinearGradient
-          colors={gradientColors}
-          style={styles.avatarGradient}
-        >
-          <Text style={styles.avatarText}>
-            {getInitials(customer.name)}
-          </Text>
-        </LinearGradient>
-      </View>
-
-      {/* Main content */}
-      <View style={styles.content}>
-        <View style={styles.header}>
-          <Text style={styles.name} numberOfLines={1}>
-            {customer.name}
-          </Text>
-          {customer.interaction_count > 0 && (
-            <View style={styles.interactionBadge}>
-              <Text style={styles.interactionCount}>
-                {customer.interaction_count}
-              </Text>
-            </View>
-          )}
+    <Animated.View style={[styles.cardWrap, { transform: [{ scale: scaleAnim }] }]}>
+      <TouchableOpacity
+        style={styles.card}
+        onPress={() => onPress(customer)}
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
+        activeOpacity={1}
+      >
+        {/* Gradient Avatar */}
+        <View style={styles.avatarWrap}>
+          <LinearGradient colors={gradColors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.avatarGradient}>
+            <Text style={styles.avatarText}>{getInitials(customer.name)}</Text>
+          </LinearGradient>
+          {/* Online-style ring glow */}
+          <View style={[styles.avatarRing, { borderColor: gradColors[0] + '60' }]} />
         </View>
-        
-        <Text style={styles.phone} numberOfLines={1}>
-          {customer.phone_number}
-        </Text>
-        
-        {customer.email && (
-          <Text style={styles.email} numberOfLines={1}>
-            {customer.email}
-          </Text>
-        )}
-        
-        <View style={styles.meta}>
-          <Text style={styles.metaText}>
-            {customer.interaction_count} {customer.interaction_count === 1 ? 'call' : 'calls'}
-          </Text>
-          <Text style={styles.separator}>•</Text>
-          <Text style={styles.metaText}>
-            Last: {timeAgo(customer.last_interaction)}
-          </Text>
-        </View>
-      </View>
 
-      {/* Right chevron */}
-      <Ionicons 
-        name="chevron-forward" 
-        size={20} 
-        color={theme.colors.textTertiary} 
-      />
-    </TouchableOpacity>
+        {/* Content */}
+        <View style={styles.content}>
+          <View style={styles.topRow}>
+            <Text style={styles.name} numberOfLines={1}>
+              {customer.name || 'Unknown'}
+            </Text>
+            {/* Interaction count badge */}
+            {customer.interaction_count > 0 && (
+              <View style={styles.badge}>
+                <Ionicons name="call" size={9} color={C.primary} style={{ marginRight: 3 }} />
+                <Text style={styles.badgeText}>{customer.interaction_count}</Text>
+              </View>
+            )}
+          </View>
+
+          <Text style={styles.phone} numberOfLines={1}>
+            {customer.phone_number}
+          </Text>
+
+          <View style={styles.bottomRow}>
+            <Ionicons name="time-outline" size={11} color={C.textFaint} />
+            <Text style={styles.timeText}>{timeAgo(customer.last_interaction)}</Text>
+          </View>
+        </View>
+
+        {/* Chevron */}
+        <Ionicons name="chevron-forward" size={18} color={C.textFaint} />
+      </TouchableOpacity>
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
+  cardWrap: {
+    marginHorizontal: 16,
+    marginVertical: 5,
+  },
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.borderRadius.lg,
-    padding: 20,
-    marginHorizontal: 20,
-    marginVertical: 8,
-    borderWidth: theme.card.borderWidth,
-    borderColor: theme.colors.border,
-    ...theme.shadow.card,
+    backgroundColor: C.surface,
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: C.border,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 3,
   },
-  avatar: {
-    marginRight: 16,
+  avatarWrap: {
+    marginRight: 14,
+    position: 'relative',
   },
   avatarGradient: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  avatarRing: {
+    position: 'absolute',
+    top: -3,
+    left: -3,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    borderWidth: 2,
+  },
   avatarText: {
-    color: theme.colors.text,
-    fontSize: 16,
-    fontWeight: theme.fontWeight.extrabold,
+    color: '#fff',
+    fontSize: 17,
+    fontWeight: '800',
+    letterSpacing: 0.5,
     textShadowColor: 'rgba(0,0,0,0.3)',
     textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+    textShadowRadius: 3,
   },
   content: {
     flex: 1,
+    gap: 3,
   },
-  header: {
+  topRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 6,
+    marginBottom: 2,
   },
   name: {
-    color: theme.colors.text,
-    fontSize: 17,
-    fontWeight: theme.fontWeight.semibold,
+    color: C.text,
+    fontSize: 16,
+    fontWeight: '700',
     flex: 1,
-    marginRight: 12,
+    marginRight: 8,
+    letterSpacing: -0.2,
+  },
+  badge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: C.primaryMuted,
+    borderRadius: 10,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderWidth: 1,
+    borderColor: C.primary + '40',
+  },
+  badgeText: {
+    color: C.primary,
+    fontSize: 11,
+    fontWeight: '700',
   },
   phone: {
-    color: theme.colors.textSecondary,
-    fontSize: 15,
-    fontWeight: theme.fontWeight.medium,
-    marginBottom: 4,
-  },
-  email: {
-    color: theme.colors.textTertiary,
+    color: C.textSecondary,
     fontSize: 13,
-    fontWeight: theme.fontWeight.medium,
-    marginBottom: 8,
+    fontWeight: '500',
   },
-  meta: { 
-    flexDirection: 'row', 
+  bottomRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 4,
+    marginTop: 2,
   },
-  metaText: { 
-    color: theme.colors.textSecondary, 
-    fontSize: 13,
-    fontWeight: theme.fontWeight.medium,
-  },
-  separator: {
-    color: theme.colors.textTertiary,
-    fontSize: 12,
-  },
-  interactionBadge: {
-    backgroundColor: theme.colors.primary + '20',
-    borderRadius: theme.borderRadius.full,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderWidth: 1,
-    borderColor: theme.colors.primary + '40',
-  },
-  interactionCount: {
-    color: theme.colors.primary,
-    fontSize: 12,
-    fontWeight: theme.fontWeight.bold,
+  timeText: {
+    color: C.textFaint,
+    fontSize: 11,
+    fontWeight: '500',
   },
 });

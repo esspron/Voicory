@@ -1,7 +1,7 @@
 import { colors as C } from '../lib/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as haptics from '../lib/haptics';
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -14,17 +14,42 @@ import {
   Alert,
   ScrollView,
   Platform,
+  Animated,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { CallCard } from '../components/CallCard';
-import { StatusBadge } from '../components/StatusBadge';
 import { getCustomerById, updateCustomer } from '../services/customerService';
-import { getCalls } from '../services/callService';
 import { Customer, CallLog } from '../types';
 
-
 const TAGS = ['hot_lead', 'follow_up', 'closed', 'vip', 'new'];
+
+const SOURCE_GRADIENTS: Record<string, [string, string]> = {
+  inbound:  ['#00d4aa', '#0099ff'],
+  outbound: ['#00d4aa', '#00b894'],
+  whatsapp: ['#22c55e', '#16a34a'],
+  vapi:     ['#a855f7', '#7c3aed'],
+};
+
+const FALLBACK_GRADIENTS: [string, string][] = [
+  ['#00d4aa', '#0099ff'],
+  ['#a855f7', '#ec4899'],
+  ['#f59e0b', '#ef4444'],
+  ['#0099ff', '#6366f1'],
+  ['#22c55e', '#00d4aa'],
+];
+
+function getGradient(name?: string, source?: string): [string, string] {
+  if (source && SOURCE_GRADIENTS[source]) return SOURCE_GRADIENTS[source];
+  const idx = name ? name.charCodeAt(0) % FALLBACK_GRADIENTS.length : 0;
+  return FALLBACK_GRADIENTS[idx];
+}
+
+function getInitials(name?: string): string {
+  if (!name) return '?';
+  return name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2);
+}
 
 function formatDate(dateStr?: string): string {
   if (!dateStr) return 'N/A';
@@ -35,9 +60,17 @@ function formatDate(dateStr?: string): string {
   });
 }
 
+function formatDateTime(dateStr?: string): string {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) +
+    ' · ' + d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+}
+
 export default function CustomerDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [calls, setCalls] = useState<CallLog[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,6 +78,8 @@ export default function CustomerDetailScreen() {
   const [activeTab, setActiveTab] = useState<'calls' | 'notes'>('calls');
   const [notes, setNotes] = useState('');
   const [savingNotes, setSavingNotes] = useState(false);
+  const heroOpacity = useRef(new Animated.Value(0)).current;
+  const heroTranslate = useRef(new Animated.Value(20)).current;
 
   const loadData = useCallback(async () => {
     if (!id) return;
@@ -52,18 +87,13 @@ export default function CustomerDetailScreen() {
       const customerData = await getCustomerById(id);
       setCustomer(customerData);
       setNotes(customerData?.variables?.notes || '');
-
-      // Load calls for this customer by matching phone_number
-      // Since there's no customer_id in call_logs, we match by phone number
-      const { data: callsRaw } = await (async () => {
-        const supabase = (await import('../lib/supabase')).supabase;
-        return supabase
-          .from('call_logs')
-          .select('*, assistant:assistant_id(name)')
-          .eq('phone_number', customerData?.phone_number)
-          .order('created_at', { ascending: false })
-          .limit(50);
-      })();
+      const { supabase } = await import('../lib/supabase');
+      const { data: callsRaw } = await supabase
+        .from('call_logs')
+        .select('*, assistant:assistant_id(name)')
+        .eq('phone_number', customerData?.phone_number)
+        .order('created_at', { ascending: false })
+        .limit(50);
       setCalls((callsRaw as CallLog[]) || []);
       setError(null);
     } catch (err: any) {
@@ -73,12 +103,19 @@ export default function CustomerDetailScreen() {
 
   useEffect(() => {
     setLoading(true);
-    loadData().finally(() => setLoading(false));
+    loadData().finally(() => {
+      setLoading(false);
+      Animated.parallel([
+        Animated.timing(heroOpacity, { toValue: 1, duration: 500, useNativeDriver: true }),
+        Animated.spring(heroTranslate, { toValue: 0, useNativeDriver: true, speed: 20, bounciness: 6 }),
+      ]).start();
+    });
   }, [loadData]);
 
   const handleSaveNotes = async () => {
     if (!customer) return;
     setSavingNotes(true);
+    haptics.lightTap();
     try {
       const updated = await updateCustomer(customer.id, {
         variables: { ...(customer.variables || {}), notes },
@@ -94,6 +131,7 @@ export default function CustomerDetailScreen() {
 
   const toggleTag = async (tag: string) => {
     if (!customer) return;
+    haptics.selectionTap();
     const currentTags: string[] = customer.variables?.tags || [];
     const newTags = currentTags.includes(tag)
       ? currentTags.filter((t) => t !== tag)
@@ -110,7 +148,7 @@ export default function CustomerDetailScreen() {
 
   if (loading) {
     return (
-      <View style={styles.centered}>
+      <View style={[styles.centered, { paddingTop: insets.top }]}>
         <ActivityIndicator size="large" color={C.primary} />
       </View>
     );
@@ -118,7 +156,7 @@ export default function CustomerDetailScreen() {
 
   if (error || !customer) {
     return (
-      <View style={styles.centered}>
+      <View style={[styles.centered, { paddingTop: insets.top }]}>
         <Ionicons name="warning-outline" size={40} color={C.danger} />
         <Text style={styles.errorText}>{error || 'Customer not found'}</Text>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
@@ -128,169 +166,167 @@ export default function CustomerDetailScreen() {
     );
   }
 
+  const gradColors = getGradient(customer.name, customer.source);
   const currentTags: string[] = customer.variables?.tags || [];
 
   return (
-    <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      {/* Top nav bar */}
+      <View style={styles.navBar}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={22} color={C.text} />
+          <Ionicons name="arrow-back" size={20} color={C.text} />
         </TouchableOpacity>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.headerName} numberOfLines={1}>{customer.name}</Text>
-          <Text style={styles.headerPhone}>{customer.phone_number}</Text>
-        </View>
-      </View>
-
-      {/* Quick Actions */}
-      <View style={styles.actions}>
-        <ActionButton
-          icon="call"
-          label="Call"
-          color={C.primary}
-          onPress={() => Linking.openURL(`tel:${customer.phone_number}`)}
-        />
-        <ActionButton
-          icon="logo-whatsapp"
-          label="WhatsApp"
-          color={C.success}
-          onPress={() =>
-            Linking.openURL(`https://wa.me/${customer.phone_number.replace(/\D/g, '')}`)
-          }
-        />
-        <ActionButton
-          icon="create-outline"
-          label="Edit"
-          color={C.secondary}
+        <Text style={styles.navTitle}>Contact</Text>
+        <TouchableOpacity
+          style={styles.editButton}
           onPress={() => router.push(`/customers/${customer.id}/edit` as any)}
-        />
+        >
+          <Ionicons name="create-outline" size={20} color={C.primary} />
+        </TouchableOpacity>
       </View>
 
-      {/* Info Card */}
-      <View style={styles.infoCard}>
-        {customer.email && (
-          <InfoRow icon="mail-outline" label="Email" value={customer.email} />
-        )}
-        {customer.source && (
-          <InfoRow icon="git-branch-outline" label="Source" value={customer.source} />
-        )}
-        <InfoRow icon="calendar-outline" label="Created" value={formatDate(customer.created_at)} />
-        <InfoRow icon="time-outline" label="Last Contact" value={formatDate(customer.last_interaction)} />
-      </View>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}>
+        {/* Hero section */}
+        <Animated.View style={[styles.hero, { opacity: heroOpacity, transform: [{ translateY: heroTranslate }] }]}>
+          {/* Large gradient avatar */}
+          <View style={styles.heroAvatarWrap}>
+            <LinearGradient colors={gradColors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.heroAvatar}>
+              <Text style={styles.heroInitials}>{getInitials(customer.name)}</Text>
+            </LinearGradient>
+            <View style={[styles.heroAvatarRing, { borderColor: gradColors[0] + '50' }]} />
+          </View>
 
-      {/* Tags */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.tagsScroll}
-        contentContainerStyle={styles.tagsContent}
-      >
-        {TAGS.map((tag) => {
-          const active = currentTags.includes(tag);
-          return (
-            <TouchableOpacity
-              key={tag}
-              style={[styles.tag, active && styles.tagActive]}
-              onPress={() => toggleTag(tag)}
-            >
-              <Text style={[styles.tagText, active && styles.tagTextActive]}>
-                {tag.replace('_', ' ')}
-              </Text>
+          <Text style={styles.heroName}>{customer.name || 'Unknown'}</Text>
+
+          {customer.email && (
+            <TouchableOpacity onPress={() => Linking.openURL(`mailto:${customer.email}`)}>
+              <Text style={styles.heroEmail}>{customer.email}</Text>
             </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
-
-      {/* Tabs */}
-      <View style={styles.tabs}>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'calls' && styles.tabActive]}
-          onPress={() => setActiveTab('calls')}
-        >
-          <Text style={[styles.tabText, activeTab === 'calls' && styles.tabTextActive]}>
-            Calls ({calls.length})
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'notes' && styles.tabActive]}
-          onPress={() => setActiveTab('notes')}
-        >
-          <Text style={[styles.tabText, activeTab === 'notes' && styles.tabTextActive]}>Notes</Text>
-        </TouchableOpacity>
-      </View>
-
-      {activeTab === 'calls' ? (
-        <FlatList
-          data={calls}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <CallCard
-              call={item}
-              onPress={(call) => router.push(`/calls/${call.id}` as any)}
-            />
           )}
-          ListEmptyComponent={
-            <View style={styles.emptyTab}>
-              <Text style={styles.emptyText}>No calls with this customer yet.</Text>
-            </View>
-          }
-          contentContainerStyle={styles.callsList}
-        />
-      ) : (
-        <View style={styles.notesSection}>
-          <TextInput
-            style={styles.notesInput}
-            value={notes}
-            onChangeText={setNotes}
-            placeholder="Write notes about this customer..."
-            placeholderTextColor={C.textMuted}
-            multiline
-            textAlignVertical="top"
-          />
-          <TouchableOpacity
-            style={[styles.saveBtn, savingNotes && { opacity: 0.6 }]}
-            onPress={handleSaveNotes}
-            disabled={savingNotes}
-          >
-            <Text style={styles.saveBtnText}>
-              {savingNotes ? 'Saving...' : 'Save Notes'}
-            </Text>
+
+          <TouchableOpacity onPress={() => Linking.openURL(`tel:${customer.phone_number}`)}>
+            <Text style={styles.heroPhone}>{customer.phone_number}</Text>
           </TouchableOpacity>
+
+          {/* Stats row */}
+          <View style={styles.statsRow}>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{customer.interaction_count}</Text>
+              <Text style={styles.statLabel}>Interactions</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{customer.source || '—'}</Text>
+              <Text style={styles.statLabel}>Source</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{formatDate(customer.created_at)}</Text>
+              <Text style={styles.statLabel}>Since</Text>
+            </View>
+          </View>
+        </Animated.View>
+
+        {/* Quick Actions */}
+        <View style={styles.actions}>
+          <ActionButton icon="call" label="Call" color={C.primary} onPress={() => Linking.openURL(`tel:${customer.phone_number}`)} />
+          <ActionButton icon="logo-whatsapp" label="WhatsApp" color={C.success} onPress={() => Linking.openURL(`https://wa.me/${customer.phone_number.replace(/\D/g, '')}`)} />
+          <ActionButton icon="mail-outline" label="Email" color={C.secondary} onPress={() => customer.email && Linking.openURL(`mailto:${customer.email}`)} />
+          <ActionButton icon="create-outline" label="Edit" color="#a855f7" onPress={() => router.push(`/customers/${customer.id}/edit` as any)} />
         </View>
-      )}
+
+        {/* Tags section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Labels</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tagsRow}>
+            {TAGS.map((tag) => {
+              const active = currentTags.includes(tag);
+              return (
+                <TouchableOpacity
+                  key={tag}
+                  style={[styles.tag, active && styles.tagActive]}
+                  onPress={() => toggleTag(tag)}
+                >
+                  {active && <Ionicons name="checkmark" size={11} color={C.primary} style={{ marginRight: 4 }} />}
+                  <Text style={[styles.tagText, active && styles.tagTextActive]}>
+                    {tag.replace(/_/g, ' ')}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+
+        {/* Tabs */}
+        <View style={styles.tabsWrap}>
+          <View style={styles.tabs}>
+            {(['calls', 'notes'] as const).map((tab) => (
+              <TouchableOpacity
+                key={tab}
+                style={[styles.tab, activeTab === tab && styles.tabActive]}
+                onPress={() => setActiveTab(tab)}
+              >
+                <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
+                  {tab === 'calls' ? `Calls (${calls.length})` : 'Notes'}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        {/* Tab content */}
+        {activeTab === 'calls' ? (
+          <View style={styles.callsSection}>
+            {calls.length === 0 ? (
+              <View style={styles.emptyTab}>
+                <Ionicons name="call-outline" size={32} color={C.textFaint} />
+                <Text style={styles.emptyText}>No calls yet</Text>
+              </View>
+            ) : (
+              calls.map((call) => (
+                <CallCard
+                  key={call.id}
+                  call={call}
+                  onPress={(c) => router.push(`/calls/${c.id}` as any)}
+                />
+              ))
+            )}
+          </View>
+        ) : (
+          <View style={styles.notesSection}>
+            <TextInput
+              style={styles.notesInput}
+              value={notes}
+              onChangeText={setNotes}
+              placeholder="Write notes about this customer..."
+              placeholderTextColor={C.textFaint}
+              multiline
+              textAlignVertical="top"
+            />
+            <TouchableOpacity
+              style={[styles.saveBtn, savingNotes && { opacity: 0.6 }]}
+              onPress={handleSaveNotes}
+              disabled={savingNotes}
+            >
+              <LinearGradient colors={[C.primary, C.primaryDark]} style={styles.saveBtnGradient}>
+                <Text style={styles.saveBtnText}>{savingNotes ? 'Saving...' : 'Save Notes'}</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        )}
+      </ScrollView>
     </View>
   );
 }
 
-function ActionButton({
-  icon,
-  label,
-  color,
-  onPress,
-}: {
-  icon: any;
-  label: string;
-  color: string;
-  onPress: () => void;
-}) {
+function ActionButton({ icon, label, color, onPress }: { icon: any; label: string; color: string; onPress: () => void }) {
   return (
     <TouchableOpacity style={styles.actionBtn} onPress={onPress} activeOpacity={0.75}>
-      <View style={[styles.actionIcon, { backgroundColor: color + '22' }]}>
+      <View style={[styles.actionIcon, { backgroundColor: color + '20', borderColor: color + '30', borderWidth: 1 }]}>
         <Ionicons name={icon} size={20} color={color} />
       </View>
       <Text style={styles.actionLabel}>{label}</Text>
     </TouchableOpacity>
-  );
-}
-
-function InfoRow({ icon, label, value }: { icon: any; label: string; value: string }) {
-  return (
-    <View style={styles.infoRow}>
-      <Ionicons name={icon} size={16} color={C.textMuted} style={{ marginRight: 8 }} />
-      <Text style={styles.infoLabel}>{label}</Text>
-      <Text style={styles.infoValue} numberOfLines={1}>{value}</Text>
-    </View>
   );
 }
 
@@ -300,44 +336,106 @@ const styles = StyleSheet.create({
   errorText: { color: C.danger, fontSize: 15 },
   backBtn: { paddingHorizontal: 20, paddingVertical: 10, backgroundColor: C.surfaceRaised, borderRadius: 8 },
   backBtnText: { color: C.text, fontSize: 14 },
-  header: {
+
+  navBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: Platform.OS === 'ios' ? 60 : 44,
     paddingHorizontal: 16,
-    paddingBottom: 12,
-    gap: 12,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: C.border,
   },
   backButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: C.surfaceRaised,
     alignItems: 'center',
     justifyContent: 'center',
+    marginRight: 12,
   },
-  headerName: { color: C.text, fontSize: 18, fontWeight: '700' },
-  headerPhone: { color: C.textMuted, fontSize: 13, marginTop: 2 },
-  actions: { flexDirection: 'row', paddingHorizontal: 16, marginBottom: 12, gap: 12 },
-  actionBtn: { flex: 1, alignItems: 'center', gap: 6 },
-  actionIcon: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
-  actionLabel: { color: C.textMuted, fontSize: 12 },
-  infoCard: {
+  navTitle: { flex: 1, color: C.text, fontSize: 17, fontWeight: '600' },
+  editButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: C.primaryMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  hero: {
+    alignItems: 'center',
+    paddingTop: 32,
+    paddingBottom: 24,
+    paddingHorizontal: 24,
+  },
+  heroAvatarWrap: {
+    position: 'relative',
+    marginBottom: 16,
+  },
+  heroAvatar: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroAvatarRing: {
+    position: 'absolute',
+    top: -5,
+    left: -5,
+    width: 98,
+    height: 98,
+    borderRadius: 49,
+    borderWidth: 2,
+  },
+  heroInitials: {
+    color: '#fff',
+    fontSize: 30,
+    fontWeight: '800',
+    letterSpacing: 1,
+    textShadowColor: 'rgba(0,0,0,0.3)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
+  heroName: { color: C.text, fontSize: 24, fontWeight: '800', letterSpacing: -0.3, textAlign: 'center' },
+  heroEmail: { color: C.secondary, fontSize: 14, marginTop: 4 },
+  heroPhone: { color: C.textSecondary, fontSize: 15, marginTop: 6, fontWeight: '500' },
+
+  statsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: C.surface,
-    marginHorizontal: 16,
-    borderRadius: 12,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: C.border,
-    padding: 14,
-    marginBottom: 10,
+    paddingVertical: 14,
+    paddingHorizontal: 8,
+    marginTop: 20,
+    width: '100%',
+  },
+  statItem: { flex: 1, alignItems: 'center' },
+  statValue: { color: C.text, fontSize: 15, fontWeight: '700' },
+  statLabel: { color: C.textMuted, fontSize: 11, marginTop: 2 },
+  statDivider: { width: 1, height: 32, backgroundColor: C.border },
+
+  actions: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    marginBottom: 20,
     gap: 8,
   },
-  infoRow: { flexDirection: 'row', alignItems: 'center' },
-  infoLabel: { color: C.textMuted, fontSize: 13, flex: 1 },
-  infoValue: { color: C.text, fontSize: 13, fontWeight: '500', flex: 2, textAlign: 'right' },
-  tagsScroll: { maxHeight: 48, marginBottom: 8 },
-  tagsContent: { paddingHorizontal: 16, gap: 8, alignItems: 'center' },
+  actionBtn: { flex: 1, alignItems: 'center', gap: 6 },
+  actionIcon: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
+  actionLabel: { color: C.textMuted, fontSize: 11, fontWeight: '500' },
+
+  section: { paddingHorizontal: 16, marginBottom: 16 },
+  sectionTitle: { color: C.textSecondary, fontSize: 12, fontWeight: '600', letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 10 },
+  tagsRow: { gap: 8, alignItems: 'center' },
   tag: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
@@ -345,20 +443,23 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: C.border,
   },
-  tagActive: { backgroundColor: C.primaryMuted, borderColor: C.primary },
+  tagActive: { backgroundColor: C.primaryMuted, borderColor: C.primary + '60' },
   tagText: { color: C.textMuted, fontSize: 12, textTransform: 'capitalize' },
   tagTextActive: { color: C.primary, fontWeight: '600' },
-  tabs: { flexDirection: 'row', marginHorizontal: 16, marginBottom: 8, backgroundColor: C.surface, borderRadius: 8, padding: 3 },
-  tab: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 6 },
+
+  tabsWrap: { paddingHorizontal: 16, marginBottom: 12 },
+  tabs: { flexDirection: 'row', backgroundColor: C.surface, borderRadius: 10, padding: 3, borderWidth: 1, borderColor: C.border },
+  tab: { flex: 1, paddingVertical: 9, alignItems: 'center', borderRadius: 8 },
   tabActive: { backgroundColor: C.surfaceRaised },
   tabText: { color: C.textMuted, fontSize: 13, fontWeight: '500' },
-  tabTextActive: { color: C.text, fontWeight: '600' },
-  callsList: { paddingBottom: 32 },
-  emptyTab: { paddingVertical: 32, alignItems: 'center' },
+  tabTextActive: { color: C.text, fontWeight: '700' },
+
+  callsSection: { paddingHorizontal: 0 },
+  emptyTab: { paddingVertical: 48, alignItems: 'center', gap: 10 },
   emptyText: { color: C.textMuted, fontSize: 14 },
-  notesSection: { flex: 1, paddingHorizontal: 16, paddingTop: 8 },
+
+  notesSection: { paddingHorizontal: 16 },
   notesInput: {
-    flex: 1,
     backgroundColor: C.surface,
     borderRadius: 12,
     borderWidth: 1,
@@ -368,14 +469,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 22,
     minHeight: 160,
-    marginBottom: 12,
+    marginBottom: 14,
   },
-  saveBtn: {
-    backgroundColor: C.primary,
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginBottom: 24,
-  },
+  saveBtn: { borderRadius: 14, overflow: 'hidden', marginBottom: 24 },
+  saveBtnGradient: { paddingVertical: 14, alignItems: 'center' },
   saveBtnText: { color: C.bg, fontSize: 15, fontWeight: '700' },
 });

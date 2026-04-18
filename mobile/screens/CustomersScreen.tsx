@@ -12,6 +12,7 @@ import {
   TouchableOpacity,
   Text,
   Platform,
+  Animated,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,6 +21,7 @@ import { SearchBar } from '../components/SearchBar';
 import { FilterChips } from '../components/FilterChips';
 import { CustomerCard } from '../components/CustomerCard';
 import { EmptyState } from '../components/EmptyState';
+import { PeopleIllustration } from '../components/PeopleIllustration';
 import { getCustomers } from '../services/customerService';
 import { supabase } from '../lib/supabase';
 import { Customer } from '../types';
@@ -45,6 +47,7 @@ export default function CustomersScreen() {
   const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const offsetRef = useRef(0);
+  const fabScale = useRef(new Animated.Value(1)).current;
 
   const fetchCustomers = useCallback(
     async (reset: boolean = false) => {
@@ -153,11 +156,11 @@ export default function CustomersScreen() {
           />
         )}
         ListEmptyComponent={
-          <EmptyState
-            icon="people"
-            title="No customers yet"
-            message="Customers are added automatically when they call your agents"
-          />
+          <View style={styles.emptyWrap}>
+            <PeopleIllustration width={200} height={180} />
+            <Text style={styles.emptyTitle}>No customers yet</Text>
+            <Text style={styles.emptyMessage}>Customers are added automatically{'\n'}when they call your agents</Text>
+          </View>
         }
         ListFooterComponent={
           loadingMore ? (
@@ -181,19 +184,32 @@ export default function CustomersScreen() {
         showsVerticalScrollIndicator={false}
       />
 
-      {/* FAB */}
-      <TouchableOpacity
-        style={styles.fab}
-        onPress={() => router.push('/customers/new' as any)}
-        activeOpacity={0.8}
-      >
-        <LinearGradient
-          colors={[C.primary, C.primary + 'dd']}
-          style={styles.fabGradient}
+      {/* FAB with glow + scale animation */}
+      <Animated.View style={[styles.fab, { transform: [{ scale: fabScale }] }]}>
+        <TouchableOpacity
+          onPress={() => {
+            haptics.mediumTap();
+            router.push('/customers/new' as any);
+          }}
+          onPressIn={() =>
+            Animated.spring(fabScale, { toValue: 0.92, useNativeDriver: true, speed: 60, bounciness: 4 }).start()
+          }
+          onPressOut={() =>
+            Animated.spring(fabScale, { toValue: 1, useNativeDriver: true, speed: 30, bounciness: 8 }).start()
+          }
+          activeOpacity={1}
+          style={styles.fabTouchable}
         >
-          <Ionicons name="add" size={24} color={C.bg} />
-        </LinearGradient>
-      </TouchableOpacity>
+          <LinearGradient
+            colors={[C.primary, C.primaryDark]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.fabGradient}
+          >
+            <Ionicons name="add" size={26} color={C.bg} />
+          </LinearGradient>
+        </TouchableOpacity>
+      </Animated.View>
     </View>
   );
 }
@@ -265,18 +281,41 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 24,
     right: 24,
-    borderRadius: 28,
-    elevation: 8,
-    shadowColor: '#000',
+    borderRadius: 30,
+    shadowColor: C.primary,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    shadowOpacity: 0.55,
+    shadowRadius: 14,
+    elevation: 12,
+  },
+  fabTouchable: {
+    borderRadius: 30,
+    overflow: 'hidden',
   },
   fabGradient: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 58,
+    height: 58,
+    borderRadius: 29,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  emptyWrap: {
+    alignItems: 'center',
+    paddingTop: 48,
+    paddingHorizontal: 32,
+    gap: 12,
+  },
+  emptyTitle: {
+    color: C.text,
+    fontSize: 20,
+    fontWeight: '700',
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  emptyMessage: {
+    color: C.textMuted,
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 20,
   },
 });
