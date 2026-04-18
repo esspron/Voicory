@@ -14,6 +14,7 @@ import { registerUnauthorizedHandler } from '../lib/api';
 import { supabase } from '../lib/supabase';
 import { colors } from '../lib/theme';
 import { theme } from '../lib/theme';
+import { useNotifications, useLastNotificationResponse } from '../hooks/useNotifications';
 
 
 // ─── Auth Guard ───────────────────────────────────────────────────────────────
@@ -55,6 +56,10 @@ function AuthGuard() {
       clearAuthStore();
     }
   }, [user, fetchProfile, clearAuthStore]);
+
+  // Register for push notifications after auth; handle cold-start tap.
+  useNotifications(!!user && !loading);
+  useLastNotificationResponse();
 
   if (loading) {
     return (

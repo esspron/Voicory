@@ -20,6 +20,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { supabase } from '../lib/supabase';
+import {
+  loadNotificationPreferences,
+  saveNotificationPreferences,
+  NotificationPreferences,
+} from '../services/notificationService';
 
 const APP_VERSION = '1.0.0';
 
@@ -217,9 +222,16 @@ export default function SettingsScreen() {
   const [loggingOut, setLoggingOut] = useState(false);
   const [showSignOutModal, setShowSignOutModal] = useState(false);
   const [user, setUser] = useState<any>(null);
+  const [notifPrefs, setNotifPrefs] = useState<NotificationPreferences>({
+    call_alerts: true,
+    whatsapp_alerts: true,
+    billing_alerts: true,
+  });
+  const [savingPrefs, setSavingPrefs] = useState(false);
 
   useEffect(() => {
     loadProfile();
+    loadNotificationPreferences().then(setNotifPrefs);
   }, []);
 
   const loadProfile = async () => {
@@ -245,6 +257,17 @@ export default function SettingsScreen() {
     await supabase.auth.signOut();
     setShowSignOutModal(false);
     router.replace('/login' as any);
+  };
+
+  const handleToggleNotifPref = async (
+    key: keyof NotificationPreferences,
+    value: boolean,
+  ) => {
+    const updated = { ...notifPrefs, [key]: value };
+    setNotifPrefs(updated);
+    setSavingPrefs(true);
+    await saveNotificationPreferences(updated).catch(() => {});
+    setSavingPrefs(false);
   };
 
   const openLink = (url: string) => Linking.openURL(url).catch(() => {});
@@ -360,6 +383,55 @@ export default function SettingsScreen() {
                 onValueChange={setDarkModeEnabled}
                 trackColor={{ false: C.border, true: '#7B68EE40' }}
                 thumbColor={darkModeEnabled ? '#7B68EE' : '#6b7280'}
+                ios_backgroundColor={C.border}
+              />
+            }
+          />
+        </View>
+
+        {/* ── Notification Preferences ── */}
+        <SectionHeader label="Notification Preferences" />
+        <View style={s.menuCard}>
+          <SettingsRow
+            icon="notifications"
+            label="Call Alerts"
+            subtitle="Notify when a call starts or ends"
+            right={
+              <Switch
+                value={notifPrefs.call_alerts}
+                onValueChange={(v) => handleToggleNotifPref('call_alerts', v)}
+                trackColor={{ false: C.border, true: C.primaryGlow }}
+                thumbColor={notifPrefs.call_alerts ? C.primary : '#6b7280'}
+                ios_backgroundColor={C.border}
+              />
+            }
+          />
+          <Sep />
+          <SettingsRow
+            icon="chatbubble"
+            label="WhatsApp Alerts"
+            subtitle="Notify on new WhatsApp messages"
+            right={
+              <Switch
+                value={notifPrefs.whatsapp_alerts}
+                onValueChange={(v) => handleToggleNotifPref('whatsapp_alerts', v)}
+                trackColor={{ false: C.border, true: '#25D36640' }}
+                thumbColor={notifPrefs.whatsapp_alerts ? '#25D366' : '#6b7280'}
+                ios_backgroundColor={C.border}
+              />
+            }
+          />
+          <Sep />
+          <SettingsRow
+            icon="card"
+            label="Billing Alerts"
+            subtitle="Low credits, payments & invoices"
+            right={
+              <Switch
+                value={notifPrefs.billing_alerts}
+                onValueChange={(v) => handleToggleNotifPref('billing_alerts', v)}
+                trackColor={{ false: C.border, true: C.secondaryMuted }}
+                thumbColor={notifPrefs.billing_alerts ? C.secondary : '#6b7280'}
                 ios_backgroundColor={C.border}
               />
             }
