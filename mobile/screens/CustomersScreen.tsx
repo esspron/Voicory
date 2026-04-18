@@ -1,6 +1,7 @@
 import { colors as C } from '../lib/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SkeletonListItem } from '../components/Skeleton';
+import { AnimatedListItem } from '../components/AnimatedListItem';
 import * as haptics from '../lib/haptics';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
@@ -149,11 +150,13 @@ export default function CustomersScreen() {
         data={customers}
         keyExtractor={(item) => item.id}
         ListHeaderComponent={ListHeader}
-        renderItem={({ item }) => (
-          <CustomerCard
-            customer={item}
-            onPress={(c) => router.push(`/customer/${c.id}` as any)}
-          />
+        renderItem={({ item, index }) => (
+          <AnimatedListItem index={index % 20}>
+            <CustomerCard
+              customer={item}
+              onPress={(c) => router.push(`/customer/${c.id}` as any)}
+            />
+          </AnimatedListItem>
         )}
         ListEmptyComponent={
           <View style={styles.emptyWrap}>

@@ -1,5 +1,6 @@
 import { colors as C } from '../lib/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { PressableScale } from '../components/PressableScale';
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
@@ -479,9 +480,9 @@ function SettingsRow({
   );
   if (onPress) {
     return (
-      <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
+      <PressableScale onPress={onPress} style={{}}>
         {inner}
-      </TouchableOpacity>
+      </PressableScale>
     );
   }
   return inner;

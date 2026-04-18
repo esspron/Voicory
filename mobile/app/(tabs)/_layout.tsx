@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Platform, StyleSheet, View } from 'react-native';
+import { Animated, Platform, StyleSheet, View } from 'react-native';
 import { colors } from '../../lib/theme';
+import { tabBounce } from '../../lib/animations';
 import * as haptics from '../../lib/haptics';
 
 type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
@@ -21,6 +22,44 @@ const TABS: TabConfig[] = [
   { name: 'whatsapp', title: 'Chat', icon: 'chatbubble-outline', iconFocused: 'chatbubble' },
   { name: 'settings', title: 'Settings', icon: 'cog-outline', iconFocused: 'cog' },
 ];
+
+// ─── Tab Icon with bounce animation ──────────────────────────────────────────
+
+function TabIcon({
+  focused,
+  color,
+  icon,
+  iconFocused,
+}: {
+  focused: boolean;
+  color: string;
+  icon: IoniconsName;
+  iconFocused: IoniconsName;
+}) {
+  const scale = useRef(new Animated.Value(1)).current;
+  const prevFocused = useRef(false);
+
+  useEffect(() => {
+    if (focused && !prevFocused.current) {
+      tabBounce(scale);
+    }
+    prevFocused.current = focused;
+  }, [focused]);
+
+  return (
+    <View style={focused ? styles.activeIconWrap : styles.iconWrap}>
+      <Animated.View style={{ transform: [{ scale }] }}>
+        <Ionicons
+          name={focused ? iconFocused : icon}
+          size={22}
+          color={color}
+        />
+      </Animated.View>
+    </View>
+  );
+}
+
+// ─── Layout ──────────────────────────────────────────────────────────────────
 
 export default function TabsLayout() {
   return (
@@ -59,13 +98,12 @@ export default function TabsLayout() {
           options={{
             title: tab.title,
             tabBarIcon: ({ focused, color }) => (
-              <View style={focused ? styles.activeIconWrap : undefined}>
-                <Ionicons
-                  name={focused ? tab.iconFocused : tab.icon}
-                  size={22}
-                  color={color}
-                />
-              </View>
+              <TabIcon
+                focused={focused}
+                color={color}
+                icon={tab.icon}
+                iconFocused={tab.iconFocused}
+              />
             ),
           }}
         />
@@ -75,10 +113,16 @@ export default function TabsLayout() {
 }
 
 const styles = StyleSheet.create({
+  iconWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   activeIconWrap: {
     backgroundColor: colors.primaryMuted,
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

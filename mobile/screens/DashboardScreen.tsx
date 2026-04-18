@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
+  Animated as RNAnimated,
   View,
   Text,
   ScrollView,
@@ -502,6 +503,36 @@ export default function DashboardScreen() {
     transform: [{ translateY: headerY.value }],
   }));
 
+  // Staggered section entrance (RN Animated — separate from reanimated)
+  const sectionAnims = useRef(
+    Array.from({ length: 5 }, () => ({
+      opacity: new RNAnimated.Value(0),
+      translateY: new RNAnimated.Value(20),
+    }))
+  ).current;
+
+  useEffect(() => {
+    if (!loading) {
+      RNAnimated.stagger(
+        70,
+        sectionAnims.map(({ opacity, translateY }) =>
+          RNAnimated.parallel([
+            RNAnimated.timing(opacity, {
+              toValue: 1,
+              duration: 300,
+              useNativeDriver: true,
+            }),
+            RNAnimated.timing(translateY, {
+              toValue: 0,
+              duration: 300,
+              useNativeDriver: true,
+            }),
+          ])
+        )
+      ).start();
+    }
+  }, [loading]);
+
   if (loading) {
     return (
       <View style={[s.container, { paddingTop: insets.top }]}>
@@ -607,7 +638,7 @@ export default function DashboardScreen() {
           CREDIT CARD — Apple Card style gradient mesh
       ════════════════════════════════════════════════════════════════ */}
       {ch && (
-        <>
+        <RNAnimated.View style={{ opacity: sectionAnims[0].opacity, transform: [{ translateY: sectionAnims[0].translateY }] }}>
           <View style={s.creditCardWrap}>
             <CreditCard ch={ch} />
           </View>
@@ -625,19 +656,23 @@ export default function DashboardScreen() {
               </LinearGradient>
             </TouchableOpacity>
           )}
-        </>
+        </RNAnimated.View>
       )}
 
       {/* ════════════════════════════════════════════════════════════════
           SETUP CHECKLIST
       ════════════════════════════════════════════════════════════════ */}
-      {!allSetupDone && <SetupChecklist steps={setupSteps} />}
+      {!allSetupDone && (
+        <RNAnimated.View style={{ opacity: sectionAnims[1].opacity, transform: [{ translateY: sectionAnims[1].translateY }] }}>
+          <SetupChecklist steps={setupSteps} />
+        </RNAnimated.View>
+      )}
 
       {/* ════════════════════════════════════════════════════════════════
           THIS WEEK STATS — animated counters
       ════════════════════════════════════════════════════════════════ */}
       {hasCalls && stats && (
-        <View style={s.weekSection}>
+        <RNAnimated.View style={[{ opacity: sectionAnims[2].opacity, transform: [{ translateY: sectionAnims[2].translateY }] }, s.weekSection]}>
           <View style={s.weekHeader}>
             <Text style={s.sectionLabel}>This week</Text>
             {activity.length > 0 && <MiniChart data={activity} width={72} height={28} />}
@@ -675,14 +710,14 @@ export default function DashboardScreen() {
               <Text style={s.metricLabel}>Spent</Text>
             </View>
           </LinearGradient>
-        </View>
+        </RNAnimated.View>
       )}
 
       {/* ════════════════════════════════════════════════════════════════
           AGENT PERFORMANCE — mini progress rings
       ════════════════════════════════════════════════════════════════ */}
       {hasAgents && (
-        <View style={s.agentSection}>
+        <RNAnimated.View style={[{ opacity: sectionAnims[3].opacity, transform: [{ translateY: sectionAnims[3].translateY }] }, s.agentSection]}>
           <Text style={s.sectionLabel}>Agents</Text>
           <LinearGradient
             colors={[C.surface, C.surfaceRaised] as [string, string]}
@@ -694,14 +729,14 @@ export default function DashboardScreen() {
               <AgentRow key={a.assistantId} agent={a} index={i} />
             ))}
           </LinearGradient>
-        </View>
+        </RNAnimated.View>
       )}
 
       {/* ════════════════════════════════════════════════════════════════
           RECENT CALLS — grouped by Today / Yesterday
       ════════════════════════════════════════════════════════════════ */}
       {hasCalls ? (
-        <View style={s.callsSection}>
+        <RNAnimated.View style={[{ opacity: sectionAnims[4].opacity, transform: [{ translateY: sectionAnims[4].translateY }] }, s.callsSection]}>
           <View style={s.callsSectionHeader}>
             <Text style={s.sectionLabel}>Recent calls</Text>
             <TouchableOpacity onPress={() => router.push('/calls' as any)}>
@@ -709,7 +744,7 @@ export default function DashboardScreen() {
             </TouchableOpacity>
           </View>
           <GroupedCallList calls={recentCalls} onCallPress={(id) => router.push(`/calls/${id}` as any)} />
-        </View>
+        </RNAnimated.View>
       ) : allSetupDone ? (
         /* Setup done, no calls yet — waiting state */
         <View style={s.waitingCard}>

@@ -1,6 +1,7 @@
 import { colors as C } from '../lib/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SkeletonListItem } from '../components/Skeleton';
+import { AnimatedListItem } from '../components/AnimatedListItem';
 import * as haptics from '../lib/haptics';
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
@@ -216,11 +217,13 @@ export default function CallLogsScreen() {
             <View style={styles.sectionHeaderLine} />
           </View>
         )}
-        renderItem={({ item }) => (
-          <CallCard
-            call={item}
-            onPress={(call) => router.push(`/calls/${call.id}` as any)}
-          />
+        renderItem={({ item, index }) => (
+          <AnimatedListItem index={index % 20}>
+            <CallCard
+              call={item}
+              onPress={(call) => router.push(`/calls/${call.id}` as any)}
+            />
+          </AnimatedListItem>
         )}
         ListEmptyComponent={ListEmpty}
         ListFooterComponent={
