@@ -21,6 +21,7 @@ interface AuthContextValue {
   signUp: (email: string, password: string) => Promise<{ error: AuthError | null }>;
   signOut: () => Promise<{ error: AuthError | null }>;
   signInWithGoogle: () => Promise<{ error: AuthError | null }>;
+  resetPassword: (email: string) => Promise<{ error: AuthError | null }>;
 }
 
 // ─── Context ─────────────────────────────────────────────────────────────────
@@ -73,6 +74,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error };
   }, []);
 
+  const resetPassword = useCallback(async (email: string) => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: 'voicory://auth/reset-password',
+    });
+    return { error };
+  }, []);
+
   const signInWithGoogle = useCallback(async () => {
     try {
       const redirectUrl = makeRedirectUri({ scheme: 'voicory', path: 'auth/callback' });
@@ -111,8 +119,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const value = useMemo<AuthContextValue>(
-    () => ({ user, session, loading, signIn, signUp, signOut, signInWithGoogle }),
-    [user, session, loading, signIn, signUp, signOut, signInWithGoogle],
+    () => ({ user, session, loading, signIn, signUp, signOut, signInWithGoogle, resetPassword }),
+    [user, session, loading, signIn, signUp, signOut, signInWithGoogle, resetPassword],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

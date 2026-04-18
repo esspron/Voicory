@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -26,13 +26,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../contexts/AuthContext';
 import { colors } from '../../lib/theme';
-import Svg, {
-  Path,
-  Defs,
-  LinearGradient as SvgGrad,
-  Stop,
-  Rect,
-} from 'react-native-svg';
+import Svg, { Path, Defs, LinearGradient as SvgGrad, Stop, Rect } from 'react-native-svg';
 
 // ─── VoicoryLogo with glow pulse ─────────────────────────────────────────────
 
@@ -46,36 +40,23 @@ function VoicoryLogo({ size = 56, glowAnim }: { size?: number; glowAnim: import(
     <Animated.View style={[{ shadowColor: colors.primary, shadowOffset: { width: 0, height: 0 }, elevation: 12 }, glowStyle]}>
       <Svg width={size} height={size} viewBox="0 0 40 40" fill="none">
         <Defs>
-          <SvgGrad id="lgVGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <SvgGrad id="fpVGrad" x1="0%" y1="0%" x2="100%" y2="100%">
             <Stop offset="0%" stopColor="#2EC7B7" />
             <Stop offset="100%" stopColor="#26AFA1" />
           </SvgGrad>
-          <SvgGrad id="lgBgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <SvgGrad id="fpBgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
             <Stop offset="0%" stopColor="#1B1E23" />
             <Stop offset="100%" stopColor="#15181C" />
           </SvgGrad>
         </Defs>
-        <Rect x="0" y="0" width="40" height="40" rx="8" ry="8" fill="url(#lgBgGrad)" />
+        <Rect x="0" y="0" width="40" height="40" rx="8" ry="8" fill="url(#fpBgGrad)" />
         <Rect x="0.5" y="0.5" width="39" height="39" rx="7.5" ry="7.5" stroke="#2EC7B7" strokeWidth="1" opacity="0.18" fill="none" />
         <Path
           d="M22.23 6.97C27.42 10.11 29.51 18.39 26.33 23.74C25.33 25.44 24.55 27.11 24.05 28.66C23.85 25.52 23.39 23.04 22.65 20.64C21.76 17.73 21.34 16.53 20.45 13.78C18.51 7.82 13.98 6.77 12.00 6.77C9.99 6.77 7.51 7.51 6.00 9.68L6.66 10.41C7.90 9.06 9.87 9.21 10.80 11.42C12.35 15.06 13.20 19.63 14.83 24.59C16.30 28.93 23.23 25.36 23.23 33.23L24.20 33.23C24.20 31.25 25.36 27.07 27.61 23.62C30.17 19.67 34.00 12.54 34.00 6.97Z"
-          fill="url(#lgVGrad)"
+          fill="url(#fpVGrad)"
         />
       </Svg>
     </Animated.View>
-  );
-}
-
-// ─── Google Icon SVG (official colours) ──────────────────────────────────────
-
-function GoogleIcon({ size = 18 }: { size?: number }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24">
-      <Path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4" />
-      <Path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
-      <Path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
-      <Path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
-    </Svg>
   );
 }
 
@@ -91,7 +72,7 @@ function BackgroundOrbs() {
   );
 }
 
-// ─── Email validation hint ────────────────────────────────────────────────────
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function isValidEmail(v: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
@@ -99,40 +80,30 @@ function isValidEmail(v: string) {
 
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 
-export default function LoginScreen() {
-  const { signIn, signInWithGoogle } = useAuth();
+export default function ForgotPasswordScreen() {
+  const { resetPassword } = useAuth();
   const router = useRouter();
 
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const [emailTouched, setEmailTouched] = useState(false);
-  const passwordRef = useRef<TextInput>(null);
 
   // ── Entrance animations ──
   const logoOpacity = useSharedValue(0);
   const logoScale = useSharedValue(0.8);
   const cardTranslateY = useSharedValue(40);
   const cardOpacity = useSharedValue(0);
-
-  // ── Logo glow pulse ──
   const glowAnim = useSharedValue(0);
-
-  // ── Button press scale ──
-  const signInScale = useSharedValue(1);
-  const googleScale = useSharedValue(1);
+  const btnScale = useSharedValue(1);
 
   useEffect(() => {
-    // Entrance sequence
     logoOpacity.value = withTiming(1, { duration: 500, easing: Easing.out(Easing.quad) });
     logoScale.value = withSpring(1, { damping: 14, stiffness: 120 });
     cardTranslateY.value = withSpring(0, { damping: 18, stiffness: 100, delay: 150 } as any);
     cardOpacity.value = withTiming(1, { duration: 400, easing: Easing.out(Easing.quad) }, () => {
-      // Start glow pulse after card appears
       glowAnim.value = withRepeat(
         withSequence(
           withTiming(1, { duration: 2000, easing: Easing.inOut(Easing.sin) }),
@@ -149,61 +120,74 @@ export default function LoginScreen() {
     transform: [{ scale: logoScale.value }],
   }));
 
-  const cardStyle = useAnimatedStyle(() => ({
+  const cardAnimStyle = useAnimatedStyle(() => ({
     opacity: cardOpacity.value,
     transform: [{ translateY: cardTranslateY.value }],
   }));
 
-  const signInBtnStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: signInScale.value }],
-  }));
-
-  const googleBtnStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: googleScale.value }],
+  const btnStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: btnScale.value }],
   }));
 
   // ── Email inline validation ──
   const emailValid = isValidEmail(email);
   const showEmailHint = emailTouched && email.length > 0;
 
-  const handleSignIn = async () => {
-    if (!email.trim() || !password) {
-      setError('Please enter your email and password.');
-      return;
-    }
-    if (!isValidEmail(email.trim())) {
-      setError('Please enter a valid email address.');
-      return;
-    }
+  const handleReset = async () => {
+    if (!email.trim()) { setError('Please enter your email address.'); return; }
+    if (!isValidEmail(email.trim())) { setError('Please enter a valid email address.'); return; }
     setError(null);
     setLoading(true);
     try {
-      const { error: authError } = await signIn(email.trim(), password);
-      if (authError) setError(authError.message);
+      if (typeof resetPassword === 'function') {
+        const { error: authError } = await resetPassword(email.trim());
+        if (authError) { setError(authError.message); return; }
+      }
+      setSuccess(true);
     } catch {
-      setError('An unexpected error occurred.');
+      setError('An unexpected error occurred. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleGoogleSignIn = async () => {
-    setError(null);
-    setGoogleLoading(true);
-    try {
-      const { error: authError } = await signInWithGoogle();
-      if (authError) setError(authError.message);
-    } catch {
-      setError('Google sign-in failed.');
-    } finally {
-      setGoogleLoading(false);
-    }
-  };
+  const onPressIn = () => { btnScale.value = withTiming(0.97, { duration: 80 }); };
+  const onPressOut = () => { btnScale.value = withSpring(1, { damping: 10, stiffness: 200 }); };
 
-  const onPressInSignIn = () => { signInScale.value = withTiming(0.97, { duration: 80 }); };
-  const onPressOutSignIn = () => { signInScale.value = withSpring(1, { damping: 10, stiffness: 200 }); };
-  const onPressInGoogle = () => { googleScale.value = withTiming(0.97, { duration: 80 }); };
-  const onPressOutGoogle = () => { googleScale.value = withSpring(1, { damping: 10, stiffness: 200 }); };
+  // ── Success state ──
+  if (success) {
+    return (
+      <View style={s.container}>
+        <BackgroundOrbs />
+        <Animated.View entering={FadeIn.duration(400)} style={s.successWrap}>
+          <View style={s.successIcon}>
+            <Ionicons name="mail" size={38} color={colors.primary} />
+          </View>
+          <Text style={s.successTitle}>Check your inbox</Text>
+          <Text style={s.successText}>
+            We sent a password reset link to{'\n'}
+            <Text style={{ color: colors.primary, fontWeight: '600' }}>{email}</Text>.
+            {'\n\n'}The link expires in 24 hours.
+          </Text>
+          <Link href="/(auth)/login" asChild>
+            <Pressable style={{ width: '100%', borderRadius: 14, overflow: 'hidden', marginTop: 8 }}>
+              <LinearGradient
+                colors={['#00d4aa', '#00b894']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={s.primaryBtnGradient}
+              >
+                <Text style={s.primaryBtnText}>Back to Sign In</Text>
+              </LinearGradient>
+            </Pressable>
+          </Link>
+          <Pressable onPress={() => { setSuccess(false); setEmail(''); }} style={{ marginTop: 12 }}>
+            <Text style={s.resendText}>Didn't receive it? Try again</Text>
+          </Pressable>
+        </Animated.View>
+      </View>
+    );
+  }
 
   return (
     <View style={s.container}>
@@ -224,9 +208,17 @@ export default function LoginScreen() {
           </Animated.View>
 
           {/* ─── Form Card ─── */}
-          <Animated.View style={[s.card, cardStyle]}>
-            <Text style={s.cardTitle}>Welcome back</Text>
-            <Text style={s.cardSubtitle}>Sign in to continue</Text>
+          <Animated.View style={[s.card, cardAnimStyle]}>
+            {/* Back button */}
+            <Pressable onPress={() => router.back()} style={s.backBtn}>
+              <Ionicons name="arrow-back" size={18} color={colors.primary} />
+              <Text style={s.backBtnText}>Back to Sign In</Text>
+            </Pressable>
+
+            <Text style={s.cardTitle}>Reset password</Text>
+            <Text style={s.cardSubtitle}>
+              Enter your email and we'll send you a link to reset your password.
+            </Text>
 
             {error && (
               <Animated.View entering={FadeIn.duration(200)} style={s.errorBanner}>
@@ -238,7 +230,7 @@ export default function LoginScreen() {
             {/* Email */}
             <View style={s.fieldGroup}>
               <Text style={s.label}>Email address</Text>
-              <Animated.View style={[
+              <View style={[
                 s.inputWrapper,
                 focusedField === 'email' && s.inputFocused,
                 showEmailHint && !emailValid && s.inputError,
@@ -265,8 +257,8 @@ export default function LoginScreen() {
                   autoCapitalize="none"
                   autoCorrect={false}
                   keyboardType="email-address"
-                  returnKeyType="next"
-                  onSubmitEditing={() => passwordRef.current?.focus()}
+                  returnKeyType="done"
+                  onSubmitEditing={handleReset}
                   editable={!loading}
                 />
                 {showEmailHint && (
@@ -276,59 +268,19 @@ export default function LoginScreen() {
                     color={emailValid ? colors.success : colors.danger}
                   />
                 )}
-              </Animated.View>
+              </View>
               {showEmailHint && !emailValid && (
                 <Text style={s.fieldHintError}>Enter a valid email address</Text>
               )}
             </View>
 
-            {/* Password */}
-            <View style={s.fieldGroup}>
-              <View style={s.passwordLabelRow}>
-                <Text style={s.label}>Password</Text>
-                <Link href="/(auth)/forgot-password" asChild>
-                  <Pressable>
-                    <Text style={s.forgotLink}>Forgot password?</Text>
-                  </Pressable>
-                </Link>
-              </View>
-              <View style={[s.inputWrapper, focusedField === 'password' && s.inputFocused]}>
-                <Ionicons
-                  name="lock-closed-outline"
-                  size={18}
-                  color={focusedField === 'password' ? colors.primary : '#6b7280'}
-                />
-                <TextInput
-                  ref={passwordRef}
-                  style={[s.input, { flex: 1 }]}
-                  placeholder="Enter your password"
-                  placeholderTextColor="#4b5563"
-                  value={password}
-                  onChangeText={(t) => { setPassword(t); setError(null); }}
-                  onFocus={() => setFocusedField('password')}
-                  onBlur={() => setFocusedField(null)}
-                  secureTextEntry={!showPassword}
-                  returnKeyType="done"
-                  onSubmitEditing={handleSignIn}
-                  editable={!loading}
-                />
-                <Pressable onPress={() => setShowPassword((v) => !v)} hitSlop={10}>
-                  <Ionicons
-                    name={showPassword ? 'eye-off-outline' : 'eye-outline'}
-                    size={18}
-                    color="#6b7280"
-                  />
-                </Pressable>
-              </View>
-            </View>
-
-            {/* Sign In Button */}
-            <Animated.View style={[{ marginTop: 6 }, signInBtnStyle]}>
+            {/* Send Reset Link Button */}
+            <Animated.View style={[{ marginTop: 6 }, btnStyle]}>
               <Pressable
-                onPress={handleSignIn}
-                onPressIn={onPressInSignIn}
-                onPressOut={onPressOutSignIn}
-                disabled={loading || googleLoading}
+                onPress={handleReset}
+                onPressIn={onPressIn}
+                onPressOut={onPressOut}
+                disabled={loading}
                 style={{ borderRadius: 14, overflow: 'hidden' }}
               >
                 <LinearGradient
@@ -340,42 +292,13 @@ export default function LoginScreen() {
                   {loading ? (
                     <ActivityIndicator size="small" color="#000" />
                   ) : (
-                    <Text style={s.primaryBtnText}>Sign In</Text>
+                    <Text style={s.primaryBtnText}>Send Reset Link</Text>
                   )}
                 </LinearGradient>
               </Pressable>
             </Animated.View>
 
-            {/* Divider */}
-            <View style={s.divider}>
-              <View style={s.dividerLine} />
-              <Text style={s.dividerText}>or continue with</Text>
-              <View style={s.dividerLine} />
-            </View>
-
-            {/* Google — official design guidelines */}
-            <Animated.View style={googleBtnStyle}>
-              <Pressable
-                onPress={handleGoogleSignIn}
-                onPressIn={onPressInGoogle}
-                onPressOut={onPressOutGoogle}
-                disabled={loading || googleLoading}
-                style={s.googleBtn}
-              >
-                {googleLoading ? (
-                  <ActivityIndicator size="small" color="#5f6368" />
-                ) : (
-                  <>
-                    <View style={s.googleIconWrap}>
-                      <GoogleIcon size={18} />
-                    </View>
-                    <Text style={s.googleBtnText}>Sign in with Google</Text>
-                  </>
-                )}
-              </Pressable>
-            </Animated.View>
-
-            {/* Signup */}
+            {/* Signup link */}
             <View style={s.signupRow}>
               <Text style={s.signupText}>Don't have an account? </Text>
               <Link href="/(auth)/signup" asChild>
@@ -406,18 +329,8 @@ const s = StyleSheet.create({
   // Brand
   brandSection: { alignItems: 'center', marginBottom: 36 },
   logoWrapper: { marginBottom: 16 },
-  brandName: {
-    fontSize: 36,
-    fontFamily: 'Ahsing',
-    color: '#2EC7B7',
-    letterSpacing: 2,
-  },
-  brandTagline: {
-    marginTop: 6,
-    fontSize: 14,
-    color: '#6b7280',
-    letterSpacing: 0.3,
-  },
+  brandName: { fontSize: 36, fontFamily: 'Ahsing', color: '#2EC7B7', letterSpacing: 2 },
+  brandTagline: { marginTop: 6, fontSize: 14, color: '#6b7280', letterSpacing: 0.3 },
 
   // Card
   card: {
@@ -432,18 +345,28 @@ const s = StyleSheet.create({
     shadowRadius: 16,
     elevation: 8,
   },
-  cardTitle: { fontSize: 24, fontWeight: '700', color: '#ffffff', marginBottom: 4 },
-  cardSubtitle: { fontSize: 14, color: '#6b7280', marginBottom: 24 },
+
+  // Back button
+  backBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 20,
+  },
+  backBtnText: { fontSize: 13, fontWeight: '600', color: colors.primary },
+
+  cardTitle: { fontSize: 24, fontWeight: '700', color: '#ffffff', marginBottom: 8 },
+  cardSubtitle: { fontSize: 14, color: '#6b7280', marginBottom: 24, lineHeight: 20 },
 
   // Error
   errorBanner: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 10,
     backgroundColor: 'rgba(239,68,68,0.08)',
     borderRadius: 12,
     padding: 14,
     marginBottom: 20,
-    gap: 10,
     borderWidth: 1,
     borderColor: 'rgba(239,68,68,0.15)',
   },
@@ -451,20 +374,18 @@ const s = StyleSheet.create({
 
   // Fields
   fieldGroup: { marginBottom: 18 },
-  passwordLabelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  label: { fontSize: 13, fontWeight: '600', color: '#9ca3af', letterSpacing: 0.3 },
-  forgotLink: { fontSize: 12, fontWeight: '600', color: colors.primary },
+  label: { fontSize: 13, fontWeight: '600', color: '#9ca3af', marginBottom: 8, letterSpacing: 0.3 },
   fieldHintError: { marginTop: 5, fontSize: 11, color: colors.danger },
 
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 10,
     backgroundColor: '#111827',
     borderRadius: 14,
     borderWidth: 1.5,
     borderColor: '#1f2937',
     paddingHorizontal: 14,
-    gap: 10,
     height: 52,
   },
   inputFocused: {
@@ -482,55 +403,38 @@ const s = StyleSheet.create({
   },
   input: { flex: 1, fontSize: 15, color: '#ffffff', height: '100%' as any },
 
-  // Primary Button
-  primaryBtnGradient: {
-    height: 52,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 14,
-  },
+  // Button
+  primaryBtnGradient: { height: 52, justifyContent: 'center', alignItems: 'center', borderRadius: 14 },
   primaryBtnText: { fontSize: 16, fontWeight: '700', color: '#000000', letterSpacing: 0.3 },
 
-  // Divider
-  divider: { flexDirection: 'row', alignItems: 'center', marginVertical: 22, gap: 14 },
-  dividerLine: { flex: 1, height: 1, backgroundColor: '#1f2937' },
-  dividerText: { fontSize: 12, color: '#4b5563', letterSpacing: 0.3 },
-
-  // Google Button — per Google's design guidelines
-  googleBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: 52,
-    backgroundColor: '#ffffff',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#dadce0',
-    gap: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 3,
-    elevation: 1,
-  },
-  googleIconWrap: {
-    width: 20,
-    height: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  googleBtnText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#3c4043',
-    letterSpacing: 0.1,
-  },
-
-  // Signup
+  // Signup link
   signupRow: { flexDirection: 'row', justifyContent: 'center', marginTop: 24 },
   signupText: { fontSize: 14, color: '#6b7280' },
   signupLink: { fontSize: 14, fontWeight: '700', color: colors.primary },
 
   // Footer
   footer: { textAlign: 'center', fontSize: 11, color: '#374151', marginTop: 24, lineHeight: 16 },
+
+  // Success
+  successWrap: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+    gap: 16,
+  },
+  successIcon: {
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    backgroundColor: colors.primaryMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: colors.primary + '30',
+    marginBottom: 8,
+  },
+  successTitle: { fontSize: 24, fontWeight: '700', color: '#ffffff', textAlign: 'center' },
+  successText: { fontSize: 15, color: '#6b7280', textAlign: 'center', lineHeight: 22 },
+  resendText: { fontSize: 13, fontWeight: '600', color: colors.primary },
 });
