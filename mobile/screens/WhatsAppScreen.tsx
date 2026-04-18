@@ -1,18 +1,26 @@
 import { colors as C } from '../lib/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as haptics from '../lib/haptics';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  View, Text, FlatList, TouchableOpacity, StyleSheet,
-  RefreshControl, TextInput, StatusBar, Platform, ActivityIndicator,
+  View,
+  Text,
+  FlatList,
+  TouchableOpacity,
+  StyleSheet,
+  RefreshControl,
+  TextInput,
+  StatusBar,
+  Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import ContactAvatar from '../components/whatsapp/ContactAvatar';
+import UnreadBadge from '../components/whatsapp/UnreadBadge';
+import MessageStatus from '../components/whatsapp/MessageStatus';
 import { EmptyState } from '../components/EmptyState';
-
 
 interface WAContact {
   id: string;
@@ -21,18 +29,75 @@ interface WAContact {
   phone_number: string;
   last_message_at: string;
   total_messages: number;
+  unread_count?: number;
+  last_message_text?: string;
+  last_message_direction?: 'inbound' | 'outbound';
+  last_message_status?: 'sent' | 'delivered' | 'read' | 'failed';
   created_at: string;
 }
 
-function formatTime(iso: string): string {
+function formatRelativeTime(iso: string): string {
   if (!iso) return '';
   const d = new Date(iso);
   const now = new Date();
-  const diff = Math.floor((now.getTime() - d.getTime()) / 86400000);
-  if (diff === 0) return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
-  if (diff === 1) return 'Yesterday';
-  if (diff < 7) return d.toLocaleDateString([], { weekday: 'short' });
+  const diffMs = now.getTime() - d.getTime();
+  const diffMin = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMin < 1) return 'now';
+  if (diffMin < 60) return `${diffMin}m`;
+  if (diffHours < 24) return `${diffHours}h`;
+  if (diffDays === 1) return 'Yesterday';
+  if (diffDays < 7) return d.toLocaleDateString([], { weekday: 'short' });
   return d.toLocaleDateString([], { day: 'numeric', month: 'numeric' });
+}
+
+interface ConversationRowProps {
+  item: WAContact;
+  onPress: () => void;
+}
+
+function ConversationRow({ item, onPress }: ConversationRowProps) {
+  const isOnline = false; // Could wire to presence later
+  const hasUnread = (item.unread_count ?? 0) > 0;
+  const preview = item.last_message_text?.trim() || (item.total_messages ? 'Tap to view messages' : 'No messages yet');
+
+  return (
+    <TouchableOpacity style={styles.row} onPress={onPress} activeOpacity={0.7}>
+      <ContactAvatar
+        name={item.profile_name || item.phone_number}
+        size={50}
+        showOnline={isOnline}
+      />
+      <View style={styles.rowContent}>
+        <View style={styles.rowTop}>
+          <Text style={[styles.contactName, hasUnread && styles.contactNameUnread]} numberOfLines={1}>
+            {item.profile_name || item.phone_number}
+          </Text>
+          <Text style={[styles.timeLabel, hasUnread && styles.timeLabelUnread]}>
+            {formatRelativeTime(item.last_message_at)}
+          </Text>
+        </View>
+        <View style={styles.rowBottom}>
+          <View style={styles.previewRow}>
+            {item.last_message_direction === 'outbound' && item.last_message_status && (
+              <View style={styles.deliveryIcon}>
+                <MessageStatus status={item.last_message_status} size={13} />
+              </View>
+            )}
+            <Text
+              style={[styles.messagePreview, hasUnread && styles.messagePreviewUnread]}
+              numberOfLines={1}
+            >
+              {preview}
+            </Text>
+          </View>
+          <UnreadBadge count={item.unread_count} />
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
 }
 
 export default function WhatsAppScreen() {
@@ -50,7 +115,6 @@ export default function WhatsAppScreen() {
     if (!user) return;
     try {
       setError(null);
-      // First get user's whatsapp config
       const { data: configs } = await supabase
         .from('whatsapp_configs')
         .select('id')
@@ -61,7 +125,7 @@ export default function WhatsAppScreen() {
         return;
       }
 
-      const configIds = configs.map(c => c.id);
+      const configIds = configs.map((c) => c.id);
       const { data, error: fetchError } = await supabase
         .from('whatsapp_contacts')
         .select('*')
@@ -70,8 +134,9 @@ export default function WhatsAppScreen() {
 
       if (fetchError) throw fetchError;
       setContacts((data ?? []) as WAContact[]);
-    } catch (e: any) {
-      setError(e.message || 'Failed to load conversations');
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Failed to load conversations';
+      setError(msg);
     }
   }, [user]);
 
@@ -86,17 +151,15 @@ export default function WhatsAppScreen() {
   }, [loadContacts]);
 
   const filtered = searchQuery
-    ? contacts.filter(c =>
-        (c.profile_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-        c.phone_number.includes(searchQuery))
+    ? contacts.filter(
+        (c) =>
+          (c.profile_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+          c.phone_number.includes(searchQuery),
+      )
     : contacts;
 
-  const handlePress = (contact: WAContact) => {
-    router.push(`/chat/${encodeURIComponent(contact.phone_number)}`);
-  };
-
   const toggleSearch = () => {
-    setSearchVisible(v => !v);
+    setSearchVisible((v) => !v);
     if (!searchVisible) {
       setTimeout(() => searchRef.current?.focus(), 100);
     } else {
@@ -105,9 +168,9 @@ export default function WhatsAppScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       <StatusBar barStyle="light-content" backgroundColor={C.surface} />
-      
+
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.titleRow}>
@@ -119,21 +182,21 @@ export default function WhatsAppScreen() {
           )}
         </View>
         <TouchableOpacity onPress={toggleSearch} style={styles.headerIcon}>
-          <Ionicons name="search" size={24} color={C.textMuted} />
+          <Ionicons name={searchVisible ? 'close' : 'search'} size={22} color={C.textMuted} />
         </TouchableOpacity>
       </View>
 
-      {/* Search Bar */}
+      {/* Search */}
       {searchVisible && (
         <View style={styles.searchContainer}>
           <View style={styles.searchBar}>
-            <Ionicons name="search" size={20} color={C.textFaint} />
-            <TextInput 
-              ref={searchRef} 
-              style={styles.searchInput} 
-              value={searchQuery} 
-              onChangeText={setSearchQuery} 
-              placeholder="Search conversations..." 
+            <Ionicons name="search" size={18} color={C.textFaint} />
+            <TextInput
+              ref={searchRef}
+              style={styles.searchInput}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder="Search conversations..."
               placeholderTextColor={C.textFaint}
               autoCapitalize="none"
               autoCorrect={false}
@@ -156,35 +219,19 @@ export default function WhatsAppScreen() {
       ) : (
         <FlatList
           data={filtered}
-          keyExtractor={item => item.id}
+          keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
-            <TouchableOpacity 
-              style={styles.conversationRow} 
-              onPress={() => handlePress(item)} 
-              activeOpacity={0.7}
-            >
-              <ContactAvatar name={item.profile_name || item.phone_number} size={48} />
-              <View style={styles.conversationContent}>
-                <View style={styles.conversationTop}>
-                  <Text style={styles.contactName} numberOfLines={1}>
-                    {item.profile_name || item.phone_number}
-                  </Text>
-                  <Text style={styles.timeLabel}>
-                    {formatTime(item.last_message_at)}
-                  </Text>
-                </View>
-                <Text style={styles.messagePreview} numberOfLines={1}>
-                  {item.total_messages ? `${item.total_messages} messages` : 'No messages yet'}
-                </Text>
-              </View>
-            </TouchableOpacity>
+            <ConversationRow
+              item={item}
+              onPress={() => router.push(`/chat/${encodeURIComponent(item.phone_number)}`)}
+            />
           )}
           refreshControl={
-            <RefreshControl 
-              refreshing={refreshing} 
-              onRefresh={onRefresh} 
-              tintColor={C.primary} 
-              colors={[C.primary]} 
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={C.primary}
+              colors={[C.primary]}
             />
           }
           ListEmptyComponent={
@@ -204,17 +251,17 @@ export default function WhatsAppScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
+  container: {
+    flex: 1,
     backgroundColor: C.bg,
   },
-  header: { 
-    flexDirection: 'row', 
-    alignItems: 'flex-end', 
-    justifyContent: 'space-between', 
-    backgroundColor: C.surface, 
-    paddingTop: 16, 
-    paddingBottom: 20, 
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: C.surface,
+    paddingTop: 8,
+    paddingBottom: 16,
     paddingHorizontal: 20,
     borderBottomWidth: 1,
     borderBottomColor: C.border,
@@ -222,39 +269,39 @@ const styles = StyleSheet.create({
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
+    gap: 12,
   },
-  headerTitle: { 
-    fontSize: 32,
+  headerTitle: {
+    fontSize: 30,
     fontWeight: '800',
     color: C.text,
-    letterSpacing: 0.5,
+    letterSpacing: -0.3,
   },
   countBadge: {
     backgroundColor: C.primaryMuted,
     borderColor: C.primary,
     borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
   },
   countText: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 13,
+    fontWeight: '700',
     color: C.primary,
   },
-  headerIcon: { 
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+  headerIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: C.surfaceRaised,
     alignItems: 'center',
     justifyContent: 'center',
   },
   searchContainer: {
     backgroundColor: C.surface,
-    paddingHorizontal: 20,
-    paddingBottom: 16,
+    paddingHorizontal: 16,
+    paddingBottom: 12,
     borderBottomWidth: 1,
     borderBottomColor: C.border,
   },
@@ -263,77 +310,105 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: C.surfaceRaised,
     borderRadius: 12,
-    paddingHorizontal: 16,
-    height: 44,
-    gap: 12,
+    paddingHorizontal: 14,
+    height: 42,
+    gap: 10,
   },
-  searchInput: { 
+  searchInput: {
     flex: 1,
     color: C.text,
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '500',
   },
-  conversationRow: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    paddingHorizontal: 20, 
-    paddingVertical: 16,
+  // Row
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     backgroundColor: C.bg,
   },
-  conversationContent: { 
-    flex: 1, 
-    marginLeft: 16,
+  rowContent: {
+    flex: 1,
+    marginLeft: 14,
+    gap: 5,
   },
-  conversationTop: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
+  rowTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 6,
   },
-  contactName: { 
-    fontSize: 16, 
-    fontWeight: '600', 
-    color: C.text, 
-    flex: 1, 
-    marginRight: 12,
+  rowBottom: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
   },
-  timeLabel: { 
-    fontSize: 12, 
+  previewRow: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  deliveryIcon: {
+    marginTop: 1,
+  },
+  contactName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: C.text,
+    flex: 1,
+    marginRight: 10,
+  },
+  contactNameUnread: {
+    fontWeight: '700',
+  },
+  timeLabel: {
+    fontSize: 12,
     color: C.textMuted,
     fontWeight: '500',
   },
-  messagePreview: { 
-    fontSize: 14, 
+  timeLabelUnread: {
+    color: C.primary,
+    fontWeight: '700',
+  },
+  messagePreview: {
+    fontSize: 14,
     color: C.textMuted,
-    fontWeight: '500',
+    fontWeight: '400',
+    flex: 1,
   },
-  separator: { 
-    height: 1, 
-    backgroundColor: C.border, 
-    marginLeft: 84,
+  messagePreviewUnread: {
+    color: C.text,
+    fontWeight: '600',
   },
-  centered: { 
-    flex: 1, 
-    alignItems: 'center', 
-    justifyContent: 'center', 
+  separator: {
+    height: 1,
+    backgroundColor: C.border,
+    marginLeft: 80,
+  },
+  centered: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
     gap: 16,
     paddingHorizontal: 32,
   },
-  errorText: { 
-    color: C.danger, 
-    fontSize: 16, 
+  errorText: {
+    color: C.danger,
+    fontSize: 16,
     textAlign: 'center',
     fontWeight: '500',
   },
-  retryBtn: { 
+  retryBtn: {
     backgroundColor: C.primary,
     borderRadius: 12,
-    paddingHorizontal: 24, 
+    paddingHorizontal: 24,
     paddingVertical: 12,
   },
-  retryText: { 
-    color: C.bg, 
-    fontWeight: '600', 
+  retryText: {
+    color: C.bg,
+    fontWeight: '600',
     fontSize: 15,
   },
 });

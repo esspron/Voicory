@@ -1,12 +1,14 @@
-import React, { useState, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   TextInput,
   TouchableOpacity,
   StyleSheet,
   Platform,
+  Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { colors as C } from '../../lib/theme';
 
 interface ChatInputProps {
   onSend: (text: string) => void;
@@ -16,47 +18,93 @@ interface ChatInputProps {
 export default function ChatInput({ onSend, disabled }: ChatInputProps) {
   const [text, setText] = useState('');
   const inputRef = useRef<TextInput>(null);
+  const sendScale = useRef(new Animated.Value(1)).current;
+  const micOpacity = useRef(new Animated.Value(1)).current;
+
+  const hasText = text.trim().length > 0;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.spring(sendScale, {
+        toValue: hasText ? 1 : 0.8,
+        useNativeDriver: true,
+        damping: 12,
+        stiffness: 180,
+      }),
+      Animated.timing(micOpacity, {
+        toValue: hasText ? 0 : 1,
+        duration: 120,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [hasText]);
 
   const handleSend = () => {
     const trimmed = text.trim();
     if (!trimmed || disabled) return;
+
+    // Press-scale animation
+    Animated.sequence([
+      Animated.spring(sendScale, {
+        toValue: 0.85,
+        useNativeDriver: true,
+        damping: 10,
+        stiffness: 200,
+      }),
+      Animated.spring(sendScale, {
+        toValue: 1,
+        useNativeDriver: true,
+        damping: 12,
+        stiffness: 180,
+      }),
+    ]).start();
+
     onSend(trimmed);
     setText('');
   };
 
-  const hasText = text.trim().length > 0;
-
   return (
     <View style={styles.container}>
-      {/* Text input */}
-      <TextInput
-        ref={inputRef}
-        style={styles.input}
-        value={text}
-        onChangeText={setText}
-        placeholder="Type a message"
-        placeholderTextColor="#8696a0"
-        multiline
-        maxLength={4096}
-        returnKeyType="default"
-        editable={!disabled}
-      />
-
-      {/* Attachment (only when no text) */}
-      {!hasText && (
-        <TouchableOpacity style={styles.iconBtn}>
-          <Ionicons name="attach-outline" size={22} color="#8696a0" />
-        </TouchableOpacity>
-      )}
-
-      {/* Send button */}
-      <TouchableOpacity
-        style={[styles.sendBtn, hasText && styles.sendBtnActive]}
-        onPress={hasText ? handleSend : undefined}
-        disabled={disabled}
-      >
-        <Ionicons name="send" size={18} color={hasText ? '#fff' : '#8696a0'} />
+      {/* Attachment */}
+      <TouchableOpacity style={styles.iconBtn} activeOpacity={0.7}>
+        <Ionicons name="attach-outline" size={22} color={C.textMuted} />
       </TouchableOpacity>
+
+      {/* Input pill */}
+      <View style={styles.inputWrapper}>
+        <TextInput
+          ref={inputRef}
+          style={styles.input}
+          value={text}
+          onChangeText={setText}
+          placeholder="Message"
+          placeholderTextColor={C.textFaint}
+          multiline
+          maxLength={4096}
+          returnKeyType="default"
+          editable={!disabled}
+        />
+      </View>
+
+      {/* Mic / Send */}
+      {hasText ? (
+        <Animated.View style={{ transform: [{ scale: sendScale }] }}>
+          <TouchableOpacity
+            style={styles.sendBtn}
+            onPress={handleSend}
+            disabled={disabled}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="send" size={18} color="#000" style={{ marginLeft: 2 }} />
+          </TouchableOpacity>
+        </Animated.View>
+      ) : (
+        <Animated.View style={{ opacity: micOpacity }}>
+          <TouchableOpacity style={styles.micBtn} activeOpacity={0.7}>
+            <Ionicons name="mic-outline" size={22} color={C.textMuted} />
+          </TouchableOpacity>
+        </Animated.View>
+      )}
     </View>
   );
 }
@@ -65,25 +113,29 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    backgroundColor: '#111827',
+    backgroundColor: '#0b141a',
     paddingHorizontal: 8,
     paddingVertical: 8,
+    paddingBottom: Platform.OS === 'ios' ? 24 : 8,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#2d3748',
+    borderTopColor: '#1a2332',
     gap: 6,
   },
   iconBtn: {
-    width: 36,
-    height: 36,
+    width: 40,
+    height: 40,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 2,
+    marginBottom: 0,
   },
-  input: {
+  inputWrapper: {
     flex: 1,
     backgroundColor: '#1f2c34',
-    color: '#ffffff',
     borderRadius: 22,
+    overflow: 'hidden',
+  },
+  input: {
+    color: '#ffffff',
     paddingHorizontal: 16,
     paddingTop: Platform.OS === 'ios' ? 10 : 8,
     paddingBottom: Platform.OS === 'ios' ? 10 : 8,
@@ -92,16 +144,18 @@ const styles = StyleSheet.create({
     minHeight: 40,
     lineHeight: 20,
   },
+  micBtn: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   sendBtn: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#2d3748',
+    backgroundColor: '#00d4aa',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 0,
-  },
-  sendBtnActive: {
-    backgroundColor: '#00d4aa',
   },
 });

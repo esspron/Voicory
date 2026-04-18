@@ -1,8 +1,9 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { colors as C } from '../../lib/theme';
 
 interface DateDividerProps {
-  label: string; // "Today", "Yesterday", "April 15, 2026"
+  label: string;
 }
 
 export default function DateDivider({ label }: DateDividerProps) {
@@ -18,23 +19,26 @@ export default function DateDivider({ label }: DateDividerProps) {
 const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
-    marginVertical: 8,
+    marginVertical: 12,
+    paddingHorizontal: 16,
   },
   pill: {
-    backgroundColor: '#1f2c34',
-    borderRadius: 8,
-    paddingHorizontal: 12,
+    backgroundColor: C.surfaceElevated,
+    borderRadius: 20,
+    paddingHorizontal: 14,
     paddingVertical: 5,
-    // subtle shadow
+    borderWidth: 1,
+    borderColor: C.border,
     shadowColor: '#000',
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.3,
     shadowOffset: { width: 0, height: 1 },
-    shadowRadius: 2,
-    elevation: 2,
+    shadowRadius: 3,
+    elevation: 3,
   },
   text: {
-    color: '#8696a0',
+    color: C.textSecondary,
     fontSize: 12,
-    fontWeight: '500',
+    fontWeight: '600',
+    letterSpacing: 0.2,
   },
 });

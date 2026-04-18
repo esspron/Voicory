@@ -1,10 +1,11 @@
 import React, { useMemo } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, Image } from 'react-native';
+import { colors as C } from '../../lib/theme';
 
 const AVATAR_COLORS = [
   '#1abc9c', '#2ecc71', '#3498db', '#9b59b6', '#e67e22',
-  '#e74c3c', '#1bbc9b', '#16a085', '#8e44ad', '#d35400',
-  '#c0392b', '#2980b9', '#27ae60', '#f39c12', '#7f8c8d',
+  '#e74c3c', '#16a085', '#8e44ad', '#d35400', '#2980b9',
+  '#27ae60', '#f39c12', '#c0392b', '#7f8c8d', '#1bbc9b',
 ];
 
 function getColorForName(name: string): string {
@@ -18,9 +19,7 @@ function getColorForName(name: string): string {
 function getInitials(name: string): string {
   if (!name) return '?';
   const parts = name.trim().split(/\s+/);
-  if (parts.length >= 2) {
-    return (parts[0][0] + parts[1][0]).toUpperCase();
-  }
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
   return name.slice(0, 2).toUpperCase();
 }
 
@@ -28,34 +27,67 @@ interface ContactAvatarProps {
   name: string;
   profilePictureUrl?: string;
   size?: number;
+  showOnline?: boolean;
 }
 
-export default function ContactAvatar({ name, profilePictureUrl, size = 48 }: ContactAvatarProps) {
-  const bgColor = useMemo(() => getColorForName(name), [name]);
-  const initials = useMemo(() => getInitials(name), [name]);
+export default function ContactAvatar({
+  name,
+  profilePictureUrl,
+  size = 48,
+  showOnline = false,
+}: ContactAvatarProps) {
+  const bgColor = useMemo(() => getColorForName(name || '?'), [name]);
+  const initials = useMemo(() => getInitials(name || '?'), [name]);
+  const indicatorSize = Math.round(size * 0.3);
+  const indicatorOffset = Math.round(size * 0.04);
 
-  const containerStyle = {
-    width: size,
-    height: size,
-    borderRadius: size / 2,
-    backgroundColor: bgColor,
-    alignItems: 'center' as const,
-    justifyContent: 'center' as const,
-    overflow: 'hidden' as const,
-  };
-
-  const textStyle = {
-    color: '#ffffff',
-    fontSize: size * 0.35,
-    fontWeight: '600' as const,
-    letterSpacing: 0.5,
-  };
-
-  // Show initials fallback when no profile picture URL is provided
-  // Profile picture display can be implemented later when needed
   return (
-    <View style={containerStyle}>
-      <Text style={textStyle}>{initials}</Text>
+    <View style={{ width: size, height: size }}>
+      <View
+        style={{
+          width: size,
+          height: size,
+          borderRadius: size / 2,
+          backgroundColor: bgColor,
+          alignItems: 'center',
+          justifyContent: 'center',
+          overflow: 'hidden',
+        }}
+      >
+        {profilePictureUrl ? (
+          <Image
+            source={{ uri: profilePictureUrl }}
+            style={{ width: size, height: size }}
+            resizeMode="cover"
+          />
+        ) : (
+          <Text
+            style={{
+              color: '#ffffff',
+              fontSize: size * 0.35,
+              fontWeight: '700',
+              letterSpacing: 0.5,
+            }}
+          >
+            {initials}
+          </Text>
+        )}
+      </View>
+      {showOnline && (
+        <View
+          style={{
+            position: 'absolute',
+            bottom: indicatorOffset,
+            right: indicatorOffset,
+            width: indicatorSize,
+            height: indicatorSize,
+            borderRadius: indicatorSize / 2,
+            backgroundColor: '#25d366',
+            borderWidth: 2,
+            borderColor: C.bg,
+          }}
+        />
+      )}
     </View>
   );
 }
