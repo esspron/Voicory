@@ -108,3 +108,23 @@ npm run test:run   # Must pass
  * PREVENTION: [Test added / type added / validation added]
  */
 ```
+
+
+---
+
+## 🔄 Context Sync Rule (MANDATORY)
+
+**Every commit that changes code MUST update the relevant context file in the same commit.**
+
+| What changed | Update this file |
+|---|---|
+| New route or service | `08-backend.md` |
+| New component pattern | `05-design-system.md` or `04-ui-components.md` |
+| Architecture change | `03-architecture.md` |
+| New integration | `06-integrations.md` |
+| Billing change | `07-billing.md` |
+| Deploy/infra change | `09-deployment.md` |
+| DB schema change | `16-technical-requirements.md` |
+| UI/UX bar update | `17-design-standards.md` |
+
+These files are read by Cursor, Copilot, and every AI agent that touches this codebase. Stale docs = wrong code generation = production bugs. You are responsible for keeping them current.

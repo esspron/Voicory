@@ -25,6 +25,7 @@ This folder contains modular copilot instructions for the Voicory project. Each 
 |------|-------------|
 | [04-ui-components.md](./04-ui-components.md) | Component library, hooks, utilities |
 | [05-design-system.md](./05-design-system.md) | Tailwind v4, colors, icons, patterns |
+| [17-design-standards.md](./17-design-standards.md) | **Apple App of the Year bar** — animations, states, performance, quality checklist |
 
 ## Integrations
 
