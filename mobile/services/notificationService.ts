@@ -220,6 +220,49 @@ export async function saveNotificationPreferences(
   }
 }
 
+// ─── Low-balance local alert ──────────────────────────────────────────────────
+
+/**
+ * Schedules a local notification when credit balance is low or critical.
+ * Idempotent: checks existing scheduled notifications to avoid spam.
+ * Silently no-ops if permissions not granted.
+ */
+export async function scheduleLowBalanceAlert(health: {
+  urgency: 'healthy' | 'watch' | 'low' | 'critical';
+  balanceInr: number;
+  daysRemaining: number;
+}): Promise<void> {
+  try {
+    const { status } = await Notifications.getPermissionsAsync();
+    if (status !== 'granted') return;
+
+    // Cancel any previous low-balance alerts before scheduling new one
+    const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+    const existing = scheduled.filter(
+      (n) => (n.content.data as any)?.type === 'billing' && (n.content.data as any)?.subtype === 'low_balance',
+    );
+    await Promise.all(existing.map((n) => Notifications.cancelScheduledNotificationAsync(n.identifier)));
+
+    const isCritical = health.urgency === 'critical';
+    const daysLabel = health.daysRemaining < 1 ? 'less than 1 day' : `~${Math.round(health.daysRemaining)} days`;
+
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: isCritical ? '⚡ Voicory Credits Critical' : '⚠️ Voicory Credits Low',
+        body: isCritical
+          ? `Your balance (₹${health.balanceInr.toFixed(0)}) will run out in ${daysLabel}. Top up now to keep your agents running.`
+          : `Your credits (₹${health.balanceInr.toFixed(0)}) will last about ${daysLabel} at current usage.`,
+        sound: true,
+        data: { type: 'billing', subtype: 'low_balance', url: 'voicory://billing' },
+        categoryIdentifier: 'billing',
+      },
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL, seconds: 5 },
+    });
+  } catch (err) {
+    if (__DEV__) console.warn('[Notifications] scheduleLowBalanceAlert failed:', err);
+  }
+}
+
 // ─── Deep link resolution ──────────────────────────────────────────────────────
 
 /**
