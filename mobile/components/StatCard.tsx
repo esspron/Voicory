@@ -7,7 +7,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { colors as C, radii, shadows, spacing } from '../lib/theme';
+import { colors as C, typography, spacing, radii, shadows } from '../lib/theme';
 import { MiniChart } from './MiniChart';
 import { AnimatedNumber } from './AnimatedNumber';
 
@@ -210,7 +210,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   sparkWrap: {
-    marginTop: 8,
+    marginTop: spacing.sm,
     alignItems: 'flex-end',
   },
 });

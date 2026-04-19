@@ -14,7 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { colors as C, radii, spacing } from '../lib/theme';
+import { colors as C, typography, spacing, radii } from '../lib/theme';
 import ContactAvatar from '../components/whatsapp/ContactAvatar';
 
 interface WhatsAppConfig {
@@ -255,9 +255,9 @@ const styles = StyleSheet.create({
     gap: 8,
     borderBottomWidth: 1,
     borderBottomColor: C.border,
-    marginBottom: 16,
+    marginBottom: spacing.lg,
   },
-  heroName: { fontSize: 24, fontWeight: '800', color: C.text, marginTop: 8, letterSpacing: -0.3 },
+  heroName: { fontSize: 24, fontWeight: '800', color: C.text, marginTop: spacing.sm, letterSpacing: -0.3 },
   heroPhone: { fontSize: 15, color: C.textMuted, fontWeight: '500' },
 
   // Action buttons row
@@ -265,8 +265,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     gap: 20,
-    paddingHorizontal: 20,
-    marginBottom: 24,
+    paddingHorizontal: spacing.xl,
+    marginBottom: spacing.xxl,
   },
   actionBtn: {
     alignItems: 'center',
@@ -286,14 +286,14 @@ const styles = StyleSheet.create({
   },
 
   // Section
-  section: { paddingHorizontal: 16, marginBottom: 16 },
+  section: { paddingHorizontal: spacing.lg, marginBottom: spacing.lg },
   sectionTitle: {
     fontSize: 13,
     fontWeight: '700',
     color: C.textMuted,
     letterSpacing: 0.8,
     textTransform: 'uppercase',
-    marginBottom: 8,
+    marginBottom: spacing.sm,
     marginLeft: 4,
   },
   card: {
@@ -308,7 +308,7 @@ const styles = StyleSheet.create({
   infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
+    paddingHorizontal: spacing.lg,
     paddingVertical: 14,
     gap: 14,
   },
@@ -331,8 +331,8 @@ const styles = StyleSheet.create({
   dangerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
     gap: 14,
   },
   dangerText: { fontSize: 16, color: C.danger, fontWeight: '500' },

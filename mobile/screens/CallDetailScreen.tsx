@@ -1,4 +1,4 @@
-import { colors as C } from '../lib/theme';
+import { colors as C, typography, spacing, radii } from '../lib/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as haptics from '../lib/haptics';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -172,7 +172,7 @@ const bubbleStyles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    marginBottom: 12,
+    marginBottom: spacing.md,
     gap: 8,
   },
   rowAI: { paddingRight: 48 },
@@ -194,7 +194,7 @@ const bubbleStyles = StyleSheet.create({
   },
   bubble: {
     flex: 1,
-    borderRadius: 16,
+    borderRadius: radii.lg,
     padding: 12,
   },
   bubbleAI: {
@@ -312,11 +312,11 @@ const waveStyles = StyleSheet.create({
     gap: 12,
     padding: 16,
   },
-  playBtn: { borderRadius: 24 },
+  playBtn: { borderRadius: radii.xxl },
   playBtnGrad: {
     width: 48,
     height: 48,
-    borderRadius: 24,
+    borderRadius: radii.xxl,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -371,11 +371,11 @@ function CollapsibleSection({ title, children }: { title: string; children: Reac
 const colStyles = StyleSheet.create({
   container: {
     backgroundColor: C.surface,
-    borderRadius: 16,
+    borderRadius: radii.lg,
     borderWidth: 1,
     borderColor: C.border,
-    marginHorizontal: 20,
-    marginBottom: 12,
+    marginHorizontal: spacing.xl,
+    marginBottom: spacing.md,
     overflow: 'hidden',
   },
   header: {
@@ -385,7 +385,7 @@ const colStyles = StyleSheet.create({
     padding: 16,
   },
   title: { color: C.textSecondary, fontSize: 13, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase' },
-  body: { paddingHorizontal: 16, paddingBottom: 16 },
+  body: { paddingHorizontal: spacing.lg, paddingBottom: 16 },
 });
 
 // ─── Metadata Row ─────────────────────────────────────────────────────────────
@@ -404,7 +404,7 @@ const metaStyles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: spacing.sm,
     borderBottomWidth: 1,
     borderBottomColor: C.border,
   },
@@ -536,8 +536,8 @@ export default function CallDetailScreen() {
   if (loading) {
     return (
       <View style={[styles.centered, { paddingTop: insets.top + 24, justifyContent: 'flex-start' }]}>
-        <SkeletonCard style={{ marginHorizontal: 20, marginBottom: 16 }} />
-        <SkeletonCard style={{ marginHorizontal: 20, marginBottom: 16 }} />
+        <SkeletonCard style={{ marginHorizontal: spacing.xl, marginBottom: spacing.lg }} />
+        <SkeletonCard style={{ marginHorizontal: spacing.xl, marginBottom: spacing.lg }} />
         {Array.from({ length: 3 }).map((_, i) => <SkeletonListItem key={i} />)}
         {slowLoad && (
           <View style={styles.slowLoadBanner}>
@@ -637,7 +637,7 @@ export default function CallDetailScreen() {
           </View>
 
           {/* Status badge */}
-          <View style={{ marginTop: 16, alignSelf: 'flex-start' }}>
+          <View style={{ marginTop: spacing.lg, alignSelf: 'flex-start' }}>
             <StatusBadge status={call.status} />
           </View>
         </LinearGradient>
@@ -747,11 +747,11 @@ const statStyles = StyleSheet.create({
   pill: {
     flex: 1,
     backgroundColor: C.surface,
-    borderRadius: 12,
+    borderRadius: radii.md,
     borderWidth: 1,
     borderColor: C.border,
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: spacing.md,
     gap: 4,
   },
   label: { color: C.textMuted, fontSize: 10, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase' },
@@ -772,14 +772,14 @@ const styles = StyleSheet.create({
     gap: 12,
     padding: 32,
   },
-  loadingText: { color: C.textMuted, fontSize: 14, marginTop: 8 },
+  loadingText: { color: C.textMuted, fontSize: 14, marginTop: spacing.sm },
   slowLoadBanner: {
-    marginTop: 16,
+    marginTop: spacing.lg,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     backgroundColor: C.surface,
-    borderRadius: 12,
+    borderRadius: radii.md,
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderWidth: 1,
@@ -799,18 +799,18 @@ const styles = StyleSheet.create({
   errorTitle: { color: C.text, fontSize: 18, fontWeight: '700' },
   errorText: { color: C.textMuted, fontSize: 14, textAlign: 'center' },
   retryBtn: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
+    paddingHorizontal: spacing.xxl,
+    paddingVertical: spacing.md,
     backgroundColor: C.primary,
-    borderRadius: 12,
+    borderRadius: radii.md,
     marginBottom: 4,
   },
   retryBtnText: { color: C.bg, fontSize: 14, fontWeight: '700' },
   errorBackBtn: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
+    paddingHorizontal: spacing.xxl,
+    paddingVertical: spacing.md,
     backgroundColor: C.surfaceRaised,
-    borderRadius: 12,
+    borderRadius: radii.md,
     borderWidth: 1,
     borderColor: C.border,
   },
@@ -818,7 +818,7 @@ const styles = StyleSheet.create({
 
   // Hero
   heroCard: {
-    paddingHorizontal: 20,
+    paddingHorizontal: spacing.xl,
     paddingBottom: 28,
     position: 'relative',
     overflow: 'hidden',
@@ -841,8 +841,8 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 20,
-    marginBottom: 12,
+    borderRadius: radii.xl,
+    marginBottom: spacing.md,
   },
   directionText: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase' },
   heroPhone: {
@@ -850,7 +850,7 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: '800',
     letterSpacing: -0.5,
-    marginBottom: 8,
+    marginBottom: spacing.sm,
   },
   agentRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 20 },
   agentName: { color: C.textSecondary, fontSize: 14, fontWeight: '500' },
@@ -863,7 +863,7 @@ const styles = StyleSheet.create({
     borderColor: C.primary + '20',
     borderRadius: 14,
     alignSelf: 'flex-start',
-    paddingHorizontal: 16,
+    paddingHorizontal: spacing.lg,
     paddingVertical: 10,
   },
   durationSep: { color: C.textFaint, fontSize: 20, fontWeight: '300' },
@@ -875,19 +875,19 @@ const styles = StyleSheet.create({
   statsRow: {
     flexDirection: 'row',
     gap: 10,
-    marginHorizontal: 20,
-    marginTop: 16,
-    marginBottom: 12,
+    marginHorizontal: spacing.xl,
+    marginTop: spacing.lg,
+    marginBottom: spacing.md,
   },
 
   // Cards
   card: {
     backgroundColor: C.surface,
-    borderRadius: 16,
+    borderRadius: radii.lg,
     borderWidth: 1,
     borderColor: C.border,
-    marginHorizontal: 20,
-    marginBottom: 12,
+    marginHorizontal: spacing.xl,
+    marginBottom: spacing.md,
     padding: 16,
   },
   cardHeader: {
@@ -899,20 +899,20 @@ const styles = StyleSheet.create({
   cardTitle: { color: C.text, fontSize: 14, fontWeight: '700', flex: 1 },
   transcriptCount: {
     backgroundColor: C.surfaceRaised,
-    paddingHorizontal: 8,
+    paddingHorizontal: spacing.sm,
     paddingVertical: 2,
-    borderRadius: 8,
+    borderRadius: radii.sm,
   },
   transcriptCountText: { color: C.textMuted, fontSize: 11, fontWeight: '600' },
-  emptyTranscript: { alignItems: 'center', gap: 8, paddingVertical: 24 },
+  emptyTranscript: { alignItems: 'center', gap: 8, paddingVertical: spacing.xxl },
   emptyTranscriptText: { color: C.textMuted, fontSize: 14 },
 
   // Actions
   actionsRow: {
     flexDirection: 'row',
     gap: 10,
-    marginHorizontal: 20,
+    marginHorizontal: spacing.xl,
     marginTop: 4,
-    marginBottom: 8,
+    marginBottom: spacing.sm,
   },
 });

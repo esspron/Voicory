@@ -1,4 +1,4 @@
-import { colors as C } from '../lib/theme';
+import { colors as C, typography, spacing, radii } from '../lib/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as haptics from '../lib/haptics';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -165,8 +165,8 @@ export default function CustomerDetailScreen() {
           <Text style={styles.navTitle}>Contact</Text>
           <View style={{ width: 36 }} />
         </View>
-        <View style={{ paddingHorizontal: 20, paddingTop: 16 }}>
-          <SkeletonCard style={{ marginBottom: 16 }} />
+        <View style={{ paddingHorizontal: spacing.xl, paddingTop: 16 }}>
+          <SkeletonCard style={{ marginBottom: spacing.lg }} />
           {Array.from({ length: 5 }).map((_, i) => <SkeletonListItem key={i} />)}
         </View>
         {slowLoad && (
@@ -362,9 +362,9 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: C.bg },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: C.bg, gap: 12 },
   errorText: { color: C.danger, fontSize: 15 },
-  retryBtn: { paddingHorizontal: 24, paddingVertical: 12, backgroundColor: C.primary, borderRadius: 12 },
+  retryBtn: { paddingHorizontal: spacing.xxl, paddingVertical: spacing.md, backgroundColor: C.primary, borderRadius: radii.md },
   retryBtnText: { color: C.bg, fontSize: 14, fontWeight: '700' },
-  backBtn: { paddingHorizontal: 20, paddingVertical: 10, backgroundColor: C.surfaceRaised, borderRadius: 8, borderWidth: 1, borderColor: C.border },
+  backBtn: { paddingHorizontal: spacing.xl, paddingVertical: 10, backgroundColor: C.surfaceRaised, borderRadius: radii.sm, borderWidth: 1, borderColor: C.border },
   backBtnText: { color: C.text, fontSize: 14 },
   slowLoadBanner: {
     position: 'absolute',
@@ -375,7 +375,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     backgroundColor: C.surface,
-    borderRadius: 12,
+    borderRadius: radii.md,
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderWidth: 1,
@@ -386,7 +386,7 @@ const styles = StyleSheet.create({
   navBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
+    paddingHorizontal: spacing.lg,
     paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: C.border,
@@ -414,11 +414,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: 32,
     paddingBottom: 24,
-    paddingHorizontal: 24,
+    paddingHorizontal: spacing.xxl,
   },
   heroAvatarWrap: {
     position: 'relative',
-    marginBottom: 16,
+    marginBottom: spacing.lg,
   },
   heroAvatar: {
     width: 88,
@@ -453,11 +453,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: C.surface,
-    borderRadius: 16,
+    borderRadius: radii.lg,
     borderWidth: 1,
     borderColor: C.border,
     paddingVertical: 14,
-    paddingHorizontal: 8,
+    paddingHorizontal: spacing.sm,
     marginTop: 20,
     width: '100%',
   },
@@ -468,23 +468,23 @@ const styles = StyleSheet.create({
 
   actions: {
     flexDirection: 'row',
-    paddingHorizontal: 20,
+    paddingHorizontal: spacing.xl,
     marginBottom: 20,
     gap: 8,
   },
   actionBtn: { flex: 1, alignItems: 'center', gap: 6 },
-  actionIcon: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
+  actionIcon: { width: 48, height: 48, borderRadius: radii.xxl, alignItems: 'center', justifyContent: 'center' },
   actionLabel: { color: C.textMuted, fontSize: 11, fontWeight: '500' },
 
-  section: { paddingHorizontal: 16, marginBottom: 16 },
+  section: { paddingHorizontal: spacing.lg, marginBottom: spacing.lg },
   sectionTitle: { color: C.textSecondary, fontSize: 12, fontWeight: '600', letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 10 },
   tagsRow: { gap: 8, alignItems: 'center' },
   tag: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
+    paddingHorizontal: spacing.md,
     paddingVertical: 6,
-    borderRadius: 20,
+    borderRadius: radii.xl,
     backgroundColor: C.surface,
     borderWidth: 1,
     borderColor: C.border,
@@ -493,9 +493,9 @@ const styles = StyleSheet.create({
   tagText: { color: C.textMuted, fontSize: 12, textTransform: 'capitalize' },
   tagTextActive: { color: C.primary, fontWeight: '600' },
 
-  tabsWrap: { paddingHorizontal: 16, marginBottom: 12 },
+  tabsWrap: { paddingHorizontal: spacing.lg, marginBottom: spacing.md },
   tabs: { flexDirection: 'row', backgroundColor: C.surface, borderRadius: 10, padding: 3, borderWidth: 1, borderColor: C.border },
-  tab: { flex: 1, paddingVertical: 9, alignItems: 'center', borderRadius: 8 },
+  tab: { flex: 1, paddingVertical: 9, alignItems: 'center', borderRadius: radii.sm },
   tabActive: { backgroundColor: C.surfaceRaised },
   tabText: { color: C.textMuted, fontSize: 13, fontWeight: '500' },
   tabTextActive: { color: C.text, fontWeight: '700' },
@@ -504,10 +504,10 @@ const styles = StyleSheet.create({
   emptyTab: { paddingVertical: 48, alignItems: 'center', gap: 10 },
   emptyText: { color: C.textMuted, fontSize: 14 },
 
-  notesSection: { paddingHorizontal: 16 },
+  notesSection: { paddingHorizontal: spacing.lg },
   notesInput: {
     backgroundColor: C.surface,
-    borderRadius: 12,
+    borderRadius: radii.md,
     borderWidth: 1,
     borderColor: C.border,
     padding: 14,
@@ -517,7 +517,7 @@ const styles = StyleSheet.create({
     minHeight: 160,
     marginBottom: 14,
   },
-  saveBtn: { borderRadius: 14, overflow: 'hidden', marginBottom: 24 },
+  saveBtn: { borderRadius: 14, overflow: 'hidden', marginBottom: spacing.xxl },
   saveBtnGradient: { paddingVertical: 14, alignItems: 'center' },
   saveBtnText: { color: C.bg, fontSize: 15, fontWeight: '700' },
 });

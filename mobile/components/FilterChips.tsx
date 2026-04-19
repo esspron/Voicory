@@ -1,4 +1,4 @@
-import { colors as C } from '../lib/theme';
+import { colors as C, typography, spacing, radii } from '../lib/theme';
 import React from 'react';
 import { ScrollView, TouchableOpacity, Text, StyleSheet, ViewStyle } from 'react-native';
 import * as haptics from '../lib/haptics';
@@ -38,7 +38,7 @@ export function FilterChips({ options, selected, onSelect, style }: FilterChipsP
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: 20,
+    paddingHorizontal: spacing.xl,
     paddingVertical: 6,
     gap: 10,
     flexDirection: 'row',
@@ -47,7 +47,7 @@ const styles = StyleSheet.create({
   chip: {
     paddingHorizontal: 18,
     paddingVertical: 9,
-    borderRadius: 24,
+    borderRadius: radii.xxl,
     backgroundColor: C.surfaceRaised,
     borderWidth: 1.5,
     borderColor: C.border,
@@ -58,8 +58,7 @@ const styles = StyleSheet.create({
   },
   label: {
     color: C.textMuted,
-    fontSize: 13,
-    fontWeight: '600',
+    ...typography.label,
     letterSpacing: 0.2,
   },
   labelSelected: {

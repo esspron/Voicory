@@ -13,7 +13,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, typography, spacing } from '../lib/theme';
+import { colors, typography, spacing, radii } from '../lib/theme';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
 
 const BANNER_HEIGHT = 40;

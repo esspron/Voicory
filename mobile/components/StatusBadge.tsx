@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, ViewStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { colors as C } from '../lib/theme';
+import { colors as C, typography, spacing, radii } from '../lib/theme';
 
 interface StatusConfig {
   gradient: [string, string];
@@ -82,7 +82,7 @@ const styles = StyleSheet.create({
     gap: 5,
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 20,
+    borderRadius: radii.xl,
   },
   liveDot: {
     width: 5,
@@ -90,8 +90,7 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
   text: {
-    fontSize: 11,
-    fontWeight: '700',
+    ...typography.captionXs,
     letterSpacing: 0.3,
   },
 });

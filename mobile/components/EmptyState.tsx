@@ -1,4 +1,4 @@
-import { colors as C } from '../lib/theme';
+import { colors as C, typography, spacing, radii } from '../lib/theme';
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -42,7 +42,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 80,
-    paddingHorizontal: 40,
+    paddingHorizontal: spacing.xxl + spacing.lg,
   },
   iconCircle: {
     width: 80,
@@ -51,7 +51,7 @@ const styles = StyleSheet.create({
     backgroundColor: C.primaryMuted,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 20,
+    marginBottom: spacing.xl,
   },
   iconInner: {
     width: 52,
@@ -63,9 +63,9 @@ const styles = StyleSheet.create({
   },
   title: {
     color: C.text,
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: 8,
+    ...typography.h2,
+    fontWeight: '700' as const,
+    marginBottom: spacing.sm,
     textAlign: 'center',
     letterSpacing: -0.2,
   },
@@ -78,11 +78,11 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   actionBtn: {
-    marginTop: 20,
+    marginTop: spacing.xl,
     backgroundColor: C.primary,
-    borderRadius: 12,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
+    borderRadius: radii.md,
+    paddingHorizontal: spacing.xxl,
+    paddingVertical: spacing.md,
   },
   actionText: {
     color: C.bg,

@@ -9,7 +9,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BottomSheet } from './BottomSheet';
-import { colors as C, radii, typography } from '../lib/theme';
+import { colors as C, typography, spacing, radii } from '../lib/theme';
 
 export interface ConfirmationModalProps {
   visible: boolean;
@@ -108,7 +108,7 @@ export function ConfirmationModal({
 
 const styles = StyleSheet.create({
   content: {
-    paddingHorizontal: 24,
+    paddingHorizontal: spacing.xxl,
     alignItems: 'center',
   },
   iconWrap: {
@@ -140,7 +140,7 @@ const styles = StyleSheet.create({
     borderRadius: radii.md,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 12,
+    marginBottom: spacing.md,
   },
   btnDisabled: {
     opacity: 0.6,

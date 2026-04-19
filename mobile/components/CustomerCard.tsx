@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { colors as C } from '../lib/theme';
+import { colors as C, typography, spacing, radii, shadows } from '../lib/theme';
 import { Customer } from '../types';
 import { ActionSheet } from './ActionSheet';
 
@@ -180,22 +180,18 @@ export function CustomerCard({ customer, onPress, onViewDetails }: CustomerCardP
 
 const styles = StyleSheet.create({
   cardWrap: {
-    marginHorizontal: 16,
+    marginHorizontal: spacing.lg,
     marginVertical: 5,
   },
   card: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: C.surface,
-    borderRadius: 16,
-    padding: 14,
+    borderRadius: radii.lg,
+    padding: spacing.md + 2,
     borderWidth: 1,
     borderColor: C.border,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    elevation: 3,
+    ...shadows.md,
   },
   avatarWrap: {
     marginRight: 14,
@@ -219,8 +215,8 @@ const styles = StyleSheet.create({
   },
   avatarText: {
     color: '#fff',
-    fontSize: 17,
-    fontWeight: '800',
+    ...typography.h3,
+    fontWeight: '800' as const,
     letterSpacing: 0.5,
     textShadowColor: 'rgba(0,0,0,0.3)',
     textShadowOffset: { width: 0, height: 1 },
@@ -238,8 +234,8 @@ const styles = StyleSheet.create({
   },
   name: {
     color: C.text,
-    fontSize: 16,
-    fontWeight: '700',
+    ...typography.bodyLg,
+    fontWeight: '700' as const,
     flex: 1,
     marginRight: 8,
     letterSpacing: -0.2,
@@ -261,8 +257,7 @@ const styles = StyleSheet.create({
   },
   phone: {
     color: C.textSecondary,
-    fontSize: 13,
-    fontWeight: '500',
+    ...typography.caption,
   },
   bottomRow: {
     flexDirection: 'row',
@@ -272,7 +267,7 @@ const styles = StyleSheet.create({
   },
   timeText: {
     color: C.textFaint,
-    fontSize: 11,
-    fontWeight: '500',
+    ...typography.captionXs,
+    fontWeight: '500' as const,
   },
 });

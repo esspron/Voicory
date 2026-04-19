@@ -40,7 +40,7 @@ import { getDashboardData, DashboardData, CreditHealth, AgentPerformance } from 
 import { getCalls } from '../services/callService';
 import { supabase } from '../lib/supabase';
 import { CallLog } from '../types';
-import { colors as C, shadows, radii, spacing } from '../lib/theme';
+import { colors as C, typography, spacing, radii, shadows } from '../lib/theme';
 import { SkeletonDashboard } from '../components/Skeleton';
 import { AnimatedNumber } from '../components/AnimatedNumber';
 import { MiniChart } from '../components/MiniChart';
@@ -664,7 +664,7 @@ export default function DashboardScreen() {
           </View>
 
           {(ch.urgency === 'critical' || ch.urgency === 'low') && (
-            <TouchableOpacity onPress={() => router.push('/billing' as any)} activeOpacity={0.85} style={{ marginHorizontal: 20, marginBottom: 24 }}>
+            <TouchableOpacity onPress={() => router.push('/billing' as any)} activeOpacity={0.85} style={{ marginHorizontal: spacing.xl, marginBottom: spacing.xxl }}>
               <LinearGradient
                 colors={ch.urgency === 'critical' ? ['#ef4444', '#dc2626'] : [C.primary, C.primaryDark] as [string, string]}
                 style={s.addCreditsFull}
@@ -799,7 +799,7 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-end',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
+    paddingHorizontal: spacing.xl,
     paddingBottom: 24,
   },
   greeting: {
@@ -818,7 +818,7 @@ const s = StyleSheet.create({
   iconBtn: {
     width: 40,
     height: 40,
-    borderRadius: 12,
+    borderRadius: radii.md,
     backgroundColor: C.surface,
     alignItems: 'center',
     justifyContent: 'center',
@@ -831,10 +831,10 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    marginHorizontal: 20,
-    marginBottom: 16,
+    marginHorizontal: spacing.xl,
+    marginBottom: spacing.lg,
     padding: 14,
-    borderRadius: 12,
+    borderRadius: radii.md,
     backgroundColor: C.danger + '12',
     borderWidth: 1,
     borderColor: C.danger + '25',
@@ -844,7 +844,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 5,
     backgroundColor: C.danger + '20',
-    borderRadius: 8,
+    borderRadius: radii.sm,
     borderWidth: 1,
     borderColor: C.danger + '40',
   },
@@ -859,7 +859,7 @@ const s = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     backgroundColor: C.surface,
-    borderRadius: 12,
+    borderRadius: radii.md,
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderWidth: 1,
@@ -872,11 +872,11 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginHorizontal: 20,
-    marginBottom: 12,
+    marginHorizontal: spacing.xl,
+    marginBottom: spacing.md,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    borderRadius: 12,
+    borderRadius: radii.md,
     borderWidth: 1,
     backgroundColor: C.surface,
   },
@@ -885,9 +885,9 @@ const s = StyleSheet.create({
 
   // Credit card
   creditCardWrap: {
-    marginHorizontal: 20,
-    marginBottom: 12,
-    borderRadius: 20,
+    marginHorizontal: spacing.xl,
+    marginBottom: spacing.md,
+    borderRadius: radii.xl,
     overflow: 'hidden',
     ...shadows.lg,
   },
@@ -897,14 +897,14 @@ const s = StyleSheet.create({
     justifyContent: 'space-between',
     padding: 20,
     backgroundColor: C.surfaceRaised,
-    borderRadius: 20,
+    borderRadius: radii.xl,
     borderWidth: 1,
     borderColor: C.borderFocus,
     overflow: 'hidden',
   },
   creditCardInnerBorder: {
     ...StyleSheet.absoluteFillObject,
-    borderRadius: 20,
+    borderRadius: radii.xl,
     borderWidth: 1,
     borderColor: C.primary + '12',
   },
@@ -944,7 +944,7 @@ const s = StyleSheet.create({
   // Add credits
   addCreditsFull: {
     height: 46,
-    borderRadius: 12,
+    borderRadius: radii.md,
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
@@ -953,10 +953,10 @@ const s = StyleSheet.create({
 
   // Setup
   setupCard: {
-    marginHorizontal: 20,
-    marginBottom: 24,
+    marginHorizontal: spacing.xl,
+    marginBottom: spacing.xxl,
     backgroundColor: C.surface,
-    borderRadius: 20,
+    borderRadius: radii.xl,
     borderWidth: 1,
     borderColor: C.border,
     overflow: 'hidden',
@@ -969,7 +969,7 @@ const s = StyleSheet.create({
     height: 3,
     backgroundColor: C.border,
     borderRadius: 2,
-    marginTop: 12,
+    marginTop: spacing.md,
     overflow: 'hidden',
   },
   setupBarFill: {
@@ -981,7 +981,7 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
-    paddingHorizontal: 20,
+    paddingHorizontal: spacing.xl,
     paddingVertical: 14,
     borderBottomWidth: 1,
     borderBottomColor: C.borderLight,
@@ -1001,7 +1001,7 @@ const s = StyleSheet.create({
   setupStepSub: { fontSize: 12, color: C.textMuted },
 
   // Week metrics
-  weekSection: { marginHorizontal: 20, marginBottom: 24 },
+  weekSection: { marginHorizontal: spacing.xl, marginBottom: spacing.xxl },
   weekHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1018,10 +1018,10 @@ const s = StyleSheet.create({
   metricCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 16,
+    borderRadius: radii.lg,
     borderWidth: 1,
     borderColor: C.border,
-    paddingVertical: 20,
+    paddingVertical: spacing.xl,
     ...shadows.md,
   },
   metric: { flex: 1, alignItems: 'center' },
@@ -1030,12 +1030,12 @@ const s = StyleSheet.create({
   metricSep: { width: 1, height: 28, backgroundColor: C.border },
 
   // Agents
-  agentSection: { marginHorizontal: 20, marginBottom: 24 },
+  agentSection: { marginHorizontal: spacing.xl, marginBottom: spacing.xxl },
   agentCard: {
-    borderRadius: 16,
+    borderRadius: radii.lg,
     borderWidth: 1,
     borderColor: C.border,
-    marginTop: 12,
+    marginTop: spacing.md,
     overflow: 'hidden',
     ...shadows.md,
   },
@@ -1043,7 +1043,7 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    paddingHorizontal: 16,
+    paddingHorizontal: spacing.lg,
     paddingVertical: 14,
   },
   agentIconWrap: {
@@ -1059,7 +1059,7 @@ const s = StyleSheet.create({
   agentRingPct: { fontSize: 10, fontWeight: '800' },
 
   // Calls
-  callsSection: { marginHorizontal: 20, marginBottom: 8 },
+  callsSection: { marginHorizontal: spacing.xl, marginBottom: spacing.sm },
   callsSectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1072,7 +1072,7 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    marginBottom: 8,
+    marginBottom: spacing.sm,
     marginTop: 4,
   },
   callGroupLabel: {
@@ -1089,10 +1089,10 @@ const s = StyleSheet.create({
   },
   callGroupCard: {
     backgroundColor: C.surface,
-    borderRadius: 16,
+    borderRadius: radii.lg,
     borderWidth: 1,
     borderColor: C.border,
-    marginBottom: 16,
+    marginBottom: spacing.lg,
     overflow: 'hidden',
     ...shadows.sm,
   },
@@ -1100,7 +1100,7 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    paddingVertical: 12,
+    paddingVertical: spacing.md,
     paddingHorizontal: 14,
     borderBottomWidth: 1,
     borderBottomColor: C.borderLight,
@@ -1120,11 +1120,11 @@ const s = StyleSheet.create({
 
   // Waiting
   waitingCard: {
-    marginHorizontal: 20,
+    marginHorizontal: spacing.xl,
     padding: 36,
     alignItems: 'center',
     backgroundColor: C.surface,
-    borderRadius: 20,
+    borderRadius: radii.xl,
     borderWidth: 1,
     borderColor: C.border,
     ...shadows.md,
@@ -1132,7 +1132,7 @@ const s = StyleSheet.create({
   waitingIconWrap: {
     width: 96,
     height: 80,
-    borderRadius: 20,
+    borderRadius: radii.xl,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1146,7 +1146,7 @@ const s = StyleSheet.create({
     fontSize: 13,
     color: C.textMuted,
     textAlign: 'center',
-    marginTop: 8,
+    marginTop: spacing.sm,
     lineHeight: 19,
   },
 });

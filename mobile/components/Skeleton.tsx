@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { View, StyleSheet, Animated, ViewStyle } from 'react-native';
-import { colors, radii } from '../lib/theme';
+import { colors, typography, spacing, radii } from '../lib/theme';
 
 interface SkeletonProps {
   width: number | string;
@@ -64,7 +64,7 @@ export function SkeletonCard({ style }: { style?: ViewStyle }) {
         <Skeleton width={48} height={48} borderRadius={14} />
         <View style={skeletonStyles.cardText}>
           <Skeleton width="60%" height={16} />
-          <Skeleton width="40%" height={12} style={{ marginTop: 8 }} />
+          <Skeleton width="40%" height={12} style={{ marginTop: spacing.sm }} />
         </View>
       </View>
     </View>
@@ -104,14 +104,14 @@ export function SkeletonDashboard() {
       <View style={skeletonStyles.creditSkeleton}>
         <View>
           <Skeleton width={120} height={36} />
-          <Skeleton width={160} height={14} style={{ marginTop: 8 }} />
+          <Skeleton width={160} height={14} style={{ marginTop: spacing.sm }} />
         </View>
         <Skeleton width={80} height={80} borderRadius={40} />
       </View>
       {/* Stats */}
       <SkeletonStatRow />
       {/* Recent calls */}
-      <Skeleton width={100} height={14} style={{ marginTop: 24, marginBottom: 12 }} />
+      <Skeleton width={100} height={14} style={{ marginTop: spacing.xxl, marginBottom: spacing.md }} />
       {Array.from({ length: 4 }).map((_, i) => (
         <SkeletonListItem key={i} />
       ))}
@@ -126,7 +126,7 @@ const skeletonStyles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     padding: 20,
-    marginBottom: 12,
+    marginBottom: spacing.md,
   },
   cardRow: {
     flexDirection: 'row',
@@ -142,7 +142,7 @@ const skeletonStyles = StyleSheet.create({
     borderRadius: radii.lg,
     borderWidth: 1,
     borderColor: colors.border,
-    paddingVertical: 20,
+    paddingVertical: spacing.xl,
   },
   stat: {
     flex: 1,
@@ -152,13 +152,13 @@ const skeletonStyles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
-    paddingVertical: 12,
+    paddingVertical: spacing.md,
   },
   listText: {
     flex: 1,
   },
   dashboard: {
-    paddingHorizontal: 20,
+    paddingHorizontal: spacing.xl,
     paddingTop: 24,
   },
   creditSkeleton: {
@@ -170,6 +170,6 @@ const skeletonStyles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: spacing.xxl,
   },
 });

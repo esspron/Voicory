@@ -10,7 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { colors, typography, spacing } from '../lib/theme';
+import { colors, typography, spacing, radii } from '../lib/theme';
 import * as haptics from '../lib/haptics';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────

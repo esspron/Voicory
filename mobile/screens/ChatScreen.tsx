@@ -16,7 +16,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { colors as C } from '../lib/theme';
+import { colors as C, typography, spacing, radii } from '../lib/theme';
 import ChatBubble from '../components/whatsapp/ChatBubble';
 import ChatInput from '../components/whatsapp/ChatInput';
 import ContactAvatar from '../components/whatsapp/ContactAvatar';
@@ -399,8 +399,8 @@ const styles = StyleSheet.create({
   chatBg: { flex: 1, backgroundColor: '#0b141a' },
   messageList: { paddingVertical: 10, paddingBottom: 4 },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
-  errorText: { color: C.danger, fontSize: 15, textAlign: 'center', paddingHorizontal: 24 },
-  retryBtn: { backgroundColor: C.primary, borderRadius: 20, paddingHorizontal: 24, paddingVertical: 10 },
+  errorText: { color: C.danger, fontSize: 15, textAlign: 'center', paddingHorizontal: spacing.xxl },
+  retryBtn: { backgroundColor: C.primary, borderRadius: radii.xl, paddingHorizontal: spacing.xxl, paddingVertical: 10 },
   retryText: { color: '#000', fontWeight: '700', fontSize: 15 },
   emptyChat: { alignItems: 'center', paddingVertical: 40 },
   emptyChatText: { color: C.textMuted, fontSize: 14 },

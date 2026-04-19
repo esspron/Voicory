@@ -1,4 +1,4 @@
-import { colors as C } from '../lib/theme';
+import { colors as C, typography, spacing, radii } from '../lib/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SkeletonListItem } from '../components/Skeleton';
 import { AnimatedListItem } from '../components/AnimatedListItem';
@@ -148,7 +148,7 @@ export default function CustomersScreen() {
   if (loading) {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
-        <View style={{ paddingHorizontal: 20, paddingTop: 24 }}>
+        <View style={{ paddingHorizontal: spacing.xl, paddingTop: 24 }}>
           {Array.from({ length: 8 }).map((_, i) => (
             <SkeletonListItem key={i} />
           ))}
@@ -251,7 +251,7 @@ const styles = StyleSheet.create({
     backgroundColor: C.bg,
   },
   screenHeader: { 
-    paddingHorizontal: 20, 
+    paddingHorizontal: spacing.xl, 
     paddingTop: 16, 
     paddingBottom: 24,
   },
@@ -270,8 +270,8 @@ const styles = StyleSheet.create({
     backgroundColor: C.primaryMuted,
     borderColor: C.primary,
     borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 12,
+    borderRadius: radii.md,
+    paddingHorizontal: spacing.md,
     paddingVertical: 6,
   },
   countText: {
@@ -283,9 +283,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: C.danger + '15',
-    marginHorizontal: 20,
+    marginHorizontal: spacing.xl,
     marginVertical: 8,
-    borderRadius: 12,
+    borderRadius: radii.md,
     padding: 14,
     borderWidth: 1,
     borderColor: C.danger + '30',
@@ -301,7 +301,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 5,
     backgroundColor: C.danger + '20',
-    borderRadius: 8,
+    borderRadius: radii.sm,
     borderWidth: 1,
     borderColor: C.danger + '40',
   },
@@ -315,7 +315,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     backgroundColor: C.surface,
-    borderRadius: 12,
+    borderRadius: radii.md,
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderWidth: 1,
@@ -323,7 +323,7 @@ const styles = StyleSheet.create({
   },
   slowLoadText: { color: C.textMuted, fontSize: 13, fontWeight: '500' },
   loadingMore: { 
-    paddingVertical: 20,
+    paddingVertical: spacing.xl,
   },
   fab: {
     position: 'absolute',
@@ -357,7 +357,7 @@ const styles = StyleSheet.create({
     color: C.text,
     fontSize: 20,
     fontWeight: '700',
-    marginTop: 8,
+    marginTop: spacing.sm,
     textAlign: 'center',
   },
   emptyMessage: {

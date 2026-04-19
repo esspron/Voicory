@@ -1,4 +1,4 @@
-import { colors as C } from '../lib/theme';
+import { colors as C, typography, spacing, radii } from '../lib/theme';
 import React, { useState } from 'react';
 import { View, TextInput, StyleSheet, ViewStyle, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -45,7 +45,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: C.border,
     paddingHorizontal: 14,
-    marginHorizontal: 20,
+    marginHorizontal: spacing.xl,
     marginVertical: 10,
     height: 48,
     gap: 10,

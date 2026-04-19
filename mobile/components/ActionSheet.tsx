@@ -7,7 +7,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BottomSheet } from './BottomSheet';
-import { colors as C, radii, typography } from '../lib/theme';
+import { colors as C, typography, spacing, radii } from '../lib/theme';
 
 export interface ActionSheetItem {
   /** Ionicons icon name */
@@ -98,14 +98,14 @@ export function ActionSheet({ visible, onClose, title, items }: ActionSheetProps
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: 16,
+    paddingHorizontal: spacing.lg,
     paddingBottom: 8,
   },
   title: {
     ...typography.caption,
     color: C.textMuted,
     textAlign: 'center',
-    marginBottom: 16,
+    marginBottom: spacing.lg,
     marginTop: -4,
     letterSpacing: 0.3,
   },
@@ -120,7 +120,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 14,
-    paddingHorizontal: 16,
+    paddingHorizontal: spacing.lg,
     gap: 14,
     minHeight: 58,
   },

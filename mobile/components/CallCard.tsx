@@ -12,7 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { CallLog } from '../types';
 import { StatusBadge } from './StatusBadge';
-import { colors as C, radii, shadows, typography } from '../lib/theme';
+import { colors as C, typography, spacing, radii, shadows } from '../lib/theme';
 import { ActionSheet } from './ActionSheet';
 
 const USD_TO_INR = 84;
@@ -211,8 +211,8 @@ const styles = StyleSheet.create({
     backgroundColor: C.surface,
     borderRadius: radii.xl,
     paddingVertical: 14,
-    paddingHorizontal: 16,
-    marginHorizontal: 16,
+    paddingHorizontal: spacing.lg,
+    marginHorizontal: spacing.lg,
     marginVertical: 5,
     borderWidth: 1,
     borderColor: C.border,
@@ -230,7 +230,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: 48,
     height: 48,
-    borderRadius: 24,
+    borderRadius: radii.xxl,
     borderWidth: 1.5,
   },
   iconContainer: {
@@ -296,7 +296,7 @@ const styles = StyleSheet.create({
   statusDotOuter: {
     width: 16,
     height: 16,
-    borderRadius: 8,
+    borderRadius: radii.sm,
     alignItems: 'center',
     justifyContent: 'center',
   },

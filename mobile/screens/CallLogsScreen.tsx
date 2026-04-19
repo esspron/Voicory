@@ -1,4 +1,4 @@
-import { colors as C } from '../lib/theme';
+import { colors as C, typography, spacing, radii } from '../lib/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SkeletonListItem } from '../components/Skeleton';
 import { AnimatedListItem } from '../components/AnimatedListItem';
@@ -160,7 +160,7 @@ export default function CallLogsScreen() {
             <Text style={styles.screenTitle}>Calls</Text>
           </View>
         </View>
-        <View style={{ paddingHorizontal: 16 }}>
+        <View style={{ paddingHorizontal: spacing.lg }}>
           {Array.from({ length: 8 }).map((_, i) => (
             <SkeletonListItem key={i} />
           ))}
@@ -285,12 +285,12 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   skeletonHeader: {
-    paddingHorizontal: 20,
+    paddingHorizontal: spacing.xl,
     paddingTop: 16,
     paddingBottom: 20,
   },
   screenHeader: {
-    paddingHorizontal: 20,
+    paddingHorizontal: spacing.xl,
     paddingTop: 16,
     paddingBottom: 20,
   },
@@ -315,7 +315,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 5,
     backgroundColor: C.successMuted,
-    borderRadius: 20,
+    borderRadius: radii.xl,
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderWidth: 1,
@@ -344,7 +344,7 @@ const styles = StyleSheet.create({
   sectionHeaderContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: spacing.xl,
     paddingTop: 20,
     paddingBottom: 10,
     gap: 10,
@@ -363,9 +363,9 @@ const styles = StyleSheet.create({
   },
   errorBanner: {
     backgroundColor: C.danger + '15',
-    marginHorizontal: 20,
+    marginHorizontal: spacing.xl,
     marginVertical: 8,
-    borderRadius: 12,
+    borderRadius: radii.md,
     padding: 14,
     borderWidth: 1,
     borderColor: C.danger + '30',
@@ -383,7 +383,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 5,
     backgroundColor: C.danger + '20',
-    borderRadius: 8,
+    borderRadius: radii.sm,
     borderWidth: 1,
     borderColor: C.danger + '40',
   },
@@ -397,7 +397,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     backgroundColor: C.surface,
-    borderRadius: 12,
+    borderRadius: radii.md,
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderWidth: 1,
@@ -405,7 +405,7 @@ const styles = StyleSheet.create({
   },
   slowLoadText: { color: C.textMuted, fontSize: 13, fontWeight: '500' },
   loadingMoreContainer: {
-    paddingHorizontal: 16,
+    paddingHorizontal: spacing.lg,
     paddingTop: 8,
   },
 });

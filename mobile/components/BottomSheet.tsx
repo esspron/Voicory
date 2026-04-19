@@ -9,7 +9,7 @@ import {
   Dimensions,
   Platform,
 } from 'react-native';
-import { colors as C, radii } from '../lib/theme';
+import { colors as C, typography, spacing, radii } from '../lib/theme';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const DRAG_THRESHOLD = 80;
@@ -172,7 +172,7 @@ const styles = StyleSheet.create({
   },
   handleArea: {
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: spacing.sm,
     paddingBottom: 16,
   },
   handle: {

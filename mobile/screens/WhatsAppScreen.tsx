@@ -1,4 +1,4 @@
-import { colors as C } from '../lib/theme';
+import { colors as C, typography, spacing, radii } from '../lib/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -217,7 +217,7 @@ export default function WhatsAppScreen() {
       )}
 
       {loading ? (
-        <View style={{ paddingHorizontal: 16, paddingTop: 8 }}>
+        <View style={{ paddingHorizontal: spacing.lg, paddingTop: 8 }}>
           {Array.from({ length: 8 }).map((_, i) => (
             <SkeletonListItem key={i} />
           ))}
@@ -284,7 +284,7 @@ const styles = StyleSheet.create({
     backgroundColor: C.surface,
     paddingTop: 8,
     paddingBottom: 16,
-    paddingHorizontal: 20,
+    paddingHorizontal: spacing.xl,
     borderBottomWidth: 1,
     borderBottomColor: C.border,
   },
@@ -315,14 +315,14 @@ const styles = StyleSheet.create({
   headerIcon: {
     width: 40,
     height: 40,
-    borderRadius: 20,
+    borderRadius: radii.xl,
     backgroundColor: C.surfaceRaised,
     alignItems: 'center',
     justifyContent: 'center',
   },
   searchContainer: {
     backgroundColor: C.surface,
-    paddingHorizontal: 16,
+    paddingHorizontal: spacing.lg,
     paddingBottom: 12,
     borderBottomWidth: 1,
     borderBottomColor: C.border,
@@ -331,7 +331,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: C.surfaceRaised,
-    borderRadius: 12,
+    borderRadius: radii.md,
     paddingHorizontal: 14,
     height: 42,
     gap: 10,
@@ -346,8 +346,8 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
     backgroundColor: C.bg,
   },
   rowContent: {
@@ -434,9 +434,9 @@ const styles = StyleSheet.create({
   },
   retryBtn: {
     backgroundColor: C.primary,
-    borderRadius: 12,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
+    borderRadius: radii.md,
+    paddingHorizontal: spacing.xxl,
+    paddingVertical: spacing.md,
   },
   retryText: {
     color: C.bg,
@@ -444,12 +444,12 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   slowLoadBanner: {
-    marginTop: 12,
+    marginTop: spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     backgroundColor: C.surface,
-    borderRadius: 12,
+    borderRadius: radii.md,
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderWidth: 1,

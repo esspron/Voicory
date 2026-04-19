@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, StyleSheet, Platform, ViewProps } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors } from '../lib/theme';
+import { colors, typography, spacing, radii } from '../lib/theme';
 
 interface ScreenContainerProps extends ViewProps {
   /** Override background color */
