@@ -234,12 +234,12 @@ export const initializePaddle = async (): Promise<boolean> => {
         window.Paddle.Initialize({
             token: config.clientToken,
             eventCallback: (event: any) => {
-                console.log('Paddle event:', event.name, event.data);
+                if (import.meta.env.DEV) console.log('Paddle event:', event.name);
             }
         });
 
         paddleInitialized = true;
-        console.log('✅ Paddle initialized:', config.environment);
+        
         return true;
     } catch (error) {
         console.error('Error initializing Paddle:', error);
@@ -339,7 +339,7 @@ export const openPaddleCheckout = async (
             },
             // Callback when checkout completes successfully
             successCallback: async (data: unknown) => {
-                console.log('Paddle checkout success:', data);
+                
                 // Type assertion for Paddle callback data
                 const paddleData = data as { transactionId?: string; transaction?: { id: string } };
                 const transactionId = paddleData.transactionId || paddleData.transaction?.id || 'unknown';
@@ -380,7 +380,7 @@ export const openPaddleCheckout = async (
             },
             // Callback when user closes checkout without completing
             closeCallback: () => {
-                console.log('Paddle checkout closed');
+                
                 onClose?.();
             }
         });
@@ -713,11 +713,11 @@ export const startSubscriptionCheckout = async (
                 allowLogout: false
             },
             successCallback: () => {
-                console.log('Subscription checkout completed');
+                
                 onSuccess();
             },
             closeCallback: () => {
-                console.log('Subscription checkout closed');
+                
                 onClose?.();
             }
         });

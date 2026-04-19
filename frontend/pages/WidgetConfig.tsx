@@ -297,11 +297,11 @@ const widget = new VoicoryWidget({
 
 // Event listeners
 widget.on('message', (event) => {
-  console.log('Message:', event.data);
+  if (import.meta.env.DEV) console.log('Message:', event.data);
 });
 
 widget.on('call-start', (event) => {
-  console.log('Call started:', event.data.sessionId);
+  if (import.meta.env.DEV) console.log('Call started:', event.data.sessionId);
 });
 
 // Control methods

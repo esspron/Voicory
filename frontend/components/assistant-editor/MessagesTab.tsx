@@ -1,6 +1,6 @@
 import {
     ChatCircle, Sparkle, WhatsappLogo, DeviceMobile, Lightning,
-    CaretRight, Gear, BracketsCurly, Code, X
+    CaretRight, BracketsCurly, Code, X
 } from '@phosphor-icons/react';
 import React from 'react';
 

@@ -6,19 +6,14 @@ import {
   Trash,
   CaretDown,
   CaretRight,
-  Lightning,
   Code,
-  Gear,
-  Check,
   X,
-  Copy,
   Eye,
   EyeSlash,
   ArrowSquareOut,
   Info,
   Broadcast,
   Database,
-  Phone,
   TestTube,
   CircleNotch,
   Warning,
@@ -37,16 +32,14 @@ import type {
   HTTPMethod,
   HTTPAuthType,
   HTTPTrigger,
-  HTTPHeader,
   LiveKitConfig,
   AssistantCRMConfig,
 } from '../../types/integrations';
 import {
-  DEFAULT_INTEGRATIONS,
   HTTP_REQUEST_TEMPLATES,
   HTTP_TEMPLATE_VARIABLES,
 } from '../../types/integrations';
-import { CRM_PROVIDERS_LIST, getIntegrations } from '../../services/crmService';
+import { getIntegrations } from '../../services/crmService';
 import type { CRMIntegration } from '../../types/crm';
 
 // ============================================
@@ -121,7 +114,7 @@ const HTTPRequestEditor: React.FC<HTTPRequestEditorProps> = ({
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showSecret, setShowSecret] = useState(false);
-  const { copy, copied } = useClipboard(2000);
+  const { copy, copied: _copied } = useClipboard(2000);
 
   const HTTP_METHODS: HTTPMethod[] = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
   const AUTH_TYPES: { value: HTTPAuthType; label: string }[] = [
@@ -170,7 +163,7 @@ const HTTPRequestEditor: React.FC<HTTPRequestEditorProps> = ({
             onChange={(checked) => onUpdate({ ...request, isEnabled: checked })}
             size="sm"
           />
-          <Badge variant={request.isEnabled ? 'success' : 'secondary'} size="sm">
+          <Badge variant={request.isEnabled ? 'success' : 'default'} size="sm">
             {request.isEnabled ? 'Active' : 'Disabled'}
           </Badge>
           {isExpanded ? <CaretDown size={16} /> : <CaretRight size={16} />}
@@ -383,7 +376,7 @@ const HTTPRequestEditor: React.FC<HTTPRequestEditorProps> = ({
 const IntegrationsTab: React.FC<IntegrationsTabProps> = ({
   integrations,
   onIntegrationsChange,
-  assistantId,
+  assistantId: _assistantId,
 }) => {
   // Section expansion state
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
@@ -455,7 +448,7 @@ const IntegrationsTab: React.FC<IntegrationsTabProps> = ({
   const updateLiveKit = (config: Partial<LiveKitConfig>) => {
     onIntegrationsChange({
       ...integrations,
-      livekit: { ...integrations.livekit!, ...config },
+      livekit: { ...integrations['livekit']!, ...config },
     });
   };
 
@@ -463,7 +456,7 @@ const IntegrationsTab: React.FC<IntegrationsTabProps> = ({
   const updateCRM = (config: Partial<AssistantCRMConfig>) => {
     onIntegrationsChange({
       ...integrations,
-      crm: { ...integrations.crm, ...config },
+      crm: { ...integrations['crm'], ...config },
     });
   };
 
@@ -489,17 +482,17 @@ const IntegrationsTab: React.FC<IntegrationsTabProps> = ({
             icon={Globe}
             title="Custom HTTP Requests"
             description="Make authenticated API calls during or after calls"
-            isExpanded={expandedSections.http ?? false}
+            isExpanded={expandedSections['http'] ?? false}
             onToggle={() => toggleSection('http')}
             badge={
               integrations.httpRequests.length > 0 ? (
-                <Badge variant="secondary" size="sm">
+                <Badge variant="default" size="sm">
                   {integrations.httpRequests.length} configured
                 </Badge>
               ) : null
             }
           />
-          {expandedSections.http && (
+          {expandedSections['http'] && (
             <div className="p-4 border-t border-white/5 space-y-4">
               {/* Add Button */}
               <div className="flex gap-2">
@@ -558,15 +551,15 @@ const IntegrationsTab: React.FC<IntegrationsTabProps> = ({
             icon={Broadcast}
             title="LiveKit Integration"
             description="Real-time audio/video communication and recording"
-            isExpanded={expandedSections.livekit ?? false}
+            isExpanded={expandedSections['livekit'] ?? false}
             onToggle={() => toggleSection('livekit')}
             badge={
-              integrations.livekit?.isEnabled ? (
+              integrations['livekit']?.isEnabled ? (
                 <Badge variant="success" size="sm">Enabled</Badge>
               ) : null
             }
           />
-          {expandedSections.livekit && (
+          {expandedSections['livekit'] && (
             <div className="p-4 border-t border-white/5 space-y-4">
               {/* Enable Toggle */}
               <div className="flex items-center justify-between p-4 bg-surface/50 rounded-xl">
@@ -575,19 +568,19 @@ const IntegrationsTab: React.FC<IntegrationsTabProps> = ({
                   <p className="text-xs text-textMuted">Use LiveKit for real-time voice communication</p>
                 </div>
                 <Toggle
-                  checked={integrations.livekit?.isEnabled || false}
+                  checked={integrations['livekit']?.isEnabled || false}
                   onChange={(checked) => updateLiveKit({ isEnabled: checked })}
                 />
               </div>
 
-              {integrations.livekit?.isEnabled && (
+              {integrations['livekit']?.isEnabled && (
                 <>
                   {/* Server Configuration */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label>LiveKit Server URL</Label>
                       <Input
-                        value={integrations.livekit?.serverUrl || ''}
+                        value={integrations['livekit']?.serverUrl || ''}
                         onChange={(e) => updateLiveKit({ serverUrl: e.target.value })}
                         placeholder="wss://your-livekit-server.com"
                       />
@@ -596,7 +589,7 @@ const IntegrationsTab: React.FC<IntegrationsTabProps> = ({
                       <Label>API Key</Label>
                       <Input
                         type="password"
-                        value={integrations.livekit?.apiKey || ''}
+                        value={integrations['livekit']?.apiKey || ''}
                         onChange={(e) => updateLiveKit({ apiKey: e.target.value })}
                         placeholder="API Key"
                       />
@@ -607,7 +600,7 @@ const IntegrationsTab: React.FC<IntegrationsTabProps> = ({
                     <Label>API Secret</Label>
                     <Input
                       type="password"
-                      value={integrations.livekit?.apiSecret || ''}
+                      value={integrations['livekit']?.apiSecret || ''}
                       onChange={(e) => updateLiveKit({ apiSecret: e.target.value })}
                       placeholder="API Secret"
                     />
@@ -624,7 +617,7 @@ const IntegrationsTab: React.FC<IntegrationsTabProps> = ({
                       <div key={feature.key} className="flex items-center justify-between p-3 bg-surface/50 rounded-xl">
                         <span className="text-sm text-textMain">{feature.label}</span>
                         <Toggle
-                          checked={(integrations.livekit as Record<string, boolean>)?.[feature.key] || false}
+                          checked={(integrations['livekit'] as Record<string, boolean>)?.[feature.key] || false}
                           onChange={(checked) => updateLiveKit({ [feature.key]: checked })}
                           size="sm"
                         />
@@ -639,16 +632,16 @@ const IntegrationsTab: React.FC<IntegrationsTabProps> = ({
                       <p className="text-xs text-textMuted">Stream transcripts to webhook in real-time</p>
                     </div>
                     <Toggle
-                      checked={integrations.livekit?.transcriptionEnabled || false}
+                      checked={integrations['livekit']?.transcriptionEnabled || false}
                       onChange={(checked) => updateLiveKit({ transcriptionEnabled: checked })}
                     />
                   </div>
 
-                  {integrations.livekit?.transcriptionEnabled && (
+                  {integrations['livekit']?.transcriptionEnabled && (
                     <div>
                       <Label>Transcript Webhook URL</Label>
                       <Input
-                        value={integrations.livekit?.liveTranscriptUrl || ''}
+                        value={integrations['livekit']?.liveTranscriptUrl || ''}
                         onChange={(e) => updateLiveKit({ liveTranscriptUrl: e.target.value })}
                         placeholder="https://your-server.com/transcript-webhook"
                       />
@@ -666,15 +659,15 @@ const IntegrationsTab: React.FC<IntegrationsTabProps> = ({
             icon={Database}
             title="CRM Integration"
             description="Sync calls and contacts with your CRM"
-            isExpanded={expandedSections.crm ?? false}
+            isExpanded={expandedSections['crm'] ?? false}
             onToggle={() => toggleSection('crm')}
             badge={
-              integrations.crm?.integrationId ? (
+              integrations['crm']?.integrationId ? (
                 <Badge variant="success" size="sm">Connected</Badge>
               ) : null
             }
           />
-          {expandedSections.crm && (
+          {expandedSections['crm'] && (
             <div className="p-4 border-t border-white/5 space-y-4">
               {loadingCRM ? (
                 <div className="text-center py-8">
@@ -702,7 +695,7 @@ const IntegrationsTab: React.FC<IntegrationsTabProps> = ({
                   <div>
                     <Label>Select CRM Integration</Label>
                     <select
-                      value={integrations.crm?.integrationId || ''}
+                      value={integrations['crm']?.integrationId || ''}
                       onChange={(e) => updateCRM({ integrationId: e.target.value || undefined })}
                       className="w-full h-10 px-3 bg-surface border border-white/10 rounded-lg text-textMain text-sm"
                     >
@@ -715,7 +708,7 @@ const IntegrationsTab: React.FC<IntegrationsTabProps> = ({
                     </select>
                   </div>
 
-                  {integrations.crm?.integrationId && (
+                  {integrations['crm']?.integrationId && (
                     <>
                       {/* Sync Options */}
                       <div className="grid grid-cols-2 gap-4">
@@ -731,7 +724,7 @@ const IntegrationsTab: React.FC<IntegrationsTabProps> = ({
                               <p className="text-xs text-textMuted">{opt.desc}</p>
                             </div>
                             <Toggle
-                              checked={(integrations.crm as Record<string, boolean>)?.[opt.key] ?? true}
+                              checked={(integrations['crm'] as Record<string, boolean>)?.[opt.key] ?? true}
                               onChange={(checked) => updateCRM({ [opt.key]: checked })}
                               size="sm"
                             />
@@ -746,7 +739,7 @@ const IntegrationsTab: React.FC<IntegrationsTabProps> = ({
                           <p className="text-xs text-textMuted">Auto-create a follow-up task in CRM</p>
                         </div>
                         <Toggle
-                          checked={integrations.crm?.createTaskOnEnd || false}
+                          checked={integrations['crm']?.createTaskOnEnd || false}
                           onChange={(checked) => updateCRM({ createTaskOnEnd: checked })}
                         />
                       </div>
@@ -783,7 +776,7 @@ const IntegrationsTab: React.FC<IntegrationsTabProps> = ({
                   >
                     <p className="text-sm font-medium text-textMain mb-1">{template.name}</p>
                     <p className="text-xs text-textMuted">{template.description}</p>
-                    <Badge variant="secondary" size="sm" className="mt-2">
+                    <Badge variant="default" size="sm" className="mt-2">
                       {template.category}
                     </Badge>
                   </button>

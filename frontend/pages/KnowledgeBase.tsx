@@ -157,9 +157,9 @@ const KnowledgeBase: React.FC = () => {
 
         setIsSaving(true);
         try {
-            console.log('Creating knowledge base:', newKbName.trim());
+            // Knowledge base creation logged in service
             const newKb = await createKnowledgeBase(newKbName.trim());
-            console.log('Created knowledge base:', newKb);
+            
             if (newKb) {
                 // Documents can be added after KB creation via the upload flow
                 await loadKnowledgeBases();
@@ -246,7 +246,7 @@ const KnowledgeBase: React.FC = () => {
     };
 
     const handleWebPagesSuccess = async (documentId: string) => {
-        console.log('Web pages added, document ID:', documentId);
+        
         if (selectedKb) {
             await loadDocuments(selectedKb.id);
             await loadKnowledgeBases();

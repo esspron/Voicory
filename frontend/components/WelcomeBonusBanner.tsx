@@ -2,7 +2,6 @@ import { Gift, X, Sparkle, Check, ArrowRight } from '@phosphor-icons/react';
 import React, { useState, useEffect } from 'react';
 
 import { useAuth } from '../contexts/AuthContext';
-import AuthService from '../services/authService';
 
 interface WelcomeBonusBannerProps {
     onDismiss?: () => void;

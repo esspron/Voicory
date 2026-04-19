@@ -12,7 +12,7 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
-    "description": "Voicory \u2014 AI-powered voice agents for your business. Deploy intelligent voice assistants that handle calls, qualify leads, and support customers 24/7.",
+    "description": "Voicory — AI-powered voice agents for your business. Deploy intelligent voice assistants that handle calls, qualify leads, and support customers 24/7.",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
@@ -110,9 +110,10 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "voicory-app"
-      }
+        "projectId": "b13d6ca8-31c3-445b-a30c-aaddad325846"
+      },
+      "router": {}
     },
-    "owner": "voicory"
+    "owner": "esspron"
   }
 }

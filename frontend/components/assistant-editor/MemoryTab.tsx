@@ -18,7 +18,7 @@ interface MemoryTabProps {
 
 const MemoryTab: React.FC<MemoryTabProps> = ({ formData, setFormData }) => {
     const updateMemoryConfig = (key: keyof MemoryConfig, value: any) => {
-        setFormData(prev => ({
+        setFormData((prev: any) => ({
             ...prev,
             memoryConfig: {
                 ...prev.memoryConfig,
@@ -41,7 +41,7 @@ const MemoryTab: React.FC<MemoryTabProps> = ({ formData, setFormData }) => {
                     <div className="flex items-center gap-3">
                         <span className="text-sm text-textMuted">{formData.memoryEnabled ? 'Enabled' : 'Disabled'}</span>
                         <button
-                            onClick={() => setFormData(prev => ({ ...prev, memoryEnabled: !prev.memoryEnabled }))}
+                            onClick={() => setFormData((prev: any) => ({ ...prev, memoryEnabled: !prev.memoryEnabled }))}
                             className={`w-12 h-7 rounded-full transition-colors relative ${formData.memoryEnabled ? 'bg-primary' : 'bg-gray-600'}`}
                         >
                             <div className={`w-5 h-5 rounded-full bg-white absolute top-1 transition-transform ${formData.memoryEnabled ? 'translate-x-6' : 'translate-x-1'}`} />

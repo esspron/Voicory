@@ -338,7 +338,7 @@ export const createTextDocument = async (
         if (data) {
             generateDocumentEmbedding(data.id)
                 .then(result => {
-                    if (result) console.log('Document embedding generated:', data.name);
+                    
                 })
                 .catch(err => console.error('Failed to generate embedding:', err));
         }
@@ -415,7 +415,7 @@ export const createFileDocument = async (
         if (data) {
             generateDocumentEmbedding(data.id)
                 .then(result => {
-                    if (result) console.log('File document embedding generated:', data.name);
+                    
                 })
                 .catch(err => console.error('Failed to generate embedding:', err));
         }

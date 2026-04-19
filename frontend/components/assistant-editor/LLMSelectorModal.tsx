@@ -1,4 +1,4 @@
-import { X, Check, Sparkle, CurrencyDollar } from '@phosphor-icons/react';
+import { X, Check, Sparkle, CurrencyDollar, Cpu } from '@phosphor-icons/react';
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -41,7 +41,7 @@ const LLMSelectorModal: React.FC<LLMSelectorModalProps> = ({
     const [tempProvider, setTempProvider] = useState(selectedProvider);
     const [tempModel, setTempModel] = useState(selectedModel);
     const [pricingData, setPricingData] = useState<Map<string, LLMPricing>>(new Map());
-    const [loadingPricing, setLoadingPricing] = useState(true);
+    const [_loadingPricing, setLoadingPricing] = useState(true);
 
     // Fetch pricing data on mount
     useEffect(() => {
@@ -117,7 +117,7 @@ const LLMSelectorModal: React.FC<LLMSelectorModalProps> = ({
                                     onClick={() => {
                                         setTempProvider(provider.id);
                                         // Auto-select first model of provider
-                                        setTempModel(provider.models[0]);
+                                        setTempModel(provider.models[0] ?? "");
                                     }}
                                     className={`
                                         relative p-3 rounded-xl border transition-all

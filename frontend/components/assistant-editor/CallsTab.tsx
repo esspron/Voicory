@@ -1,7 +1,7 @@
 import {
     Sparkle, Globe, Microphone,
     CaretRight, Plus, X, Check, Translate, Palette, Lightning, Gear,
-    BracketsCurly, Code
+    BracketsCurly, Code, PhoneIncoming, PhoneOutgoing
 } from '@phosphor-icons/react';
 import React, { useState, useRef, useEffect } from 'react';
 
