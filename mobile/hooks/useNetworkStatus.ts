@@ -28,7 +28,8 @@ async function ping(): Promise<boolean> {
       signal: controller.signal,
     });
     clearTimeout(id);
-    return res.status === 204 || res.ok;
+    // Any HTTP response (even 4xx) means we have connectivity
+    return res.status > 0;
   } catch {
     clearTimeout(id);
     return false;
