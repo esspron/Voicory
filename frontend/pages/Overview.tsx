@@ -109,7 +109,7 @@ const StatCard = ({ title, value, change, icon: Icon, trend, gradient, loading }
 // ---------------------------------------------------------------------------
 // CallItem
 // ---------------------------------------------------------------------------
-const CallItem = ({ log }: { log: RecentCall }) => (
+const CallItem = ({ log, formatAmount }: { log: RecentCall; formatAmount: (n: number) => string }) => (
     <div className="group flex items-center justify-between p-3.5 rounded-xl bg-white/[0.02] border border-transparent hover:bg-white/[0.05] hover:border-white/5 transition-all duration-200 cursor-pointer">
         <div className="flex items-center gap-3">
             <div className="relative">
@@ -461,7 +461,7 @@ const Overview: React.FC = () => {
                                 </div>
                             ) : (
                                 d.recentCalls.map((log) => (
-                                    <CallItem key={log.id} log={log} />
+                                    <CallItem key={log.id} log={log} formatAmount={formatAmount} />
                                 ))
                             )}
                         </div>
