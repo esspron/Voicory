@@ -680,30 +680,6 @@ export default function DashboardScreen() {
         </View>
       )}
 
-      {/* ════════════════════════════════════════════════════════════════
-          CREDIT CARD — Apple Card style gradient mesh
-      ════════════════════════════════════════════════════════════════ */}
-      {ch && (
-        <RNAnimated.View style={{ opacity: sectionAnims[0].opacity, transform: [{ translateY: sectionAnims[0].translateY }] }}>
-          <View style={s.creditCardWrap}>
-            <CreditCard ch={ch} />
-          </View>
-
-          {(ch.urgency === 'critical' || ch.urgency === 'low') && (
-            <TouchableOpacity onPress={() => router.push('/billing' as any)} activeOpacity={0.85} style={{ marginHorizontal: spacing.xl, marginBottom: spacing.xxl }}>
-              <LinearGradient
-                colors={ch.urgency === 'critical' ? ['#ef4444', '#dc2626'] : [C.primary, C.primaryDark] as [string, string]}
-                style={s.addCreditsFull}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-              >
-                <Ionicons name="add-circle-outline" size={18} color="#000" style={{ marginRight: 8 }} />
-                <Text style={s.addCreditsFullText}>Add Credits</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-          )}
-        </RNAnimated.View>
-      )}
 
       {/* ════════════════════════════════════════════════════════════════
           SETUP CHECKLIST
@@ -768,11 +744,6 @@ export default function DashboardScreen() {
             <View style={s.metric}>
               <AnimatedNumber value={data?.assistantCount ?? 0} style={s.metricNum} delay={400} />
               <Text style={s.metricLabel}>Agents</Text>
-            </View>
-            <View style={s.metricSep} />
-            <View style={s.metric}>
-              <AnimatedNumber value={ch?.balanceInr ?? 0} prefix="₹" style={s.metricNum} decimals={0} delay={500} />
-              <Text style={s.metricLabel}>Balance</Text>
             </View>
           </LinearGradient>
         </RNAnimated.View>
