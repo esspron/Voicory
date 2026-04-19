@@ -563,6 +563,7 @@ export default function DashboardScreen() {
   const ch = data?.creditHealth;
   const stats = data?.stats;
   const agents = data?.agentPerformance ?? [];
+  const assistantsList = data?.assistantsList ?? [];
   const activity = data?.dailyActivity?.map(d => d.count) ?? [];
   const hasCalls = (stats?.totalCalls ?? 0) > 0;
   const hasAgents = (data?.assistantCount ?? 0) > 0 || agents.length > 0;
@@ -767,9 +768,23 @@ export default function DashboardScreen() {
             start={{ x: 0, y: 0 }}
             end={{ x: 0, y: 1 }}
           >
-            {agents.slice(0, 4).map((a, i) => (
-              <AgentRow key={a.assistantId} agent={a} index={i} />
-            ))}
+            {agents.length > 0 ? (
+              agents.slice(0, 4).map((a, i) => (
+                <AgentRow key={a.assistantId} agent={a} index={i} />
+              ))
+            ) : (
+              assistantsList.slice(0, 4).map((a, i) => (
+                <View key={a.id} style={[s.agentRow, i > 0 && { borderTopWidth: 1, borderTopColor: C.borderLight }]}>
+                  <View style={s.agentIconWrap}>
+                    <Ionicons name="hardware-chip-outline" size={16} color={C.primary} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.agentName} numberOfLines={1}>{a.name || 'Unnamed Agent'}</Text>
+                    <Text style={s.agentSub}>No calls yet</Text>
+                  </View>
+                </View>
+              ))
+            )}
           </LinearGradient>
         </RNAnimated.View>
       )}

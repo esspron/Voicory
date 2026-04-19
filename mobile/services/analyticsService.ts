@@ -63,6 +63,7 @@ export interface DashboardData {
   stats: DashboardStats;
   creditHealth: CreditHealth;
   agentPerformance: AgentPerformance[];
+  assistantsList: { id: string; name: string; created_at: string }[];
   /** Daily call counts for last 7 days [{ date, count }] */
   dailyActivity: { date: string; count: number }[];
   /** Time-of-day greeting */
@@ -100,7 +101,7 @@ export async function getDashboardData(userId: string): Promise<DashboardData> {
     const fourteenDaysAgo = new Date(now.getTime() - 14 * 86400000).toISOString();
 
   // Parallel fetch everything we need
-  const [profileRes, weekCallsRes, priorWeekCallsRes, assistantsCountRes] = await Promise.all([
+  const [profileRes, weekCallsRes, priorWeekCallsRes, assistantsCountRes, assistantsListRes] = await Promise.all([
     supabase
       .from('user_profiles')
       .select('credits_balance')
@@ -122,6 +123,12 @@ export async function getDashboardData(userId: string): Promise<DashboardData> {
       .from('assistants')
       .select('id', { count: 'exact', head: true })
       .eq('user_id', userId),
+    supabase
+      .from('assistants')
+      .select('id, name, created_at')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(10),
   ]);
 
   const balanceUsd = profileRes.data?.credits_balance ?? 0;
@@ -212,6 +219,7 @@ export async function getDashboardData(userId: string): Promise<DashboardData> {
     stats,
     creditHealth,
     agentPerformance,
+    assistantsList: (assistantsListRes.data ?? []) as { id: string; name: string; created_at: string }[],
     dailyActivity,
     greeting: getGreeting(),
     assistantCount,
