@@ -1,15 +1,17 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   TouchableOpacity,
   View,
   Text,
   StyleSheet,
   Animated,
+  Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors as C } from '../lib/theme';
 import { Customer } from '../types';
+import { ActionSheet } from './ActionSheet';
 
 const SOURCE_GRADIENTS: Record<string, [string, string]> = {
   inbound:  ['#00d4aa', '#0099ff'],
@@ -60,10 +62,12 @@ function getInitials(name?: string): string {
 interface CustomerCardProps {
   customer: Customer;
   onPress: (customer: Customer) => void;
+  onViewDetails?: (customer: Customer) => void;
 }
 
-export function CustomerCard({ customer, onPress }: CustomerCardProps) {
+export function CustomerCard({ customer, onPress, onViewDetails }: CustomerCardProps) {
   const scaleAnim = useRef(new Animated.Value(1)).current;
+  const [actionSheetVisible, setActionSheetVisible] = useState(false);
 
   const gradColors = getGradient(customer.name, customer.source);
 
@@ -85,15 +89,46 @@ export function CustomerCard({ customer, onPress }: CustomerCardProps) {
     }).start();
   };
 
+  const handleLongPress = () => {
+    setActionSheetVisible(true);
+  };
+
+  const actionItems = [
+    ...(customer.phone_number
+      ? [
+          {
+            icon: 'call-outline',
+            label: 'Call',
+            sublabel: customer.phone_number,
+            onPress: () => Linking.openURL(`tel:${customer.phone_number}`),
+          },
+          {
+            icon: 'chatbubble-outline',
+            label: 'Message',
+            sublabel: 'Open WhatsApp chat',
+            onPress: () => Linking.openURL(`https://wa.me/${customer.phone_number.replace(/\D/g, '')}`),
+          },
+        ]
+      : []),
+    {
+      icon: 'person-outline',
+      label: 'View Details',
+      onPress: () => (onViewDetails ?? onPress)(customer),
+    },
+  ];
+
   return (
-    <Animated.View style={[styles.cardWrap, { transform: [{ scale: scaleAnim }] }]}>
-      <TouchableOpacity
-        style={styles.card}
-        onPress={() => onPress(customer)}
-        onPressIn={onPressIn}
-        onPressOut={onPressOut}
-        activeOpacity={1}
-      >
+    <>
+      <Animated.View style={[styles.cardWrap, { transform: [{ scale: scaleAnim }] }]}>
+        <TouchableOpacity
+          style={styles.card}
+          onPress={() => onPress(customer)}
+          onPressIn={onPressIn}
+          onPressOut={onPressOut}
+          onLongPress={handleLongPress}
+          delayLongPress={400}
+          activeOpacity={1}
+        >
         {/* Gradient Avatar */}
         <View style={styles.avatarWrap}>
           <LinearGradient colors={gradColors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.avatarGradient}>
@@ -130,8 +165,16 @@ export function CustomerCard({ customer, onPress }: CustomerCardProps) {
 
         {/* Chevron */}
         <Ionicons name="chevron-forward" size={18} color={C.textFaint} />
-      </TouchableOpacity>
-    </Animated.View>
+        </TouchableOpacity>
+      </Animated.View>
+
+      <ActionSheet
+        visible={actionSheetVisible}
+        onClose={() => setActionSheetVisible(false)}
+        title={customer.name || customer.phone_number}
+        items={actionItems}
+      />
+    </>
   );
 }
 

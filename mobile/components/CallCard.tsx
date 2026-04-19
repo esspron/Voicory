@@ -1,11 +1,10 @@
-import React, { useRef, useCallback } from 'react';
+import React, { useRef, useCallback, useState } from 'react';
 import {
   Animated,
   TouchableOpacity,
   View,
   Text,
   StyleSheet,
-  Alert,
   Linking,
   Platform,
 } from 'react-native';
@@ -14,6 +13,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { CallLog } from '../types';
 import { StatusBadge } from './StatusBadge';
 import { colors as C, radii, shadows, typography } from '../lib/theme';
+import { ActionSheet } from './ActionSheet';
 
 const USD_TO_INR = 84;
 
@@ -58,6 +58,7 @@ const STATUS_DOT: Record<string, string> = {
 
 export function CallCard({ call, onPress }: CallCardProps) {
   const scaleAnim = useRef(new Animated.Value(1)).current;
+  const [actionSheetVisible, setActionSheetVisible] = useState(false);
 
   const handlePressIn = useCallback(() => {
     Animated.spring(scaleAnim, {
@@ -77,22 +78,45 @@ export function CallCard({ call, onPress }: CallCardProps) {
     }).start();
   }, [scaleAnim]);
 
-  const handleLongPress = useCallback(() => {
-    const displayNum =
-      call.direction === 'inbound'
-        ? call.from_number || call.phone_number
-        : call.to_number || call.phone_number;
+  const displayNumber =
+    call.direction === 'inbound'
+      ? call.from_number || call.phone_number
+      : call.to_number || call.phone_number;
 
-    if (call.status === 'completed' || call.status === 'no-answer' || call.status === 'busy') {
-      Alert.alert('Call Back', `Call ${displayNum}?`, [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Call',
-          onPress: () => Linking.openURL(`tel:${displayNum}`),
-        },
-      ]);
-    }
-  }, [call]);
+  const handleLongPress = useCallback(() => {
+    setActionSheetVisible(true);
+  }, []);
+
+  const canCallBack =
+    call.status === 'completed' || call.status === 'no-answer' || call.status === 'busy';
+
+  const actionItems = [
+    ...(canCallBack
+      ? [
+          {
+            icon: 'call-outline',
+            label: 'Call Back',
+            sublabel: displayNumber || undefined,
+            onPress: () => {
+              if (displayNumber) Linking.openURL(`tel:${displayNumber}`);
+            },
+          },
+        ]
+      : []),
+    {
+      icon: 'information-circle-outline',
+      label: 'View Details',
+      onPress: () => onPress(call),
+    },
+    {
+      icon: 'copy-outline',
+      label: 'Copy Number',
+      sublabel: displayNumber || undefined,
+      onPress: () => {
+        // Clipboard: implement when expo-clipboard is added
+      },
+    },
+  ];
 
   const dirConf = DIRECTION_CONFIG[call.direction] ?? DIRECTION_CONFIG.outbound;
   const dotColor = STATUS_DOT[call.status] ?? C.textMuted;
@@ -100,20 +124,16 @@ export function CallCard({ call, onPress }: CallCardProps) {
   const cost = call.cost ?? 0;
   const costInr = (cost * USD_TO_INR).toFixed(2);
 
-  const displayNumber =
-    call.direction === 'inbound'
-      ? call.from_number || call.phone_number
-      : call.to_number || call.phone_number;
-
   return (
-    <TouchableOpacity
-      activeOpacity={1}
-      onPress={() => onPress(call)}
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
-      onLongPress={handleLongPress}
-      delayLongPress={400}
-    >
+    <>
+      <TouchableOpacity
+        activeOpacity={1}
+        onPress={() => onPress(call)}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        onLongPress={handleLongPress}
+        delayLongPress={400}
+      >
       <Animated.View style={[styles.card, { transform: [{ scale: scaleAnim }] }]}>
         {/* LEFT: Direction icon with gradient ring */}
         <View style={styles.iconWrapper}>
@@ -173,6 +193,14 @@ export function CallCard({ call, onPress }: CallCardProps) {
         </View>
       </Animated.View>
     </TouchableOpacity>
+
+      <ActionSheet
+        visible={actionSheetVisible}
+        onClose={() => setActionSheetVisible(false)}
+        title={displayNumber || 'Call Actions'}
+        items={actionItems}
+      />
+    </>
   );
 }
 

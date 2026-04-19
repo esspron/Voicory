@@ -1,7 +1,8 @@
 import { colors as C } from '../lib/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PressableScale } from '../components/PressableScale';
-import React, { useState, useEffect, useRef } from 'react';
+import { ConfirmationModal } from '../components/ConfirmationModal';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,9 +13,6 @@ import {
   Linking,
   ActivityIndicator,
   Platform,
-  Modal,
-  Animated,
-  Pressable,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -75,140 +73,6 @@ const iconCircleStyles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: 14,
   },
-});
-
-// ─── Sign Out Modal ────────────────────────────────────────────────────────────
-function SignOutModal({
-  visible,
-  onCancel,
-  onConfirm,
-  loading,
-}: {
-  visible: boolean;
-  onCancel: () => void;
-  onConfirm: () => void;
-  loading: boolean;
-}) {
-  const slideAnim = useRef(new Animated.Value(300)).current;
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    if (visible) {
-      Animated.parallel([
-        Animated.timing(fadeAnim, { toValue: 1, duration: 250, useNativeDriver: true }),
-        Animated.spring(slideAnim, { toValue: 0, damping: 20, stiffness: 200, useNativeDriver: true }),
-      ]).start();
-    } else {
-      Animated.parallel([
-        Animated.timing(fadeAnim, { toValue: 0, duration: 200, useNativeDriver: true }),
-        Animated.timing(slideAnim, { toValue: 300, duration: 200, useNativeDriver: true }),
-      ]).start();
-    }
-  }, [visible]);
-
-  return (
-    <Modal transparent visible={visible} animationType="none" onRequestClose={onCancel}>
-      <Animated.View style={[modalStyles.backdrop, { opacity: fadeAnim }]}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onCancel} />
-        <Animated.View
-          style={[
-            modalStyles.sheet,
-            { transform: [{ translateY: slideAnim }] },
-          ]}
-        >
-          <View style={modalStyles.handle} />
-
-          <View style={modalStyles.iconWrap}>
-            <LinearGradient
-              colors={['#EF4444', '#DC2626']}
-              style={modalStyles.iconCircle}
-            >
-              <Ionicons name="log-out" size={28} color="#fff" />
-            </LinearGradient>
-          </View>
-
-          <Text style={modalStyles.title}>Sign Out?</Text>
-          <Text style={modalStyles.desc}>
-            You'll be signed out of your Voicory account on this device.
-          </Text>
-
-          <TouchableOpacity
-            style={[modalStyles.confirmBtn, loading && { opacity: 0.6 }]}
-            onPress={onConfirm}
-            disabled={loading}
-            activeOpacity={0.8}
-          >
-            {loading ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <Text style={modalStyles.confirmText}>Sign Out</Text>
-            )}
-          </TouchableOpacity>
-
-          <TouchableOpacity style={modalStyles.cancelBtn} onPress={onCancel} activeOpacity={0.7}>
-            <Text style={modalStyles.cancelText}>Cancel</Text>
-          </TouchableOpacity>
-        </Animated.View>
-      </Animated.View>
-    </Modal>
-  );
-}
-
-const modalStyles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'flex-end',
-  },
-  sheet: {
-    backgroundColor: '#0d1420',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    paddingHorizontal: 24,
-    paddingBottom: 40,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderColor: '#1a2332',
-    alignItems: 'center',
-  },
-  handle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#2a3545',
-    marginBottom: 28,
-  },
-  iconCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  iconWrap: { marginBottom: 20 },
-  title: { fontSize: 22, fontWeight: '800', color: '#f0f2f5', marginBottom: 10, textAlign: 'center' },
-  desc: { fontSize: 15, color: '#7a8599', textAlign: 'center', lineHeight: 22, marginBottom: 32 },
-  confirmBtn: {
-    width: '100%',
-    height: 52,
-    backgroundColor: '#EF4444',
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
-  },
-  confirmText: { fontSize: 16, fontWeight: '700', color: '#fff' },
-  cancelBtn: {
-    width: '100%',
-    height: 52,
-    backgroundColor: '#111a24',
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#1a2332',
-  },
-  cancelText: { fontSize: 16, fontWeight: '600', color: '#8b95a5' },
 });
 
 // ─── Main Screen ───────────────────────────────────────────────────────────────
@@ -506,10 +370,17 @@ export default function SettingsScreen() {
         </View>
       </ScrollView>
 
-      <SignOutModal
+      <ConfirmationModal
         visible={showSignOutModal}
-        onCancel={() => setShowSignOutModal(false)}
+        onClose={() => setShowSignOutModal(false)}
         onConfirm={handleSignOut}
+        icon="log-out"
+        iconGradient={['#EF4444', '#DC2626']}
+        title="Sign Out?"
+        message="You'll be signed out of your Voicory account on this device."
+        confirmLabel="Sign Out"
+        cancelLabel="Cancel"
+        destructive
         loading={loggingOut}
       />
     </>

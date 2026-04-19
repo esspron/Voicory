@@ -9,14 +9,43 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors as C } from '../../lib/theme';
+import { ActionSheet, ActionSheetItem } from '../ActionSheet';
 
 interface ChatInputProps {
   onSend: (text: string) => void;
   disabled?: boolean;
 }
 
+const ATTACHMENT_ITEMS: ActionSheetItem[] = [
+  {
+    icon: 'image-outline',
+    label: 'Photo & Video',
+    sublabel: 'Share from your gallery',
+    onPress: () => { /* future: image picker */ },
+  },
+  {
+    icon: 'camera-outline',
+    label: 'Camera',
+    sublabel: 'Take a photo or video',
+    onPress: () => { /* future: camera */ },
+  },
+  {
+    icon: 'document-outline',
+    label: 'Document',
+    sublabel: 'Share a file',
+    onPress: () => { /* future: file picker */ },
+  },
+  {
+    icon: 'location-outline',
+    label: 'Location',
+    sublabel: 'Share your current location',
+    onPress: () => { /* future: location */ },
+  },
+];
+
 export default function ChatInput({ onSend, disabled }: ChatInputProps) {
   const [text, setText] = useState('');
+  const [attachmentSheetVisible, setAttachmentSheetVisible] = useState(false);
   const inputRef = useRef<TextInput>(null);
   const sendScale = useRef(new Animated.Value(1)).current;
   const micOpacity = useRef(new Animated.Value(1)).current;
@@ -64,9 +93,10 @@ export default function ChatInput({ onSend, disabled }: ChatInputProps) {
   };
 
   return (
+    <>
     <View style={styles.container}>
       {/* Attachment */}
-      <TouchableOpacity style={styles.iconBtn} activeOpacity={0.7}>
+      <TouchableOpacity style={styles.iconBtn} activeOpacity={0.7} onPress={() => setAttachmentSheetVisible(true)}>
         <Ionicons name="attach-outline" size={22} color={C.textMuted} />
       </TouchableOpacity>
 
@@ -106,6 +136,14 @@ export default function ChatInput({ onSend, disabled }: ChatInputProps) {
         </Animated.View>
       )}
     </View>
+
+      <ActionSheet
+        visible={attachmentSheetVisible}
+        onClose={() => setAttachmentSheetVisible(false)}
+        title="Share Attachment"
+        items={ATTACHMENT_ITEMS}
+      />
+    </>
   );
 }
 
