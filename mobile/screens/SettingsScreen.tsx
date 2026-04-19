@@ -1,4 +1,5 @@
 import { colors as C, typography, spacing, radii } from '../lib/theme';
+import { useWebLink } from '../hooks/useWebLink';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PressableScale } from '../components/PressableScale';
 import { ConfirmationModal } from '../components/ConfirmationModal';
@@ -48,6 +49,13 @@ const ICON_COLORS: Record<string, [string, string]> = {
   'document-text': ['#607D8B', '#455A64'],
   'information-circle': ['#00BCD4', '#0097A7'],
   'log-out': ['#EF4444', '#DC2626'],
+  // Web management icons
+  'hardware-chip': ['#00d4aa', '#00b894'],
+  megaphone: ['#f59e0b', '#d97706'],
+  library: ['#8b5cf6', '#7c3aed'],
+  key: ['#0099ff', '#0077cc'],
+  people: ['#ec4899', '#db2777'],
+  chatbubble: ['#25D366', '#1DA851'],
 };
 
 function IconCircle({ name, size = 20 }: { name: string; size?: number }) {
@@ -134,6 +142,7 @@ export default function SettingsScreen() {
     setSavingPrefs(false);
   };
 
+  const { openLink: openWebLink } = useWebLink();
   const openLink = (url: string) => Linking.openURL(url).catch(() => {});
 
   const getInitials = (email?: string): string => {
@@ -299,6 +308,50 @@ export default function SettingsScreen() {
                 ios_backgroundColor={C.border}
               />
             }
+          />
+        </View>
+
+        {/* ── Manage on Web ── */}
+        <SectionHeader label="Manage on Web" />
+        <View style={s.menuCard}>
+          <SettingsRow
+            icon="hardware-chip"
+            label="Assistants"
+            subtitle="View and configure AI agents"
+            chevron
+            onPress={() => openWebLink('assistants')}
+          />
+          <Sep />
+          <SettingsRow
+            icon="megaphone"
+            label="Campaigns"
+            subtitle="Manage outbound campaigns"
+            chevron
+            onPress={() => openWebLink('campaigns')}
+          />
+          <Sep />
+          <SettingsRow
+            icon="library"
+            label="Knowledge Base"
+            subtitle="Manage documents and FAQs"
+            chevron
+            onPress={() => openWebLink('knowledgeBase')}
+          />
+          <Sep />
+          <SettingsRow
+            icon="key"
+            label="API Keys"
+            subtitle="Manage integration credentials"
+            chevron
+            onPress={() => openWebLink('apiKeys')}
+          />
+          <Sep />
+          <SettingsRow
+            icon="people"
+            label="Team Settings"
+            subtitle="Manage team members and roles"
+            chevron
+            onPress={() => openWebLink('teamSettings')}
           />
         </View>
 

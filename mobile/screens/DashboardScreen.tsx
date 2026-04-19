@@ -41,6 +41,7 @@ import { getCalls } from '../services/callService';
 import { supabase } from '../lib/supabase';
 import { CallLog } from '../types';
 import { colors as C, typography, spacing, radii, shadows } from '../lib/theme';
+import { useWebLink } from '../hooks/useWebLink';
 import { SkeletonDashboard } from '../components/Skeleton';
 import { AnimatedNumber } from '../components/AnimatedNumber';
 import { MiniChart } from '../components/MiniChart';
@@ -446,6 +447,7 @@ function GroupedCallList({ calls, onCallPress }: { calls: CallLog[]; onCallPress
 export default function DashboardScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { openLink: openWebLink } = useWebLink();
   const [data, setData] = useState<DashboardData | null>(null);
   const [recentCalls, setRecentCalls] = useState<CallLog[]>([]);
   const [loading, setLoading] = useState(true);
@@ -583,7 +585,7 @@ export default function DashboardScreen() {
         : 'Set up your AI assistant',
       icon: 'hardware-chip',
       done: hasAgents,
-      action: () => Linking.openURL('https://app.voicory.com/assistants'),
+      action: () => openWebLink('createAssistant'),
     },
     {
       key: 'call',
@@ -591,7 +593,7 @@ export default function DashboardScreen() {
       subtitle: hasCalls ? `${stats!.totalCalls} calls this week` : 'Test your agent with a live call',
       icon: 'call',
       done: hasCalls,
-      action: () => Linking.openURL('https://app.voicory.com'),
+      action: () => openWebLink('dashboard'),
     },
   ];
 
@@ -632,6 +634,26 @@ export default function DashboardScreen() {
           </TouchableOpacity>
         </View>
       )}
+
+      {/* ════════════════════════════════════════════════════════════════
+          WEB DASHBOARD QUICK ACTION
+      ════════════════════════════════════════════════════════════════ */}
+      <TouchableOpacity
+        onPress={() => openWebLink('dashboard')}
+        activeOpacity={0.8}
+        style={s.webDashBtn}
+      >
+        <LinearGradient
+          colors={[C.primaryMuted, C.secondaryMuted]}
+          style={s.webDashGradient}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+        >
+          <Ionicons name="globe-outline" size={16} color={C.primary} />
+          <Text style={s.webDashText}>Web Dashboard</Text>
+          <Ionicons name="open-outline" size={14} color={C.textFaint} style={{ marginLeft: 'auto' }} />
+        </LinearGradient>
+      </TouchableOpacity>
 
       {/* ════════════════════════════════════════════════════════════════
           CREDIT URGENCY BANNER
@@ -824,6 +846,28 @@ const s = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: C.border,
+  },
+
+  // Web Dashboard quick action
+  webDashBtn: {
+    marginHorizontal: spacing.xl,
+    marginBottom: spacing.lg,
+    borderRadius: radii.md,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: C.primary + '25',
+  },
+  webDashGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 11,
+    paddingHorizontal: 14,
+  },
+  webDashText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: C.primary,
   },
 
   // Error
