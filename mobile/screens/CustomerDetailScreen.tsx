@@ -226,15 +226,7 @@ export default function CustomerDetailScreen() {
 
           <Text style={styles.heroName}>{customer.name || 'Unknown'}</Text>
 
-          {customer.email && (
-            <TouchableOpacity onPress={() => Linking.openURL(`mailto:${customer.email}`)}>
-              <Text style={styles.heroEmail}>{customer.email}</Text>
-            </TouchableOpacity>
-          )}
-
-          <TouchableOpacity onPress={() => Linking.openURL(`tel:${customer.phone_number}`)}>
-            <Text style={styles.heroPhone}>{customer.phone_number}</Text>
-          </TouchableOpacity>
+          <Text style={styles.heroPhone}>{customer.phone_number}</Text>
 
           {/* Stats row */}
           <View style={styles.statsRow}>
@@ -257,9 +249,14 @@ export default function CustomerDetailScreen() {
 
         {/* Quick Actions */}
         <View style={styles.actions}>
-          <ActionButton icon="call" label="Call" color={C.primary} onPress={() => Linking.openURL(`tel:${customer.phone_number}`)} />
-          <ActionButton icon="logo-whatsapp" label="WhatsApp" color={C.success} onPress={() => Linking.openURL(`https://wa.me/${customer.phone_number.replace(/\D/g, '')}`)} />
-          <ActionButton icon="mail-outline" label="Email" color={C.secondary} onPress={() => customer.email && Linking.openURL(`mailto:${customer.email}`)} />
+          <ActionButton icon="call" label="Call" color={C.primary} onPress={() => {
+            Alert.alert('Call via Voicory', 'To place AI-assisted calls, configure Twilio or Exotel in your Voicory dashboard at app.voicory.com/settings.', [
+              { text: 'Open Settings', onPress: () => Linking.openURL('https://app.voicory.com/settings') },
+              { text: 'OK', style: 'cancel' },
+            ]);
+          }} />
+          <ActionButton icon="logo-whatsapp" label="WhatsApp" color={C.success} onPress={() => router.push(`/chat/${customer.phone_number.replace(/\D/g, '')}`)} />
+          <ActionButton icon="create-outline" label="Edit" color={C.secondary} onPress={() => {}} />
           <ActionButton icon="create-outline" label="Edit" color="#a855f7" onPress={() => router.push(`/customers/${customer.id}/edit` as any)} />
         </View>
 
