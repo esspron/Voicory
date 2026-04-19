@@ -88,7 +88,7 @@ export default function CustomerDetailScreen() {
     try {
       const customerData = await getCustomerById(id);
       setCustomer(customerData);
-      setNotes(customerData?.variables?.notes || '');
+      setNotes((customerData?.variables as Record<string, unknown> | undefined)?.notes as string || '');
       const { supabase } = await import('../lib/supabase');
       const { data: callsRaw } = await supabase
         .from('call_logs')
@@ -141,7 +141,7 @@ export default function CustomerDetailScreen() {
   const toggleTag = async (tag: string) => {
     if (!customer) return;
     haptics.selectionTap();
-    const currentTags: string[] = customer.variables?.tags || [];
+    const currentTags: string[] = ((customer.variables as Record<string, unknown> | undefined)?.tags as string[]) || [];
     const newTags = currentTags.includes(tag)
       ? currentTags.filter((t) => t !== tag)
       : [...currentTags, tag];
@@ -195,7 +195,7 @@ export default function CustomerDetailScreen() {
   }
 
   const gradColors = getGradient(customer.name, customer.source);
-  const currentTags: string[] = customer.variables?.tags || [];
+  const currentTags: string[] = ((customer.variables as Record<string, unknown> | undefined)?.tags as string[]) || [];
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>

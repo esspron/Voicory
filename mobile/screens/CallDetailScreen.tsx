@@ -568,7 +568,7 @@ export default function CallDetailScreen() {
   }
 
   const costInr = (call.cost || 0) * USD_TO_INR;
-  const breakdown = call.metadata?.cost_breakdown;
+  const breakdown = (call.metadata as Record<string, unknown> | undefined)?.cost_breakdown as { stt?: number; llm?: number; tts?: number; infra?: number } | undefined;
   const durationParts = formatDurationParts(call.duration_seconds ?? 0);
   const isInbound = call.direction === 'inbound';
   const heroGradient: [string, string, string] = isInbound
