@@ -1,21 +1,17 @@
-import React, { useRef, useEffect } from 'react';
+import React from 'react';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Animated, Platform, StyleSheet, View } from 'react-native';
+import { Platform, StyleSheet } from 'react-native';
 import { colors } from '../../lib/theme';
-import { tabBounce } from '../../lib/animations';
-import * as haptics from '../../lib/haptics';
 
 type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
 
-interface TabConfig {
+const TABS: {
   name: string;
   title: string;
   icon: IoniconsName;
   iconFocused: IoniconsName;
-}
-
-const TABS: TabConfig[] = [
+}[] = [
   { name: 'index', title: 'Home', icon: 'grid-outline', iconFocused: 'grid' },
   { name: 'calls', title: 'Calls', icon: 'call-outline', iconFocused: 'call' },
   { name: 'customers', title: 'Contacts', icon: 'people-outline', iconFocused: 'people' },
@@ -23,56 +19,18 @@ const TABS: TabConfig[] = [
   { name: 'settings', title: 'Settings', icon: 'cog-outline', iconFocused: 'cog' },
 ];
 
-// ─── Tab Icon with bounce animation ──────────────────────────────────────────
-
-function TabIcon({
-  focused,
-  color,
-  icon,
-  iconFocused,
-}: {
-  focused: boolean;
-  color: string;
-  icon: IoniconsName;
-  iconFocused: IoniconsName;
-}) {
-  const scale = useRef(new Animated.Value(1)).current;
-  const prevFocused = useRef(false);
-
-  useEffect(() => {
-    if (focused && !prevFocused.current) {
-      tabBounce(scale);
-    }
-    prevFocused.current = focused;
-  }, [focused]);
-
-  return (
-    <View style={focused ? styles.activeIconWrap : styles.iconWrap}>
-      <Animated.View style={{ transform: [{ scale }] }}>
-        <Ionicons
-          name={focused ? iconFocused : icon}
-          size={22}
-          color={color}
-        />
-      </Animated.View>
-    </View>
-  );
-}
-
-// ─── Layout ──────────────────────────────────────────────────────────────────
-
 export default function TabsLayout() {
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: colors.surface + 'F5', // near-opaque for pseudo-blur
+          backgroundColor: colors.surface,
           borderTopColor: colors.border,
           borderTopWidth: StyleSheet.hairlineWidth,
-          height: Platform.OS === 'ios' ? 88 : 64,
-          paddingBottom: Platform.OS === 'ios' ? 28 : 8,
-          paddingTop: 8,
+          height: Platform.OS === 'ios' ? 85 : 60,
+          paddingBottom: Platform.OS === 'ios' ? 28 : 6,
+          paddingTop: 6,
           elevation: 0,
         },
         tabBarActiveTintColor: colors.primary,
@@ -83,12 +41,6 @@ export default function TabsLayout() {
           letterSpacing: 0.2,
           marginTop: 2,
         },
-        tabBarItemStyle: {
-          paddingTop: 2,
-        },
-      }}
-      screenListeners={{
-        tabPress: () => haptics.selectionTap(),
       }}
     >
       {TABS.map((tab) => (
@@ -98,11 +50,10 @@ export default function TabsLayout() {
           options={{
             title: tab.title,
             tabBarIcon: ({ focused, color }) => (
-              <TabIcon
-                focused={focused}
+              <Ionicons
+                name={focused ? tab.iconFocused : tab.icon}
+                size={22}
                 color={color}
-                icon={tab.icon}
-                iconFocused={tab.iconFocused}
               />
             ),
           }}
@@ -111,18 +62,3 @@ export default function TabsLayout() {
     </Tabs>
   );
 }
-
-const styles = StyleSheet.create({
-  iconWrap: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  activeIconWrap: {
-    backgroundColor: colors.primaryMuted,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
