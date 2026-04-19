@@ -1,3 +1,8 @@
+/**
+ * StatCard — Dashboard metric card.
+ * Displays a label, animated value, optional trend indicator, and icon.
+ * Applies a glow shadow tinted by the `color` prop.
+ */
 import React, { useEffect, useRef, useState } from 'react';
 import {
   View,

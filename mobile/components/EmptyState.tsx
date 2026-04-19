@@ -1,3 +1,8 @@
+/**
+ * EmptyState — Placeholder shown when a list has no data.
+ * Accepts an optional illustration, title, description, and CTA button.
+ * All empty states in the app should use this component.
+ */
 import { colors as C, typography, spacing, radii } from '../lib/theme';
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';

@@ -1,3 +1,8 @@
+/**
+ * CallCard — List item card for a single call log entry.
+ * Shows direction, status badge, phone number, duration, and cost.
+ * Supports swipe-to-delete (left swipe) and tap-to-open.
+ */
 import React, { useRef, useCallback, useState } from 'react';
 import {
   Animated,

@@ -1,3 +1,11 @@
+/**
+ * AuthContext — Supabase authentication context provider.
+ * Manages the active session and exposes the current user.
+ * Wrap the app root with <AuthProvider> to enable auth-gated navigation.
+ *
+ * @example
+ * const { session, user } = useAuth();
+ */
 import React, {
   createContext,
   useCallback,

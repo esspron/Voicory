@@ -1,3 +1,8 @@
+/**
+ * CustomerCard — List item card for a single customer record.
+ * Displays name, phone number, last interaction, and interaction count.
+ * Memory indicator shown when `has_memory` is true.
+ */
 import React, { useRef, useState } from 'react';
 import {
   TouchableOpacity,

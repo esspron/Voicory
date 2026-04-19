@@ -1,3 +1,8 @@
+/**
+ * whatsappService — WhatsApp Business message data access layer.
+ * Fetches conversation lists and message history from Supabase.
+ * Sends messages via the Voicory backend API.
+ */
 import { supabase } from '../lib/supabase';
 import { authFetch } from '../lib/api';
 

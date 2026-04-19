@@ -1,3 +1,8 @@
+/**
+ * SplashScreen — Animated app launch screen.
+ * Fades in the Voicory logo, then calls `onComplete` when done.
+ * Rendered by the root layout while fonts and auth state load.
+ */
 import React, { useEffect, useRef } from 'react';
 import { View, StyleSheet, Dimensions } from 'react-native';
 import Animated, {

@@ -1,3 +1,13 @@
+/**
+ * AnimatedNumber — Smoothly animates a numeric value change.
+ * Useful for dashboard stats that update in real-time.
+ *
+ * @param value - The target number to animate to
+ * @param style - Optional TextStyle overrides
+ * @param prefix - Optional prefix string (e.g. "$")
+ * @param suffix - Optional suffix string (e.g. "%")
+ * @param decimals - Number of decimal places to display
+ */
 import React, { useEffect, useRef, useState } from 'react';
 import { Text, TextStyle } from 'react-native';
 

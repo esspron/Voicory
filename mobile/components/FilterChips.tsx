@@ -1,3 +1,8 @@
+/**
+ * FilterChips — Horizontal scrollable row of filter pills.
+ * Used above lists to filter by status, type, or other categories.
+ * Highlights the currently selected chip.
+ */
 import { colors as C, typography, spacing, radii } from '../lib/theme';
 import React from 'react';
 import { ScrollView, TouchableOpacity, Text, StyleSheet, ViewStyle } from 'react-native';

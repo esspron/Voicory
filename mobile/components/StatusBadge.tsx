@@ -1,3 +1,8 @@
+/**
+ * StatusBadge — Pill-shaped status label.
+ * Maps call/assistant status strings to semantic colors.
+ * Example statuses: "completed", "failed", "in-progress", "active".
+ */
 import React from 'react';
 import { View, Text, StyleSheet, ViewStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';

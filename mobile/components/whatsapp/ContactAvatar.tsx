@@ -1,3 +1,7 @@
+/**
+ * ContactAvatar — Circular avatar for a WhatsApp contact.
+ * Falls back to initials on a branded background when no photo is available.
+ */
 import React, { useMemo } from 'react';
 import { View, Text, Image } from 'react-native';
 import { colors as C } from '../../lib/theme';

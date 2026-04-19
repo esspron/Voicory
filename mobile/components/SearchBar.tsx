@@ -1,3 +1,8 @@
+/**
+ * SearchBar — Animated full-width search input.
+ * Expands/collapses with a smooth animation on focus.
+ * Includes a clear (×) button when text is present.
+ */
 import { colors as C, typography, spacing, radii } from '../lib/theme';
 import React, { useState } from 'react';
 import { View, TextInput, StyleSheet, ViewStyle, TouchableOpacity } from 'react-native';

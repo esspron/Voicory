@@ -1,3 +1,8 @@
+/**
+ * authStore — Zustand store for authentication state.
+ * Stores session, user profile, and auth loading state.
+ * Syncs with Supabase Auth via `onAuthStateChange`.
+ */
 import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
 

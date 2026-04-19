@@ -1,3 +1,7 @@
+/**
+ * DateDivider — Date separator label between message groups in a chat.
+ * Shows "Today", "Yesterday", or a formatted date string.
+ */
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { colors as C } from '../../lib/theme';

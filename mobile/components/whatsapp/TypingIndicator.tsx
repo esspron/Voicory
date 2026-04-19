@@ -1,3 +1,7 @@
+/**
+ * TypingIndicator — Animated three-dot indicator for "contact is typing".
+ * Each dot bounces in sequence using Reanimated.
+ */
 import React, { useEffect, useRef } from 'react';
 import { View, Animated, StyleSheet } from 'react-native';
 

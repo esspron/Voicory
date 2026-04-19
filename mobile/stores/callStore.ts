@@ -1,3 +1,8 @@
+/**
+ * callStore — Zustand store for call log state.
+ * Caches call records, tracks active filters, and manages loading/error state.
+ * Populated by `callService.fetchCallLogs()`.
+ */
 import { create } from 'zustand';
 import { CallLog } from '../types';
 import { getCalls, getCallById } from '../services/callService';

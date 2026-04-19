@@ -1,3 +1,8 @@
+/**
+ * ChatInput — WhatsApp chat composer bar.
+ * Contains a text input, emoji placeholder, and send button.
+ * Calls `onSend(text)` when the send button is pressed.
+ */
 import React, { useEffect, useRef, useState } from 'react';
 import {
   View,

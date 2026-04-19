@@ -1,3 +1,7 @@
+/**
+ * appStore — Zustand store for global app UI state.
+ * Tracks tab badge counts, notification state, and app-level loading flags.
+ */
 import { create } from 'zustand';
 import Constants from 'expo-constants';
 

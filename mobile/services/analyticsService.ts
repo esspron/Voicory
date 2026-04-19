@@ -1,3 +1,8 @@
+/**
+ * analyticsService — Dashboard analytics queries.
+ * Aggregates call log data into summary stats for the Dashboard screen.
+ * All queries are scoped to the authenticated user via RLS.
+ */
 import { supabase } from '../lib/supabase';
 import { DashboardStats } from '../types';
 

@@ -1,3 +1,8 @@
+/**
+ * MiniChart — Compact sparkline SVG chart.
+ * Renders a filled area chart from an array of numeric data points.
+ * Used on the Dashboard to show call volume trends.
+ */
 import React from 'react';
 import { View, StyleSheet, ViewStyle } from 'react-native';
 import Svg, { Path, Defs, LinearGradient as SvgGrad, Stop } from 'react-native-svg';

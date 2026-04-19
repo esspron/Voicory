@@ -1,3 +1,8 @@
+/**
+ * ChatBubble — A single WhatsApp message bubble.
+ * Renders sent (right-aligned, teal) or received (left-aligned, surface) variants.
+ * Shows message text, timestamp, and read receipt status icons.
+ */
 import React from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';

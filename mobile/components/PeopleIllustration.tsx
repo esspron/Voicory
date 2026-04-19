@@ -1,3 +1,7 @@
+/**
+ * PeopleIllustration — Custom SVG illustration of a team of people.
+ * Used on screens that reference team/user contexts.
+ */
 import React from 'react';
 import Svg, { Circle, Ellipse, Path, Rect, Defs, LinearGradient, Stop, G } from 'react-native-svg';
 import { colors as C } from '../lib/theme';

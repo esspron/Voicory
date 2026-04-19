@@ -1,3 +1,8 @@
+/**
+ * customerStore — Zustand store for customer list state.
+ * Caches customers, tracks search query and selected customer.
+ * Populated by `customerService.fetchCustomers()`.
+ */
 import { create } from 'zustand';
 import { Customer } from '../types';
 import { getCustomers, getCustomerById, updateCustomer, createCustomer } from '../services/customerService';

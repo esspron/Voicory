@@ -1,3 +1,8 @@
+/**
+ * Header — Standard screen header component.
+ * Shows a title, optional back button, and optional right-side action buttons.
+ * Handles safe-area top inset automatically.
+ */
 import React from 'react';
 import {
   View,

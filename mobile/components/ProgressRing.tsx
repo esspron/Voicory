@@ -1,3 +1,8 @@
+/**
+ * ProgressRing — Circular SVG progress indicator.
+ * Animates from 0 to the given `progress` value (0–1).
+ * Used on the Dashboard for credit/minutes usage display.
+ */
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, ViewStyle, Animated } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';

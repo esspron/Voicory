@@ -1,3 +1,7 @@
+/**
+ * UnreadBadge — Circular badge showing an unread message count.
+ * Capped display at 99+. Used on conversation list items.
+ */
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';

@@ -1,3 +1,8 @@
+/**
+ * customerService — Customer data access layer.
+ * Wraps Supabase queries for the customers table: list, get, create, update.
+ * All operations are scoped to the authenticated user via RLS.
+ */
 import { supabase } from '../lib/supabase';
 import { Customer } from '../types';
 

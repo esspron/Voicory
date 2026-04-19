@@ -1,3 +1,8 @@
+/**
+ * callService — Call log data access layer.
+ * Wraps Supabase queries for call_logs table: fetch, filter, paginate.
+ * Sets up real-time subscription for live call status updates.
+ */
 import { supabase } from '../lib/supabase';
 import { CallLog } from '../types';
 
