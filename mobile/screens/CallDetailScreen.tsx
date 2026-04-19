@@ -8,7 +8,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  ActivityIndicator,
   Linking,
   Alert,
   Animated,
@@ -18,6 +17,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBadge } from '../components/StatusBadge';
+import { SkeletonCard, SkeletonListItem } from '../components/Skeleton';
 import { getCallById, getCallTranscript } from '../services/callService';
 import { CallLog } from '../types';
 
@@ -459,6 +459,8 @@ export default function CallDetailScreen() {
   const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [slowLoad, setSlowLoad] = useState(false);
+  const slowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
@@ -481,7 +483,16 @@ export default function CallDetailScreen() {
 
   useEffect(() => {
     setLoading(true);
-    loadData().finally(() => setLoading(false));
+    setSlowLoad(false);
+    slowTimerRef.current = setTimeout(() => setSlowLoad(true), 10000);
+    loadData().finally(() => {
+      setLoading(false);
+      setSlowLoad(false);
+      if (slowTimerRef.current) clearTimeout(slowTimerRef.current);
+    });
+    return () => {
+      if (slowTimerRef.current) clearTimeout(slowTimerRef.current);
+    };
   }, [loadData]);
 
   const handleCallAgain = () => {
@@ -524,9 +535,16 @@ export default function CallDetailScreen() {
 
   if (loading) {
     return (
-      <View style={[styles.centered, { paddingTop: insets.top }]}>
-        <ActivityIndicator size="large" color={C.primary} />
-        <Text style={styles.loadingText}>Loading call…</Text>
+      <View style={[styles.centered, { paddingTop: insets.top + 24, justifyContent: 'flex-start' }]}>
+        <SkeletonCard style={{ marginHorizontal: 20, marginBottom: 16 }} />
+        <SkeletonCard style={{ marginHorizontal: 20, marginBottom: 16 }} />
+        {Array.from({ length: 3 }).map((_, i) => <SkeletonListItem key={i} />)}
+        {slowLoad && (
+          <View style={styles.slowLoadBanner}>
+            <Ionicons name="time-outline" size={15} color={C.textMuted} />
+            <Text style={styles.slowLoadText}>Taking longer than usual…</Text>
+          </View>
+        )}
       </View>
     );
   }
@@ -539,6 +557,9 @@ export default function CallDetailScreen() {
         </View>
         <Text style={styles.errorTitle}>Couldn't load call</Text>
         <Text style={styles.errorText}>{error || 'Call not found'}</Text>
+        <TouchableOpacity onPress={loadData} style={styles.retryBtn}>
+          <Text style={styles.retryBtnText}>Retry</Text>
+        </TouchableOpacity>
         <TouchableOpacity onPress={() => router.back()} style={styles.errorBackBtn}>
           <Text style={styles.errorBackBtnText}>Go Back</Text>
         </TouchableOpacity>
@@ -752,6 +773,19 @@ const styles = StyleSheet.create({
     padding: 32,
   },
   loadingText: { color: C.textMuted, fontSize: 14, marginTop: 8 },
+  slowLoadBanner: {
+    marginTop: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: C.surface,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  slowLoadText: { color: C.textMuted, fontSize: 13, fontWeight: '500' },
 
   errorIcon: {
     width: 64,
@@ -764,8 +798,15 @@ const styles = StyleSheet.create({
   },
   errorTitle: { color: C.text, fontSize: 18, fontWeight: '700' },
   errorText: { color: C.textMuted, fontSize: 14, textAlign: 'center' },
+  retryBtn: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    backgroundColor: C.primary,
+    borderRadius: 12,
+    marginBottom: 4,
+  },
+  retryBtnText: { color: C.bg, fontSize: 14, fontWeight: '700' },
   errorBackBtn: {
-    marginTop: 8,
     paddingHorizontal: 24,
     paddingVertical: 12,
     backgroundColor: C.surfaceRaised,

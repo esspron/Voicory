@@ -8,7 +8,6 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  ActivityIndicator,
   Linking,
   TextInput,
   Alert,
@@ -20,6 +19,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { CallCard } from '../components/CallCard';
+import { SkeletonCard, SkeletonListItem } from '../components/Skeleton';
 import { getCustomerById, updateCustomer } from '../services/customerService';
 import { Customer, CallLog } from '../types';
 
@@ -78,6 +78,8 @@ export default function CustomerDetailScreen() {
   const [activeTab, setActiveTab] = useState<'calls' | 'notes'>('calls');
   const [notes, setNotes] = useState('');
   const [savingNotes, setSavingNotes] = useState(false);
+  const [slowLoad, setSlowLoad] = useState(false);
+  const slowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const heroOpacity = useRef(new Animated.Value(0)).current;
   const heroTranslate = useRef(new Animated.Value(20)).current;
 
@@ -103,13 +105,20 @@ export default function CustomerDetailScreen() {
 
   useEffect(() => {
     setLoading(true);
+    setSlowLoad(false);
+    slowTimerRef.current = setTimeout(() => setSlowLoad(true), 10000);
     loadData().finally(() => {
       setLoading(false);
+      setSlowLoad(false);
+      if (slowTimerRef.current) clearTimeout(slowTimerRef.current);
       Animated.parallel([
         Animated.timing(heroOpacity, { toValue: 1, duration: 500, useNativeDriver: true }),
         Animated.spring(heroTranslate, { toValue: 0, useNativeDriver: true, speed: 20, bounciness: 6 }),
       ]).start();
     });
+    return () => {
+      if (slowTimerRef.current) clearTimeout(slowTimerRef.current);
+    };
   }, [loadData]);
 
   const handleSaveNotes = async () => {
@@ -148,8 +157,24 @@ export default function CustomerDetailScreen() {
 
   if (loading) {
     return (
-      <View style={[styles.centered, { paddingTop: insets.top }]}>
-        <ActivityIndicator size="large" color={C.primary} />
+      <View style={[styles.container, { paddingTop: insets.top }]}>
+        <View style={styles.navBar}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={20} color={C.text} />
+          </TouchableOpacity>
+          <Text style={styles.navTitle}>Contact</Text>
+          <View style={{ width: 36 }} />
+        </View>
+        <View style={{ paddingHorizontal: 20, paddingTop: 16 }}>
+          <SkeletonCard style={{ marginBottom: 16 }} />
+          {Array.from({ length: 5 }).map((_, i) => <SkeletonListItem key={i} />)}
+        </View>
+        {slowLoad && (
+          <View style={styles.slowLoadBanner}>
+            <Ionicons name="time-outline" size={15} color={C.textMuted} />
+            <Text style={styles.slowLoadText}>Taking longer than usual…</Text>
+          </View>
+        )}
       </View>
     );
   }
@@ -159,6 +184,9 @@ export default function CustomerDetailScreen() {
       <View style={[styles.centered, { paddingTop: insets.top }]}>
         <Ionicons name="warning-outline" size={40} color={C.danger} />
         <Text style={styles.errorText}>{error || 'Customer not found'}</Text>
+        <TouchableOpacity onPress={loadData} style={styles.retryBtn}>
+          <Text style={styles.retryBtnText}>Retry</Text>
+        </TouchableOpacity>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Text style={styles.backBtnText}>Go Back</Text>
         </TouchableOpacity>
@@ -334,8 +362,26 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: C.bg },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: C.bg, gap: 12 },
   errorText: { color: C.danger, fontSize: 15 },
-  backBtn: { paddingHorizontal: 20, paddingVertical: 10, backgroundColor: C.surfaceRaised, borderRadius: 8 },
+  retryBtn: { paddingHorizontal: 24, paddingVertical: 12, backgroundColor: C.primary, borderRadius: 12 },
+  retryBtnText: { color: C.bg, fontSize: 14, fontWeight: '700' },
+  backBtn: { paddingHorizontal: 20, paddingVertical: 10, backgroundColor: C.surfaceRaised, borderRadius: 8, borderWidth: 1, borderColor: C.border },
   backBtnText: { color: C.text, fontSize: 14 },
+  slowLoadBanner: {
+    position: 'absolute',
+    bottom: 40,
+    left: 20,
+    right: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: C.surface,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  slowLoadText: { color: C.textMuted, fontSize: 13, fontWeight: '500' },
 
   navBar: {
     flexDirection: 'row',

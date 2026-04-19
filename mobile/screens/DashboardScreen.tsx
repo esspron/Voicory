@@ -452,6 +452,8 @@ export default function DashboardScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [orgName, setOrgName] = useState('');
+  const [slowLoad, setSlowLoad] = useState(false);
+  const slowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const loadData = useCallback(async () => {
     try {
@@ -480,7 +482,16 @@ export default function DashboardScreen() {
 
   useEffect(() => {
     setLoading(true);
-    loadData().finally(() => setLoading(false));
+    setSlowLoad(false);
+    slowTimerRef.current = setTimeout(() => setSlowLoad(true), 10000);
+    loadData().finally(() => {
+      setLoading(false);
+      setSlowLoad(false);
+      if (slowTimerRef.current) clearTimeout(slowTimerRef.current);
+    });
+    return () => {
+      if (slowTimerRef.current) clearTimeout(slowTimerRef.current);
+    };
   }, [loadData]);
 
   const onRefresh = useCallback(async () => {
@@ -537,6 +548,12 @@ export default function DashboardScreen() {
     return (
       <View style={[s.container, { paddingTop: insets.top }]}>
         <SkeletonDashboard />
+        {slowLoad && (
+          <View style={s.slowLoadBanner}>
+            <Ionicons name="time-outline" size={15} color={C.textMuted} />
+            <Text style={s.slowLoadText}>Taking longer than usual…</Text>
+          </View>
+        )}
       </View>
     );
   }
@@ -610,6 +627,9 @@ export default function DashboardScreen() {
         <View style={s.errorBox}>
           <Ionicons name="alert-circle" size={16} color={C.danger} />
           <Text style={s.errorText}>{error}</Text>
+          <TouchableOpacity onPress={onRefresh} style={s.errorRetryBtn}>
+            <Text style={s.errorRetryText}>Retry</Text>
+          </TouchableOpacity>
         </View>
       )}
 
@@ -820,6 +840,32 @@ const s = StyleSheet.create({
     borderColor: C.danger + '25',
   },
   errorText: { color: C.danger, fontSize: 13, flex: 1, fontWeight: '500' },
+  errorRetryBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    backgroundColor: C.danger + '20',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: C.danger + '40',
+  },
+  errorRetryText: { color: C.danger, fontSize: 12, fontWeight: '700' },
+
+  slowLoadBanner: {
+    position: 'absolute',
+    bottom: 40,
+    left: 20,
+    right: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: C.surface,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  slowLoadText: { color: C.textMuted, fontSize: 13, fontWeight: '500' },
 
   // Urgency banner
   urgencyBanner: {

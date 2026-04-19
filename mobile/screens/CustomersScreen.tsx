@@ -22,7 +22,6 @@ import { SearchBar } from '../components/SearchBar';
 import { FilterChips } from '../components/FilterChips';
 import { CustomerCard } from '../components/CustomerCard';
 import { EmptyState } from '../components/EmptyState';
-import { PeopleIllustration } from '../components/PeopleIllustration';
 import { getCustomers } from '../services/customerService';
 import { supabase } from '../lib/supabase';
 import { Customer } from '../types';
@@ -49,6 +48,8 @@ export default function CustomersScreen() {
   const [error, setError] = useState<string | null>(null);
   const offsetRef = useRef(0);
   const fabScale = useRef(new Animated.Value(1)).current;
+  const [slowLoad, setSlowLoad] = useState(false);
+  const slowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fetchCustomers = useCallback(
     async (reset: boolean = false) => {
@@ -82,7 +83,16 @@ export default function CustomersScreen() {
 
   useEffect(() => {
     setLoading(true);
-    fetchCustomers(true).finally(() => setLoading(false));
+    setSlowLoad(false);
+    slowTimerRef.current = setTimeout(() => setSlowLoad(true), 10000);
+    fetchCustomers(true).finally(() => {
+      setLoading(false);
+      setSlowLoad(false);
+      if (slowTimerRef.current) clearTimeout(slowTimerRef.current);
+    });
+    return () => {
+      if (slowTimerRef.current) clearTimeout(slowTimerRef.current);
+    };
   }, [fetchCustomers]);
 
   const onRefresh = useCallback(async () => {
@@ -127,6 +137,9 @@ export default function CustomersScreen() {
         <View style={styles.errorBanner}>
           <Ionicons name="alert-circle" size={16} color={C.danger} />
           <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity onPress={onRefresh} style={styles.errorRetryBtn}>
+            <Text style={styles.errorRetryText}>Retry</Text>
+          </TouchableOpacity>
         </View>
       ) : null}
     </View>
@@ -140,6 +153,12 @@ export default function CustomersScreen() {
             <SkeletonListItem key={i} />
           ))}
         </View>
+        {slowLoad && (
+          <View style={styles.slowLoadBanner}>
+            <Ionicons name="time-outline" size={15} color={C.textMuted} />
+            <Text style={styles.slowLoadText}>Taking longer than usual…</Text>
+          </View>
+        )}
       </View>
     );
   }
@@ -159,11 +178,11 @@ export default function CustomersScreen() {
           </AnimatedListItem>
         )}
         ListEmptyComponent={
-          <View style={styles.emptyWrap}>
-            <PeopleIllustration width={200} height={180} />
-            <Text style={styles.emptyTitle}>No customers yet</Text>
-            <Text style={styles.emptyMessage}>Customers are added automatically{'\n'}when they call your agents</Text>
-          </View>
+          <EmptyState
+            icon="people"
+            title="No contacts yet"
+            message={"Customers are added automatically\nwhen they call your agents"}
+          />
         }
         ListFooterComponent={
           loadingMore ? (
@@ -267,16 +286,42 @@ const styles = StyleSheet.create({
     marginHorizontal: 20,
     marginVertical: 8,
     borderRadius: 12,
-    padding: 16,
+    padding: 14,
     borderWidth: 1,
     borderColor: C.danger + '30',
-    gap: 12,
+    gap: 10,
   },
   errorText: { 
     color: C.danger, 
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '500',
+    flex: 1,
   },
+  errorRetryBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    backgroundColor: C.danger + '20',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: C.danger + '40',
+  },
+  errorRetryText: { color: C.danger, fontSize: 12, fontWeight: '700' },
+  slowLoadBanner: {
+    position: 'absolute',
+    bottom: 40,
+    left: 20,
+    right: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: C.surface,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  slowLoadText: { color: C.textMuted, fontSize: 13, fontWeight: '500' },
   loadingMore: { 
     paddingVertical: 20,
   },

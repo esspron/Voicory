@@ -10,9 +10,11 @@ import {
   StyleSheet,
   RefreshControl,
   Text,
+  TouchableOpacity,
   Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { SearchBar } from '../components/SearchBar';
 import { FilterChips } from '../components/FilterChips';
 import { CallCard } from '../components/CallCard';
@@ -80,6 +82,8 @@ export default function CallLogsScreen() {
   const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const offsetRef = useRef(0);
+  const [slowLoad, setSlowLoad] = useState(false);
+  const slowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fetchCalls = useCallback(
     async (reset: boolean = false) => {
@@ -113,7 +117,16 @@ export default function CallLogsScreen() {
 
   useEffect(() => {
     setLoading(true);
-    fetchCalls(true).finally(() => setLoading(false));
+    setSlowLoad(false);
+    slowTimerRef.current = setTimeout(() => setSlowLoad(true), 10000);
+    fetchCalls(true).finally(() => {
+      setLoading(false);
+      setSlowLoad(false);
+      if (slowTimerRef.current) clearTimeout(slowTimerRef.current);
+    });
+    return () => {
+      if (slowTimerRef.current) clearTimeout(slowTimerRef.current);
+    };
   }, [fetchCalls]);
 
   const onRefresh = useCallback(async () => {
@@ -152,6 +165,12 @@ export default function CallLogsScreen() {
             <SkeletonListItem key={i} />
           ))}
         </View>
+        {slowLoad && (
+          <View style={styles.slowLoadBanner}>
+            <Ionicons name="time-outline" size={15} color={C.textMuted} />
+            <Text style={styles.slowLoadText}>Taking longer than usual…</Text>
+          </View>
+        )}
       </View>
     );
   }
@@ -191,7 +210,11 @@ export default function CallLogsScreen() {
 
       {error ? (
         <View style={styles.errorBanner}>
+          <Ionicons name="alert-circle" size={15} color={C.danger} />
           <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity onPress={onRefresh} style={styles.errorRetryBtn}>
+            <Text style={styles.errorRetryText}>Retry</Text>
+          </TouchableOpacity>
         </View>
       ) : null}
     </View>
@@ -343,15 +366,44 @@ const styles = StyleSheet.create({
     marginHorizontal: 20,
     marginVertical: 8,
     borderRadius: 12,
-    padding: 16,
+    padding: 14,
     borderWidth: 1,
     borderColor: C.danger + '30',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
   errorText: {
     color: C.danger,
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '500',
+    flex: 1,
   },
+  errorRetryBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    backgroundColor: C.danger + '20',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: C.danger + '40',
+  },
+  errorRetryText: { color: C.danger, fontSize: 12, fontWeight: '700' },
+  slowLoadBanner: {
+    position: 'absolute',
+    bottom: 40,
+    left: 20,
+    right: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: C.surface,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  slowLoadText: { color: C.textMuted, fontSize: 13, fontWeight: '500' },
   loadingMoreContainer: {
     paddingHorizontal: 16,
     paddingTop: 8,

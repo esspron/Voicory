@@ -11,7 +11,6 @@ import {
   TextInput,
   StatusBar,
   Platform,
-  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -21,6 +20,7 @@ import ContactAvatar from '../components/whatsapp/ContactAvatar';
 import UnreadBadge from '../components/whatsapp/UnreadBadge';
 import MessageStatus from '../components/whatsapp/MessageStatus';
 import { EmptyState } from '../components/EmptyState';
+import { SkeletonListItem } from '../components/Skeleton';
 
 interface WAContact {
   id: string;
@@ -110,6 +110,8 @@ export default function WhatsAppScreen() {
   const [searchVisible, setSearchVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const searchRef = useRef<TextInput>(null);
+  const [slowLoad, setSlowLoad] = useState(false);
+  const slowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const loadContacts = useCallback(async () => {
     if (!user) return;
@@ -141,7 +143,16 @@ export default function WhatsAppScreen() {
   }, [user]);
 
   useEffect(() => {
-    loadContacts().finally(() => setLoading(false));
+    setSlowLoad(false);
+    slowTimerRef.current = setTimeout(() => setSlowLoad(true), 10000);
+    loadContacts().finally(() => {
+      setLoading(false);
+      setSlowLoad(false);
+      if (slowTimerRef.current) clearTimeout(slowTimerRef.current);
+    });
+    return () => {
+      if (slowTimerRef.current) clearTimeout(slowTimerRef.current);
+    };
   }, [loadContacts]);
 
   const onRefresh = useCallback(async () => {
@@ -206,14 +217,25 @@ export default function WhatsAppScreen() {
       )}
 
       {loading ? (
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color={C.primary} />
+        <View style={{ paddingHorizontal: 16, paddingTop: 8 }}>
+          {Array.from({ length: 8 }).map((_, i) => (
+            <SkeletonListItem key={i} />
+          ))}
+          {slowLoad && (
+            <View style={styles.slowLoadBanner}>
+              <Ionicons name="time-outline" size={15} color={C.textMuted} />
+              <Text style={styles.slowLoadText}>Taking longer than usual…</Text>
+            </View>
+          )}
         </View>
       ) : error ? (
         <View style={styles.centered}>
+          <View style={styles.errorIconWrap}>
+            <Ionicons name="warning-outline" size={28} color={C.danger} />
+          </View>
           <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity onPress={loadContacts} style={styles.retryBtn}>
-            <Text style={styles.retryText}>Try again</Text>
+            <Text style={styles.retryText}>Retry</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -391,12 +413,22 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 16,
+    gap: 14,
     paddingHorizontal: 32,
+  },
+  errorIconWrap: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: C.danger + '15',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: C.danger + '30',
   },
   errorText: {
     color: C.danger,
-    fontSize: 16,
+    fontSize: 15,
     textAlign: 'center',
     fontWeight: '500',
   },
@@ -411,4 +443,17 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 15,
   },
+  slowLoadBanner: {
+    marginTop: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: C.surface,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  slowLoadText: { color: C.textMuted, fontSize: 13, fontWeight: '500' },
 });
