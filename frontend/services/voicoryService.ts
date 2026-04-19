@@ -763,8 +763,8 @@ export const duplicateAssistant = async (id: string): Promise<Assistant | null> 
 export const getAssistantCallLogs = async (assistantId: string): Promise<CallLog[]> => {
     try {
         const { data, error } = await supabase
-            .from('callyy_call_logs')
-            .select('*')
+            .from('call_logs')
+            .select('*, assistants(name)')
             .eq('assistant_id', assistantId)
             .order('created_at', { ascending: false });
 
@@ -1046,15 +1046,15 @@ export const deleteApiKey = async (id: string): Promise<void> => {
 export const getCallLogs = async (): Promise<CallLog[]> => {
     try {
         const { data, error } = await supabase
-            .from('callyy_call_logs')
-            .select('*')
+            .from('call_logs')
+            .select('*, assistants(name)')
             .order('created_at', { ascending: false });
 
         if (error) throw error;
 
         return (data || []).map(c => ({
             id: c.id,
-            assistantName: c.assistant_name || c.assistantName || 'Unknown',
+            assistantName: c.assistants?.name || c.assistant_name || c.assistantName || 'Unknown',
             phoneNumber: c.phone_number || c.phoneNumber || '',
             duration: c.duration || '0:00',
             cost: Number(c.cost) || 0,
