@@ -73,21 +73,21 @@ const Skeleton = ({ className }: { className?: string }) => (
 // StatCard
 // ---------------------------------------------------------------------------
 const StatCard = ({ title, value, change, icon: Icon, trend, gradient, loading }: any) => (
-    <div className="group relative bg-surface/80 backdrop-blur-xl border border-white/5 rounded-2xl p-6 overflow-hidden transition-all duration-300 hover:border-white/10 hover:shadow-xl hover:shadow-black/20 hover:-translate-y-0.5">
+    <div className="group relative bg-surface/80 backdrop-blur-xl border border-white/5 rounded-2xl p-4 lg:p-6 overflow-hidden transition-all duration-300 hover:border-white/10 hover:shadow-xl hover:shadow-black/20 hover:-translate-y-0.5 min-w-0">
         <div className={`absolute -top-12 -right-12 w-32 h-32 ${gradient} blur-3xl opacity-0 group-hover:opacity-20 transition-opacity duration-500`} />
         <div className={`absolute top-0 left-1/2 -translate-x-1/2 w-16 h-0.5 ${gradient} opacity-50 rounded-full`} />
 
-        <div className="relative flex justify-between items-start">
-            <div className="space-y-1">
-                <p className="text-xs font-medium text-textMuted uppercase tracking-wider">{title}</p>
+        <div className="relative flex justify-between items-start gap-2">
+            <div className="space-y-1 min-w-0">
+                <p className="text-[10px] lg:text-xs font-medium text-textMuted uppercase tracking-wider truncate">{title}</p>
                 {loading ? (
-                    <Skeleton className="h-8 w-24" />
+                    <Skeleton className="h-8 w-20" />
                 ) : (
-                    <h3 className="text-3xl font-bold text-textMain tracking-tight">{value}</h3>
+                    <h3 className="text-2xl lg:text-3xl font-bold text-textMain tracking-tight truncate">{value}</h3>
                 )}
             </div>
-            <div className={`p-3 ${gradient} rounded-xl shadow-lg`}>
-                <Icon size={22} weight="fill" className="text-white" />
+            <div className={`p-2.5 lg:p-3 ${gradient} rounded-xl shadow-lg flex-shrink-0`}>
+                <Icon size={20} weight="fill" className="text-white" />
             </div>
         </div>
 
@@ -248,7 +248,7 @@ const Overview: React.FC = () => {
             </FadeIn>
 
             {/* Metrics Grid — 5 cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
                 <FadeIn delay={0.1}>
                     <StatCard
                         title="Total Calls"
@@ -334,7 +334,7 @@ const Overview: React.FC = () => {
             )}
 
             {/* Charts Area */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {/* Main Chart */}
                 <div className="lg:col-span-2 relative bg-surface/80 backdrop-blur-xl border border-white/5 rounded-2xl p-6 overflow-hidden">
                     <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 blur-3xl rounded-full pointer-events-none" />
