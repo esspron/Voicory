@@ -44,7 +44,7 @@ router.get('/', async (req, res) => {
 
         let query = supabase
             .from('customers')
-            .select('id, name, email, phone_number, variables, created_at, updated_at, has_memory, last_interaction, interaction_count, source, crm_provider, last_synced_at, last_called_at')
+            .select('id, name, email, phone_number, variables, created_at, updated_at, has_memory, last_interaction, interaction_count, source, crm_provider, last_synced_at, last_interaction')
             .eq('user_id', userId)
             .order('created_at', { ascending: false });
 
@@ -73,7 +73,7 @@ router.get('/export', async (req, res) => {
 
         const { data, error } = await supabase
             .from('customers')
-            .select('id, name, email, phone_number, variables, source, created_at, last_called_at')
+            .select('id, name, email, phone_number, variables, source, created_at, last_interaction')
             .eq('user_id', userId)
             .order('created_at', { ascending: false });
 
@@ -82,7 +82,7 @@ router.get('/export', async (req, res) => {
         const customers = data || [];
 
         // Build CSV rows
-        const headers = ['id', 'name', 'email', 'phone_number', 'source', 'created_at', 'last_called_at'];
+        const headers = ['id', 'name', 'email', 'phone_number', 'source', 'created_at', 'last_interaction'];
         const rows = [headers.join(',')];
 
         for (const c of customers) {
@@ -93,7 +93,7 @@ router.get('/export', async (req, res) => {
                 csvEscape(c.phone_number || ''),
                 csvEscape(c.source || ''),
                 csvEscape(c.created_at || ''),
-                csvEscape(c.last_called_at || ''),
+                csvEscape(c.last_interaction || ''),
             ];
             rows.push(row.join(','));
         }
