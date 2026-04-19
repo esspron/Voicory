@@ -12,10 +12,11 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 
-const PING_URL = 'https://www.google.com/generate_204';
-const PING_INTERVAL_MS = 15_000;      // check every 15s when app is active
-const PING_TIMEOUT_MS = 5_000;
+const PING_URL = 'https://ssxirklimsdmsnwgtwfs.supabase.co/rest/v1/';
+const PING_INTERVAL_MS = 30_000;      // check every 30s when app is active
+const PING_TIMEOUT_MS = 8_000;
 const RETRY_WHEN_OFFLINE_MS = 5_000;  // recheck faster when known offline
+const CONSECUTIVE_FAILS_THRESHOLD = 2; // need 2 fails before marking offline
 
 async function ping(): Promise<boolean> {
   const controller = new AbortController();
@@ -37,6 +38,7 @@ async function ping(): Promise<boolean> {
 export function useNetworkStatus() {
   const [isOnline, setIsOnline] = useState<boolean>(true);
   const [isChecking, setIsChecking] = useState<boolean>(true);
+  const failCount = useRef(0);
 
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isMounted = useRef(true);
@@ -51,7 +53,15 @@ export function useNetworkStatus() {
     if (!isMounted.current) return;
     const online = await ping();
     if (!isMounted.current) return;
-    setIsOnline(online);
+    if (online) {
+      failCount.current = 0;
+      setIsOnline(true);
+    } else {
+      failCount.current += 1;
+      if (failCount.current >= CONSECUTIVE_FAILS_THRESHOLD) {
+        setIsOnline(false);
+      }
+    }
     setIsChecking(false);
     scheduleCheck(online);
   }, [scheduleCheck]);

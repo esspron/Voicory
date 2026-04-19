@@ -77,6 +77,7 @@ export default function CallLogsScreen() {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
   const [loading, setLoading] = useState(true);
+  const initialLoadDone = useRef(false);
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
@@ -116,11 +117,14 @@ export default function CallLogsScreen() {
   );
 
   useEffect(() => {
-    setLoading(true);
-    setSlowLoad(false);
-    slowTimerRef.current = setTimeout(() => setSlowLoad(true), 10000);
+    if (!initialLoadDone.current) {
+      setLoading(true);
+      setSlowLoad(false);
+      slowTimerRef.current = setTimeout(() => setSlowLoad(true), 10000);
+    }
     fetchCalls(true).finally(() => {
       setLoading(false);
+      initialLoadDone.current = true;
       setSlowLoad(false);
       if (slowTimerRef.current) clearTimeout(slowTimerRef.current);
     });
