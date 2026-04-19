@@ -299,10 +299,13 @@ function AnimatedCheckmark({ done, index }: { done: boolean; index: number }) {
 
   return (
     <Animated.View style={[s.setupCheck, containerStyle]}>
-      <Animated.View style={iconStyle}>
-        <Ionicons name="checkmark" size={14} color={C.bg} />
-      </Animated.View>
-      {!done && <Text style={s.setupCheckNum}>{index + 1}</Text>}
+      {done ? (
+        <Animated.View style={iconStyle}>
+          <Ionicons name="checkmark" size={14} color={C.bg} />
+        </Animated.View>
+      ) : (
+        <Text style={s.setupCheckNum}>{index + 1}</Text>
+      )}
     </Animated.View>
   );
 }
