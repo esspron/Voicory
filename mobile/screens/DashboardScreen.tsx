@@ -715,13 +715,13 @@ export default function DashboardScreen() {
       )}
 
       {/* ════════════════════════════════════════════════════════════════
-          THIS WEEK STATS — animated counters
+          KEY METRICS — always visible
       ════════════════════════════════════════════════════════════════ */}
-      {hasCalls && stats && (
+      {stats && (
         <RNAnimated.View style={[{ opacity: sectionAnims[2].opacity, transform: [{ translateY: sectionAnims[2].translateY }] }, s.weekSection]}>
           <View style={s.weekHeader}>
             <Text style={s.sectionLabel}>This week</Text>
-            {activity.length > 0 && <MiniChart data={activity} width={72} height={28} />}
+            {activity.length > 0 && hasCalls && <MiniChart data={activity} width={72} height={28} />}
           </View>
 
           <LinearGradient
@@ -744,16 +744,35 @@ export default function DashboardScreen() {
               <AnimatedNumber value={Math.round(stats.avgDuration)} style={s.metricNum} suffix="s" delay={200} />
               <Text style={s.metricLabel}>Avg call</Text>
             </View>
-            <View style={s.metricSep} />
+          </LinearGradient>
+
+          <View style={{ height: 10 }} />
+
+          <LinearGradient
+            colors={[C.surface, C.surfaceRaised] as [string, string]}
+            style={s.metricCard}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 0, y: 1 }}
+          >
             <View style={s.metric}>
               <AnimatedNumber
                 value={stats.totalCost}
                 prefix="₹"
                 style={s.metricNum}
-                decimals={stats.totalCost < 100 ? 0 : 0}
+                decimals={0}
                 delay={300}
               />
-              <Text style={s.metricLabel}>Spent</Text>
+              <Text style={s.metricLabel}>Total Cost</Text>
+            </View>
+            <View style={s.metricSep} />
+            <View style={s.metric}>
+              <AnimatedNumber value={data?.assistantCount ?? 0} style={s.metricNum} delay={400} />
+              <Text style={s.metricLabel}>Agents</Text>
+            </View>
+            <View style={s.metricSep} />
+            <View style={s.metric}>
+              <AnimatedNumber value={ch?.balanceInr ?? 0} prefix="₹" style={s.metricNum} decimals={0} delay={500} />
+              <Text style={s.metricLabel}>Balance</Text>
             </View>
           </LinearGradient>
         </RNAnimated.View>
