@@ -30,6 +30,7 @@ interface AuthStore {
   orgInfo: OrgInfo | null;
   creditsBalance: number;
   isLoadingProfile: boolean;
+  profileError: string | null;
 
   // Actions
   fetchProfile: (userId: string) => Promise<void>;
@@ -45,9 +46,10 @@ export const useAuthStore = create<AuthStore>((set, _get) => ({
   orgInfo: null,
   creditsBalance: 0,
   isLoadingProfile: false,
+  profileError: null,
 
   fetchProfile: async (userId: string) => {
-    set({ isLoadingProfile: true });
+    set({ isLoadingProfile: true, profileError: null });
 
     try {
       // Fetch user profile using user_id column
@@ -59,7 +61,7 @@ export const useAuthStore = create<AuthStore>((set, _get) => ({
 
       if (profileError) {
         if (__DEV__) console.error('[AuthStore] Failed to fetch user profile:', profileError.message);
-        set({ isLoadingProfile: false });
+        set({ isLoadingProfile: false, profileError: profileError.message });
         return;
       }
 
@@ -78,7 +80,9 @@ export const useAuthStore = create<AuthStore>((set, _get) => ({
         set({ profile: null, orgInfo: null, creditsBalance: 0 });
       }
     } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unexpected error fetching profile';
       if (__DEV__) console.error('[AuthStore] Unexpected error fetching profile:', err);
+      set({ profileError: message });
     } finally {
       set({ isLoadingProfile: false });
     }
@@ -94,5 +98,5 @@ export const useAuthStore = create<AuthStore>((set, _get) => ({
   },
 
   clearAuthStore: () =>
-    set({ profile: null, orgInfo: null, creditsBalance: 0, isLoadingProfile: false }),
+    set({ profile: null, orgInfo: null, creditsBalance: 0, isLoadingProfile: false, profileError: null }),
 }));
