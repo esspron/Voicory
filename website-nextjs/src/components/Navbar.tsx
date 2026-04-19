@@ -8,9 +8,10 @@ import { VoicoryLogo } from './VoicoryLogo'
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false)
 
-  const navLinks = [
+  const navLinks: { href: string; label: string; external?: boolean }[] = [
     { href: '#features', label: 'Features' },
     { href: '/pricing', label: 'Pricing' },
+    { href: '/docs', label: 'API Docs' },
   ]
 
   return (
