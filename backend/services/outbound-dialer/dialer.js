@@ -110,6 +110,29 @@ async function dialerLoop(dialerInstance) {
     if (availableSlots <= 0) {
         return; // All slots busy
     }
+
+    // Pre-flight credit check before placing more calls
+    const billing = require('../billing.js');
+    try {
+        const { balance, hasCredits } = await billing.checkBalance(userId);
+        if (!hasCredits) {
+            console.warn(`[dialer] Campaign ${campaignId}: zero credits, auto-pausing`);
+            dialerInstance.isRunning = false;
+            // Update campaign status in DB
+            const { createClient } = require('@supabase/supabase-js');
+            const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+            await supabase.from('campaigns').update({ status: 'paused', paused_reason: 'insufficient_credits' }).eq('id', campaignId);
+            return;
+        }
+        // Warn if balance is getting low (< $2 per available slot)
+        if (balance < availableSlots * 2) {
+            console.warn(`[dialer] Campaign ${campaignId}: low balance $${balance.toFixed(2)} for ${availableSlots} slots`);
+        }
+    } catch (e) {
+        console.error(`[dialer] Campaign ${campaignId}: billing check failed, pausing for safety:`, e.message);
+        dialerInstance.isRunning = false;
+        return;
+    }
     
     // Check daily limit
     const callsToday = await getTodayCallCount(campaignId);

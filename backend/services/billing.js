@@ -34,7 +34,7 @@ async function checkBalance(userId) {
     const { data, error } = await supabase.rpc('check_user_balance', { p_user_id: userId });
     if (error) {
       console.error('[billing] checkBalance RPC error:', error.message);
-      // Fail open — don't block user if DB is temporarily unavailable
+      // Fail closed — don't give away free service if DB is down
       return { balance: 0, hasCredits: false };
     }
     const balance = parseFloat(data?.balance ?? 0);

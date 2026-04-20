@@ -205,6 +205,27 @@ async function deductVoiceCredits(userId, durationSeconds, sessionId, assistantC
             return { success: true, amountDeducted: amount, newBalance };
         }
 
+        // Insert call_costs for P&L tracking
+        const callLogId = assistantConfig.callLogId;
+        if (callLogId) {
+            supabase.from('call_costs').insert({
+                user_id: userId,
+                call_log_id: callLogId,
+                llm_cost: parseFloat(result.breakdown.llm_cost.toFixed(6)),
+                tts_cost: parseFloat(result.breakdown.tts_cost.toFixed(6)),
+                telephony_cost: parseFloat((result.breakdown.stt_cost + result.breakdown.infra_cost).toFixed(6)),
+                total_cost: amount,
+                credits_deducted: amount,
+                breakdown: {
+                    channel: 'livekit', source: 'livekit',
+                    duration_minutes: durationMinutes,
+                    tts_provider: ttsKey, llm_model: llmModel,
+                    rate_per_min: result.ratePerMin,
+                    pricing_source: result.breakdown.pricing_source,
+                },
+            }).catch(e => console.error('[livekit] call_costs insert error:', e.message));
+        }
+
         return { success: true, amountDeducted: amount, newBalance: data, breakdown: result.breakdown };
 
     } catch (error) {

@@ -30,8 +30,11 @@ module.exports = async function billingGuard(req, res, next) {
     req.userBalance = balance;
     return next();
   } catch (err) {
-    // Fail open — don't block on billing system error; log prominently
-    console.error('[billingGuard] Error checking balance (failing open):', err.message);
-    return next();
+    // Fail closed — if we can't verify credits, block the request
+    console.error('[billingGuard] Error checking balance (blocking request):', err.message);
+    return res.status(503).json({
+      error:   'billing_unavailable',
+      message: 'Unable to verify account balance. Please try again in a moment.',
+    });
   }
 };

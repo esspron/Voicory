@@ -1281,6 +1281,15 @@ router.post('/test-call', verifySupabaseAuth, async (req, res) => {
             return res.status(400).json({ error: 'Outbound calls are disabled for this number' });
         }
 
+        // Pre-flight credit check — don't initiate a call if user can't pay for it
+        const { hasCredits } = await billing.checkBalance(req.userId);
+        if (!hasCredits) {
+            return res.status(402).json({
+                error: 'insufficient_credits',
+                message: 'Your credit balance is zero. Please top up to make outbound calls.',
+            });
+        }
+
         // Get decrypted credentials
         const accountSid = phoneData.twilio_account_sid;
         const authToken = decrypt(phoneData.twilio_auth_token);

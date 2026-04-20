@@ -145,6 +145,20 @@ router.get('/campaigns/:id/stats', verifySupabaseAuth, async (req, res) => {
  */
 router.post('/campaigns/:id/start', verifySupabaseAuth, async (req, res) => {
     try {
+        // Pre-flight credit check — campaigns burn credits fast
+        const billing = require('../services/billing');
+        const { balance, hasCredits } = await billing.checkBalance(req.userId);
+        if (!hasCredits) {
+            return res.status(402).json({
+                error: 'insufficient_credits',
+                message: 'Your credit balance is zero. Please top up before starting a campaign.',
+            });
+        }
+        // Warn if balance is low (less than $5 — a campaign can burn through credits quickly)
+        if (balance < 5) {
+            console.warn(`[billing] Campaign start with low balance: user=${req.userId} balance=$${balance.toFixed(2)}`);
+        }
+
         // First update campaign status
         const campaign = await startCampaign(req.userId, req.params.id);
         
@@ -187,6 +201,16 @@ router.post('/campaigns/:id/pause', verifySupabaseAuth, async (req, res) => {
  */
 router.post('/campaigns/:id/resume', verifySupabaseAuth, async (req, res) => {
     try {
+        // Pre-flight credit check
+        const billing = require('../services/billing');
+        const { hasCredits } = await billing.checkBalance(req.userId);
+        if (!hasCredits) {
+            return res.status(402).json({
+                error: 'insufficient_credits',
+                message: 'Your credit balance is zero. Please top up before resuming.',
+            });
+        }
+
         // Update campaign status
         const campaign = await resumeCampaign(req.userId, req.params.id);
         

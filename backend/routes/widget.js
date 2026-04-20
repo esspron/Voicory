@@ -303,7 +303,18 @@ router.post('/message', validateApiKey, validateDomain, rateLimit(120, 60000), a
         code: 'MISSING_REQUIRED_FIELDS',
       });
     }
-    
+
+    // Pre-flight credit check
+    const billing = require('../services/billing');
+    const { hasCredits } = await billing.checkBalance(req.userId);
+    if (!hasCredits) {
+      return res.status(402).json({
+        error: 'insufficient_credits',
+        message: 'Service temporarily unavailable. Please contact the business.',
+        code: 'INSUFFICIENT_CREDITS',
+      });
+    }
+
     // Get assistant
     const { data: assistant, error: assistantError } = await supabase
       .from('assistants')
@@ -404,9 +415,21 @@ router.post('/message', validateApiKey, validateDomain, rateLimit(120, 60000), a
         .eq('id', sessionId);
     }
     
-    // Track usage for billing
+    // Track usage for billing — deduct actual LLM cost
     const tokensUsed = completion.usage?.total_tokens || 0;
+    const inputTokens = completion.usage?.prompt_tokens || 0;
+    const outputTokens = completion.usage?.completion_tokens || 0;
     await trackWidgetUsage(req.userId, assistantId, sessionId, tokensUsed);
+
+    // Deduct credits via central billing
+    const billing = require('../services/billing');
+    billing.deductMessageCost(req.userId, {
+      model: assistant.llm_model || 'gpt-4o-mini',
+      inputTokens,
+      outputTokens,
+      assistantId,
+      channel: 'widget',
+    }).catch(e => console.error('[billing] Widget deductMessageCost error:', e.message));
     
     res.json({
       messageId: uuidv4(),
