@@ -20,10 +20,8 @@ import { getUsageSummary, getCreditTransactions, checkBalance, CreditTransaction
 import { 
     Coupon, 
     PaymentResult, 
-    getBillingStatus, 
-    BillingStatus,
-    initializePaddle
-} from '../../services/paddleService';
+} from '../../services/razorpayService';
+import { getBillingStatus, BillingStatus } from '../../services/paddleService';
 import { getAutoReloadSettings, updateAutoReloadSettings, AutoReloadSettings } from '../../services/paymentService';
 import { getUserProfile } from '../../services/voicoryService';
 import { UserProfile } from '../../types';
@@ -102,7 +100,7 @@ const BillingAndAddons: React.FC = () => {
             }
             try {
                 // Initialize Paddle in background — don't block data load
-                initializePaddle().catch(e => console.warn('Paddle init failed (non-critical):', e));
+                // Razorpay script loaded on-demand in BuyCreditsModal
 
                 const [profile, summary, txns, billingStatusResult, addons, addonHistory, reloadSettings] = await Promise.all([
                     getUserProfile(),

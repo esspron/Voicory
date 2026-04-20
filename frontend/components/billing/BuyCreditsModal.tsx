@@ -2,16 +2,17 @@ import { X, Lightning, Check, CircleNotch, Warning, CreditCard, Plus, Minus } fr
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 
-import { 
-    openPaddleCheckout,
-    initializePaddle,
+import {
+    openRazorpayCheckout,
+    loadRazorpayScript,
     PaymentResult,
     validateCoupon,
     applyDiscount,
     Coupon,
     PRICING_CONFIG,
-    QUICK_AMOUNTS
-} from '../../services/paddleService';
+    QUICK_AMOUNTS_USD,
+    QUICK_AMOUNTS_INR,
+} from '../../services/razorpayService';
 import { useCurrency } from '../../contexts/CurrencyContext';
 
 interface BuyCreditsModalProps {
@@ -28,43 +29,43 @@ const BuyCreditsModal: React.FC<BuyCreditsModalProps> = ({
     currentBalance,
 }) => {
     const [step, setStep] = useState<'amount' | 'processing' | 'success' | 'failed'>('amount');
-    const [amount, setAmount] = useState<string>('20');
+    const [amount, setAmount] = useState<string>('');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [paymentResult, setPaymentResult] = useState<PaymentResult | null>(null);
-    const [paddleReady, setPaddleReady] = useState(false);
-    const { currency, currencySymbol, formatAmount, isIndia } = useCurrency();
-    
+    const [razorpayReady, setRazorpayReady] = useState(false);
+    const { currency, currencySymbol, formatAmount, isIndia, usdInrRate } = useCurrency();
+
     // Coupon state
     const [couponCode, setCouponCode] = useState('');
     const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
     const [couponLoading, setCouponLoading] = useState(false);
     const [couponError, setCouponError] = useState<string | null>(null);
 
-    // Initialize Paddle on mount
+    const quickAmounts = isIndia ? QUICK_AMOUNTS_INR : QUICK_AMOUNTS_USD;
+    const defaultAmount = isIndia ? '1000' : '25';
+
+    // Load Razorpay script on mount
     useEffect(() => {
-        const init = async () => {
-            const ready = await initializePaddle();
-            setPaddleReady(ready);
-        };
-        init();
+        loadRazorpayScript().then(setRazorpayReady);
     }, []);
 
-    // Reset state when modal closes
+    // Reset state when modal opens/closes
     useEffect(() => {
         if (!isOpen) {
             setStep('amount');
-            setAmount('20');
+            setAmount('');
             setError(null);
             setPaymentResult(null);
             setCouponCode('');
             setAppliedCoupon(null);
             setCouponError(null);
+        } else {
+            setAmount(defaultAmount);
         }
-    }, [isOpen]);
+    }, [isOpen, defaultAmount]);
 
     const handleAmountChange = (value: string) => {
-        // Only allow whole numbers for dynamic pricing
         const sanitized = value.replace(/[^0-9]/g, '');
         setAmount(sanitized);
         setError(null);
@@ -77,73 +78,66 @@ const BuyCreditsModal: React.FC<BuyCreditsModalProps> = ({
 
     const incrementAmount = () => {
         const current = parseInt(amount) || 0;
-        setAmount((current + 10).toString());
+        const step = isIndia ? 500 : 10;
+        setAmount((current + step).toString());
     };
 
     const decrementAmount = () => {
         const current = parseInt(amount) || 0;
-        if (current > PRICING_CONFIG.minAmount) {
-            setAmount((current - 10).toString());
-        }
+        const step = isIndia ? 500 : 10;
+        const min = isIndia ? PRICING_CONFIG.minAmountInr : PRICING_CONFIG.minAmountUsd;
+        if (current > min) setAmount((current - step).toString());
     };
 
     const handleApplyCoupon = async () => {
         if (!couponCode.trim()) return;
-        
         setCouponLoading(true);
         setCouponError(null);
-        
         const coupon = await validateCoupon(couponCode);
-        
-        if (coupon) {
-            setAppliedCoupon(coupon);
-        } else {
-            setCouponError('Invalid or expired coupon code');
-        }
-        
+        if (coupon) setAppliedCoupon(coupon);
+        else setCouponError('Invalid or expired coupon code');
         setCouponLoading(false);
     };
 
-    const getFinalAmount = (): number => {
-        const baseAmount = parseInt(amount) || 0;
-        if (!appliedCoupon) return baseAmount;
-        return applyDiscount(baseAmount, appliedCoupon);
+    const getCreditsToAdd = (): number => {
+        const num = parseInt(amount) || 0;
+        if (isIndia) {
+            // INR → USD credits at live rate
+            return Math.round((num / usdInrRate) * 100) / 100;
+        }
+        return num; // USD = credits
     };
 
-    const getCreditsToAdd = (): number => {
-        // $1 = 1 credit
-        return parseInt(amount) || 0;
+    const getFinalDisplayAmount = (): number => {
+        const num = parseInt(amount) || 0;
+        if (!appliedCoupon) return num;
+        return applyDiscount(num, appliedCoupon);
     };
 
     const handleProceedToPayment = async () => {
         const numAmount = parseInt(amount);
-        
-        if (!numAmount || numAmount < PRICING_CONFIG.minAmount) {
-            setError(`Minimum amount is $${PRICING_CONFIG.minAmount}`);
-            return;
-        }
+        const min = isIndia ? PRICING_CONFIG.minAmountInr : PRICING_CONFIG.minAmountUsd;
+        const max = isIndia ? PRICING_CONFIG.maxAmountInr : PRICING_CONFIG.maxAmountUsd;
 
-        if (numAmount > PRICING_CONFIG.maxAmount) {
-            setError(`Maximum amount is $${PRICING_CONFIG.maxAmount}. Contact sales for larger amounts.`);
+        if (!numAmount || numAmount < min) {
+            setError(`Minimum amount is ${currencySymbol}${min.toLocaleString(isIndia ? 'en-IN' : 'en-US')}`);
             return;
         }
-
-        if (!Number.isInteger(numAmount)) {
-            setError('Amount must be a whole number');
+        if (numAmount > max) {
+            setError(`Maximum amount is ${currencySymbol}${max.toLocaleString(isIndia ? 'en-IN' : 'en-US')}. Contact sales for larger amounts.`);
             return;
         }
-        
-        if (!paddleReady) {
+        if (!razorpayReady) {
             setError('Payment system is initializing. Please try again.');
             return;
         }
-        
+
         setIsLoading(true);
         setError(null);
 
-        // Open Paddle checkout with dynamic amount
-        await openPaddleCheckout(
-            numAmount, // Just pass the amount - backend handles quantity
+        await openRazorpayCheckout(
+            numAmount,
+            isIndia ? 'INR' : 'USD',
             (result) => {
                 setPaymentResult(result);
                 setStep('success');
@@ -156,7 +150,6 @@ const BuyCreditsModal: React.FC<BuyCreditsModalProps> = ({
                 setIsLoading(false);
             },
             () => {
-                // User closed checkout without completing
                 setIsLoading(false);
             }
         );
@@ -167,16 +160,13 @@ const BuyCreditsModal: React.FC<BuyCreditsModalProps> = ({
     return createPortal(
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
             {/* Backdrop */}
-            <div 
-                className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-                onClick={onClose}
-            />
-            
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+
             {/* Modal */}
             <div className="relative bg-surface border border-white/10 rounded-2xl w-full max-w-md max-h-[90vh] overflow-hidden shadow-2xl">
                 {/* Ambient glow */}
                 <div className="absolute -top-20 -right-20 w-40 h-40 bg-primary/10 blur-3xl pointer-events-none" />
-                
+
                 {/* Header */}
                 <div className="relative flex items-center justify-between p-6 border-b border-white/5">
                     <div className="flex items-center gap-3">
@@ -190,17 +180,14 @@ const BuyCreditsModal: React.FC<BuyCreditsModalProps> = ({
                             </p>
                         </div>
                     </div>
-                    <button 
-                        onClick={onClose}
-                        className="p-2 hover:bg-white/5 rounded-lg transition-colors"
-                    >
+                    <button onClick={onClose} className="p-2 hover:bg-white/5 rounded-lg transition-colors">
                         <X size={20} className="text-textMuted" />
                     </button>
                 </div>
 
                 {/* Content */}
                 <div className="relative p-6">
-                    {/* Error Message */}
+                    {/* Error */}
                     {error && (
                         <div className="mb-4 p-4 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center gap-3">
                             <Warning size={20} weight="fill" className="text-red-400 flex-shrink-0" />
@@ -208,8 +195,8 @@ const BuyCreditsModal: React.FC<BuyCreditsModalProps> = ({
                         </div>
                     )}
 
-                    {/* Paddle not ready warning */}
-                    {!paddleReady && step === 'amount' && (
+                    {/* Razorpay not ready */}
+                    {!razorpayReady && step === 'amount' && (
                         <div className="mb-4 p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center gap-3">
                             <CircleNotch size={20} className="text-amber-400 animate-spin" />
                             <p className="text-sm text-amber-400">Initializing payment system...</p>
@@ -222,7 +209,7 @@ const BuyCreditsModal: React.FC<BuyCreditsModalProps> = ({
                             {/* Amount Input */}
                             <div>
                                 <label className="block text-sm font-medium text-textMuted mb-3">
-                                    Enter amount (USD)
+                                    Enter amount ({isIndia ? 'INR' : 'USD'})
                                 </label>
                                 <div className="flex items-center gap-2">
                                     <button
@@ -232,7 +219,9 @@ const BuyCreditsModal: React.FC<BuyCreditsModalProps> = ({
                                         <Minus size={20} className="text-textMuted" />
                                     </button>
                                     <div className="flex-1 relative">
-                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-bold text-primary">$</span>
+                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-bold text-primary">
+                                            {currencySymbol}
+                                        </span>
                                         <input
                                             type="text"
                                             value={amount}
@@ -249,7 +238,9 @@ const BuyCreditsModal: React.FC<BuyCreditsModalProps> = ({
                                     </button>
                                 </div>
                                 <p className="text-xs text-textMuted mt-2 text-center">
-                                    {isIndia ? '₹84 = 1 credit • Min ₹1,500 • Max ₹8,40,000' : '$1 = 1 credit • Min $20 • Max $10,000'}
+                                    {isIndia
+                                        ? `₹${usdInrRate.toFixed(1)} = 1 credit • Min ₹${PRICING_CONFIG.minAmountInr.toLocaleString('en-IN')}`
+                                        : `$1 = 1 credit • Min $${PRICING_CONFIG.minAmountUsd}`}
                                 </p>
                             </div>
 
@@ -257,17 +248,17 @@ const BuyCreditsModal: React.FC<BuyCreditsModalProps> = ({
                             <div>
                                 <label className="block text-xs font-medium text-textMuted mb-2">Quick add</label>
                                 <div className="flex gap-2">
-                                    {QUICK_AMOUNTS.map((quickAmount) => (
+                                    {quickAmounts.map((qa) => (
                                         <button
-                                            key={quickAmount}
-                                            onClick={() => handleQuickAmount(quickAmount)}
+                                            key={qa}
+                                            onClick={() => handleQuickAmount(qa)}
                                             className={`flex-1 py-2.5 text-sm font-semibold rounded-xl border transition-all ${
-                                                parseFloat(amount) === quickAmount
+                                                parseInt(amount) === qa
                                                     ? 'bg-primary/10 border-primary/30 text-primary'
                                                     : 'bg-white/[0.02] border-white/5 text-textMuted hover:bg-white/[0.05] hover:border-white/10'
                                             }`}
                                         >
-                                            {isIndia ? `₹${Math.round(quickAmount * 84).toLocaleString('en-IN')}` : `$${quickAmount}`}
+                                            {isIndia ? `₹${qa.toLocaleString('en-IN')}` : `$${qa}`}
                                         </button>
                                     ))}
                                 </div>
@@ -292,18 +283,13 @@ const BuyCreditsModal: React.FC<BuyCreditsModalProps> = ({
                                         {couponLoading ? <CircleNotch size={16} className="animate-spin" /> : 'Apply'}
                                     </button>
                                 </div>
-                                {couponError && (
-                                    <p className="text-xs text-red-400 mt-1">{couponError}</p>
-                                )}
+                                {couponError && <p className="text-xs text-red-400 mt-1">{couponError}</p>}
                                 {appliedCoupon && (
                                     <div className="mt-2 p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg flex items-center justify-between">
                                         <span className="text-xs text-emerald-400">
                                             Coupon applied: {appliedCoupon.discountPercent}% off
                                         </span>
-                                        <button 
-                                            onClick={() => setAppliedCoupon(null)}
-                                            className="text-xs text-textMuted hover:text-textMain"
-                                        >
+                                        <button onClick={() => setAppliedCoupon(null)} className="text-xs text-textMuted hover:text-textMain">
                                             Remove
                                         </button>
                                     </div>
@@ -314,27 +300,33 @@ const BuyCreditsModal: React.FC<BuyCreditsModalProps> = ({
                             <div className="p-4 bg-white/[0.02] border border-white/5 rounded-xl space-y-2">
                                 <div className="flex justify-between text-sm">
                                     <span className="text-textMuted">Amount</span>
-                                    <span className="text-textMain">${parseFloat(amount) || 0}</span>
+                                    <span className="text-textMain">{currencySymbol}{parseInt(amount) || 0}</span>
                                 </div>
+                                {isIndia && (
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-textMuted">Rate</span>
+                                        <span className="text-textMuted">₹{usdInrRate.toFixed(2)}/USD</span>
+                                    </div>
+                                )}
                                 {appliedCoupon && (
                                     <div className="flex justify-between text-sm">
                                         <span className="text-emerald-400">Discount ({appliedCoupon.discountPercent}%)</span>
                                         <span className="text-emerald-400">
-                                            -${((parseFloat(amount) || 0) - getFinalAmount()).toFixed(2)}
+                                            -{currencySymbol}{((parseInt(amount) || 0) - getFinalDisplayAmount()).toFixed(0)}
                                         </span>
                                     </div>
                                 )}
                                 <div className="flex justify-between text-sm pt-2 border-t border-white/5">
                                     <span className="text-textMain font-medium">Credits to add</span>
-                                    <span className="text-primary font-bold">{getCreditsToAdd()} credits</span>
+                                    <span className="text-primary font-bold">{getCreditsToAdd().toFixed(2)} credits</span>
                                 </div>
                             </div>
 
-                            {/* Payment Security Note */}
+                            {/* Payment Security */}
                             <div className="flex items-center gap-3 p-3 bg-white/[0.02] border border-white/5 rounded-xl">
                                 <CreditCard size={20} className="text-primary flex-shrink-0" />
                                 <p className="text-xs text-textMuted">
-                                    Secure payment via Paddle. All major cards accepted.
+                                    Secure payment via Razorpay. UPI, cards, net banking accepted.
                                 </p>
                             </div>
                         </div>
@@ -348,16 +340,13 @@ const BuyCreditsModal: React.FC<BuyCreditsModalProps> = ({
                             </div>
                             <h3 className="text-xl font-bold text-textMain mb-2">Payment Successful!</h3>
                             <p className="text-textMuted mb-6">
-                                ${paymentResult.credits?.toFixed(2)} has been added to your account.
-                            </p>
-                            <p className="text-sm text-textMuted/70 mb-4">
-                                Your balance will be updated in a few seconds.
+                                {paymentResult.credits?.toFixed(2)} credits have been added to your account.
                             </p>
                             {paymentResult.newBalance !== undefined && (
                                 <div className="p-4 bg-white/[0.02] border border-white/5 rounded-xl inline-block">
                                     <div className="text-sm text-textMuted mb-1">New Balance</div>
                                     <div className="text-2xl font-bold text-primary">
-                                        ${paymentResult.newBalance.toFixed(2)}
+                                        {formatAmount(paymentResult.newBalance)}
                                     </div>
                                 </div>
                             )}
@@ -374,9 +363,6 @@ const BuyCreditsModal: React.FC<BuyCreditsModalProps> = ({
                             <p className="text-textMuted mb-4">
                                 {error || 'Something went wrong with your payment.'}
                             </p>
-                            <p className="text-sm text-textMuted/70">
-                                Please try again or contact support if the issue persists.
-                            </p>
                         </div>
                     )}
                 </div>
@@ -386,48 +372,33 @@ const BuyCreditsModal: React.FC<BuyCreditsModalProps> = ({
                     {step === 'amount' && (
                         <button
                             onClick={handleProceedToPayment}
-                            disabled={!parseFloat(amount) || parseFloat(amount) < 1 || isLoading || !paddleReady}
+                            disabled={!parseInt(amount) || isLoading || !razorpayReady}
                             className="w-full px-6 py-3 bg-gradient-to-r from-primary to-primary/80 text-black font-semibold rounded-xl hover:shadow-lg hover:shadow-primary/25 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                         >
                             {isLoading ? (
-                                <>
-                                    <CircleNotch size={20} className="animate-spin" />
-                                    Processing...
-                                </>
+                                <><CircleNotch size={20} className="animate-spin" /> Processing...</>
                             ) : (
-                                <>
-                                    Add ${getFinalAmount().toFixed(2)}
-                                </>
+                                <>Pay {currencySymbol}{getFinalDisplayAmount().toLocaleString(isIndia ? 'en-IN' : 'en-US')}</>
                             )}
                         </button>
                     )}
-
                     {step === 'success' && (
                         <button
-                            onClick={() => {
-                                onClose();
-                                // Refresh the page to show updated balance
-                                window.location.reload();
-                            }}
+                            onClick={() => { onClose(); window.location.reload(); }}
                             className="w-full px-6 py-3 bg-gradient-to-r from-primary to-primary/80 text-black font-semibold rounded-xl hover:shadow-lg hover:shadow-primary/25 transition-all"
                         >
                             Done
                         </button>
                     )}
-
                     {step === 'failed' && (
                         <div className="flex gap-3">
                             <button
-                                onClick={() => {
-                                    setStep('amount');
-                                    setError(null);
-                                }}
+                                onClick={() => { setStep('amount'); setError(null); }}
                                 className="flex-1 px-6 py-3 bg-surface border border-white/10 text-textMain font-semibold rounded-xl hover:bg-surfaceHover transition-colors"
                             >
                                 Try Again
                             </button>
-                            <button
-                                onClick={onClose}
+                            <button onClick={onClose}
                                 className="flex-1 px-6 py-3 bg-white/5 border border-white/10 text-textMuted font-semibold rounded-xl hover:bg-white/10 transition-colors"
                             >
                                 Close

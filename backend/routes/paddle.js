@@ -206,10 +206,20 @@ router.get('/billing-status', verifySupabaseAuth, async (req, res) => {
         // Cache the result for 60 seconds
         await cacheSet(cacheKey, payload, CREDITS_CACHE_TTL);
 
+        // Fetch live forex rate (non-blocking — don't fail billing-status if forex breaks)
+        let usdInrRate = 85;
+        try {
+            const { getUsdInrRate } = require('../services/forex');
+            usdInrRate = await getUsdInrRate();
+        } catch (e) {
+            console.warn('[billing-status] forex rate fetch failed:', e.message);
+        }
+
         res.json({
             success: true,
             billingMode: 'prepaid',
-            ...payload
+            ...payload,
+            forex: { usdInr: usdInrRate }
         });
 
     } catch (error) {
@@ -860,6 +870,20 @@ router.post('/pricing/invalidate-cache', async (req, res) => {
     }
     await rateEngine.invalidateCache(redis);
     res.json({ ok: true, message: 'Pricing cache cleared — next request will reload from DB' });
+});
+
+// ============================================
+// GET /api/paddle/forex
+// Returns live USD/INR rate (public, cached 15min)
+// ============================================
+router.get('/forex', async (_req, res) => {
+    try {
+        const { getUsdInrRate } = require('../services/forex');
+        const rate = await getUsdInrRate();
+        res.json({ success: true, usdInr: rate, cachedFor: '15m' });
+    } catch (error) {
+        res.status(500).json({ success: false, error: 'Forex service unavailable', fallback: 85 });
+    }
 });
 
 module.exports = router;

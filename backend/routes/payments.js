@@ -263,8 +263,14 @@ router.post('/stripe', express.raw({ type: 'application/json' }), async (req, re
 });
 
 /**
- * Create Razorpay Order
+ * Create Razorpay Order — Dynamic Pricing with Live Forex
  * POST /api/payments/razorpay/create-order
+ *
+ * Accepts EITHER:
+ *   { amountUsd: 50 }          ← USD amount, converted to INR at live rate
+ *   { amountInr: 4200 }        ← Direct INR amount, converted to USD credits at live rate
+ *   { packageId: 'starter' }   ← Legacy fixed packages
+ *
  * PROTECTED: Requires valid Supabase JWT token
  */
 router.post('/razorpay/create-order', verifySupabaseAuth, async (req, res) => {
@@ -273,29 +279,56 @@ router.post('/razorpay/create-order', verifySupabaseAuth, async (req, res) => {
             return res.status(503).json({ error: 'Razorpay not configured' });
         }
 
-        // SECURITY: Use authenticated user ID
         const userId = req.userId;
-        const { packageId, amount, credits } = req.body;
+        const { packageId, amountUsd, amountInr } = req.body;
+        const { getUsdInrRate, convertUsdToInr, convertInrToUsd } = require('../services/forex');
 
-        if (!packageId || !amount) {
-            return res.status(400).json({ error: 'Package ID and amount are required' });
-        }
+        let amountPaise, creditsToAdd, amountInrFinal, rateUsed;
 
-        // Validate package
-        const pkg = CREDIT_PACKAGES[packageId];
-        if (!pkg) {
-            return res.status(400).json({ error: 'Invalid package' });
+        if (packageId && CREDIT_PACKAGES[packageId]) {
+            // Legacy package flow
+            const pkg = CREDIT_PACKAGES[packageId];
+            amountPaise = pkg.priceINR * 100;
+            creditsToAdd = pkg.credits;
+            amountInrFinal = pkg.priceINR;
+            rateUsed = pkg.priceINR / (pkg.priceUSD || 1);
+        } else if (amountUsd) {
+            // Dynamic USD → INR conversion
+            const numUsd = parseFloat(amountUsd);
+            if (!numUsd || numUsd < 1 || numUsd > 10000) {
+                return res.status(400).json({ error: 'Amount must be between $1 and $10,000' });
+            }
+            const conv = await convertUsdToInr(numUsd);
+            amountInrFinal = Math.ceil(conv.inr); // Round up to nearest rupee
+            amountPaise = amountInrFinal * 100;
+            creditsToAdd = numUsd; // $1 = 1 credit
+            rateUsed = conv.rate;
+        } else if (amountInr) {
+            // Direct INR → calculate USD credits
+            const numInr = parseFloat(amountInr);
+            if (!numInr || numInr < 100 || numInr > 1000000) {
+                return res.status(400).json({ error: 'Amount must be between ₹100 and ₹10,00,000' });
+            }
+            const conv = await convertInrToUsd(numInr);
+            amountInrFinal = Math.ceil(numInr);
+            amountPaise = amountInrFinal * 100;
+            creditsToAdd = Math.round(conv.usd * 100) / 100; // Round to 2 decimal places
+            rateUsed = conv.rate;
+        } else {
+            return res.status(400).json({ error: 'Provide amountUsd, amountInr, or packageId' });
         }
 
         // Create Razorpay order
         const order = await razorpay.orders.create({
-            amount: amount, // Amount in paise
+            amount: amountPaise,
             currency: 'INR',
-            receipt: `credit_${packageId}_${Date.now()}`,
+            receipt: `credit_${Date.now()}_${userId.slice(0, 8)}`,
+            payment_capture: true,
             notes: {
                 userId,
-                packageId,
-                credits: pkg.credits.toString()
+                credits: creditsToAdd.toString(),
+                rateUsed: rateUsed.toString(),
+                amountInr: amountInrFinal.toString(),
             }
         });
 
@@ -306,19 +339,21 @@ router.post('/razorpay/create-order', verifySupabaseAuth, async (req, res) => {
                 user_id: userId,
                 provider: 'razorpay',
                 provider_transaction_id: order.id,
-                amount: amount / 100, // Convert paise to rupees
+                amount: amountInrFinal,
                 currency: 'INR',
-                credits: pkg.credits,
+                credits: creditsToAdd,
                 status: 'pending',
-                metadata: { packageId }
+                metadata: { rateUsed, amountInr: amountInrFinal, creditsToAdd }
             });
-
-        console.log('Created Razorpay order:', order.id);
 
         res.json({
             orderId: order.id,
             amount: order.amount,
-            currency: order.currency
+            amountInr: amountInrFinal,
+            currency: 'INR',
+            credits: creditsToAdd,
+            rateUsed,
+            keyId: process.env.RAZORPAY_KEY_ID,
         });
 
     } catch (error) {
@@ -374,9 +409,10 @@ router.post('/razorpay/verify', verifySupabaseAuth, async (req, res) => {
             });
         }
 
-        // Fetch order details to get credits
+        // Fetch order details to get credits and rate
         const order = await razorpay.orders.fetch(orderId);
-        const actualCredits = parseInt(order.notes?.credits) || credits || 0;
+        const actualCredits = parseFloat(order.notes?.credits) || credits || 0;
+        const rateUsed = parseFloat(order.notes?.rateUsed) || 85;
 
         // Add credits to user
         const { data: creditResult, error: creditError } = await supabase.rpc('add_credits', {
@@ -384,7 +420,7 @@ router.post('/razorpay/verify', verifySupabaseAuth, async (req, res) => {
             p_amount: actualCredits,
             p_transaction_type: 'purchase',
             p_reference_id: paymentId,
-            p_description: `Credit purchase via Razorpay - ${actualCredits} credits`
+            p_description: `Credit purchase via Razorpay - ${actualCredits} credits @ ₹${rateUsed}/USD`
         });
 
         if (creditError) {
