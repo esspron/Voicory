@@ -13,6 +13,7 @@ const OpenAI = require('openai');
 
 // Use shared config
 const { supabase } = require('../config');
+const billing = require('../services/billing');
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -305,7 +306,6 @@ router.post('/message', validateApiKey, validateDomain, rateLimit(120, 60000), a
     }
 
     // Pre-flight credit check
-    const billing = require('../services/billing');
     const { hasCredits } = await billing.checkBalance(req.userId);
     if (!hasCredits) {
       return res.status(402).json({
@@ -422,7 +422,6 @@ router.post('/message', validateApiKey, validateDomain, rateLimit(120, 60000), a
     await trackWidgetUsage(req.userId, assistantId, sessionId, tokensUsed);
 
     // Deduct credits via central billing
-    const billing = require('../services/billing');
     billing.deductMessageCost(req.userId, {
       model: assistant.llm_model || 'gpt-4o-mini',
       inputTokens,
